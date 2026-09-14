@@ -24,7 +24,4 @@ public class RegularShiftPattern extends BaseEntity {
 
     @Column(nullable = false)
     private LocalTime endTime;
-
-    @Column(nullable = false)
-    private String status;
 }
