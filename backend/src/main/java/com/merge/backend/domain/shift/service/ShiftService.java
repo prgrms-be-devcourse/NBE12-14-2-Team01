@@ -1,18 +1,18 @@
-package com.merge.backend.domain.shift.service;
-
-import com.merge.backend.domain.shift.controller.ShiftController.RegularShiftPatternDto;
-import com.merge.backend.domain.shift.entity.Shift;
-import java.time.DayOfWeek;
-import java.time.LocalDateTime;
-import org.springframework.stereotype.Service;
-
-@Service
-public class ShiftService {
-
-//    public Shift create(RegularShiftPatternDto reqBody, int scheduleId) {
-//        LocalDateTime startAt = parseDayOfWeek(reqBody.)
+//package com.merge.backend.domain.shift.service;
+//
+//import com.merge.backend.domain.shift.entity.RegularShiftPattern;
+//import com.merge.backend.domain.shift.entity.Shift;
+//import java.time.DayOfWeek;
+//import java.time.LocalDateTime;
+//import org.springframework.stereotype.Service;
+//
+//@Service
+//public class ShiftService {
+//
+//    public Shift create(RegularShiftPattern reqBody, int scheduleId) {
+//        LocalDateTime startAt = parseDayOfWeek(String.valueOf(reqBody.getDayOfWeek()));
 //    }
-
+//
 //    // 한글 요일을 DayOfWeek Enum으로 변환
 //    private LocalDateTime parseDayOfWeek(String dayOfWeekStr) {
 //        DayOfWeek targetDay = switch (dayOfWeekStr) {
@@ -26,5 +26,6 @@ public class ShiftService {
 //            default -> throw new IllegalArgumentException("유효하지 않은 요일입니다: " + dayOfWeekStr);
 //        };
 //
+//        return
 //    }
-}
+//}

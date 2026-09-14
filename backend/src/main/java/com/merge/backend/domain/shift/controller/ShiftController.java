@@ -1,5 +1,6 @@
 package com.merge.backend.domain.shift.controller;
 
+import com.merge.backend.domain.shift.entity.RegularShiftPattern;
 import com.merge.backend.domain.shift.entity.Shift;
 import com.merge.backend.domain.shift.service.ShiftService;
 import java.time.LocalTime;
@@ -18,26 +19,14 @@ public class ShiftController {
 
     private final ShiftService shiftService;
 
-//    @PostMapping
-//    public ResponseEntity<?> create(
-//        @RequestBody RegularShiftPatternDto reqBody,
-//        @RequestParam int scheduleId
-//    ){
-//        Shift shift = shiftService.create(reqBody, scheduleId);
-//
-//        return ResponseEntity.ok();
-//    }
-
-    public record RegularShiftPatternDto (
-        String memberId,
-
-        String dayOfWeek,
-
-        LocalTime startTime,
-
-        LocalTime endTime,
-
-        String status
+    @PostMapping
+    public ResponseEntity<?> create(
+        @RequestBody RegularShiftPattern reqBody,
+        @RequestParam int scheduleId
     ){
+        Shift shift = shiftService.create(reqBody, scheduleId);
+
+        return ResponseEntity.status(201).body(ApiRe);
     }
+
 }
