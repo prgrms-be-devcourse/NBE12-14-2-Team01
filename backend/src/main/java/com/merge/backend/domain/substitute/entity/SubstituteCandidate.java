@@ -1,4 +1,4 @@
-package com.merge.backend.domain.shift.entity;
+package com.merge.backend.domain.substitute.entity;
 
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.global.entity.BaseEntity;
@@ -10,23 +10,24 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor
-public class Shift extends BaseEntity {
+@Table(
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = {"request_id", "member_id"})
+        }
+)
+public class SubstituteCandidate extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "schedule_id", nullable = false)
-    private Schedule schedule;
+    @JoinColumn(name = "request_id", nullable = false)
+    private SubstituteRequest request;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "member_id", nullable = false)
     private WorkplaceMember member;
 
-    @Column(nullable = false)
-    private LocalDateTime startAt;
-
-    @Column(nullable = false)
-    private LocalDateTime endAt;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private ShiftStatus status;
+    private CandidateStatus status;
+
+    private LocalDateTime respondedAt;
 }
