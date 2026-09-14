@@ -1,6 +1,7 @@
 package com.merge.backend.domain.user.controller;
 
 import com.merge.backend.domain.user.dto.SignupRequest;
+import com.merge.backend.domain.user.dto.UserResponse;
 import com.merge.backend.domain.user.entity.User;
 import com.merge.backend.domain.user.service.UserService;
 import com.merge.backend.global.dto.ApiResponse;
@@ -21,12 +22,14 @@ public class ApiV1UserController {
     private final UserService userService;
 
     @PostMapping
-    public ResponseEntity<ApiResponse<User>> signup(@Valid @RequestBody SignupRequest request) {
+    public ResponseEntity<ApiResponse<UserResponse>> signup(@Valid @RequestBody SignupRequest request) {
         User user = userService.join(request.email(), request.password(), request.name());
+
+        UserResponse response = new UserResponse(user.getId(), user.getEmail(), user.getName());
 
         return ResponseEntity
             .status(HttpStatus.CREATED)
-            .body(ApiResponse.success("201", user));
+            .body(ApiResponse.success("201", response));
     }
 
 }
