@@ -11,9 +11,9 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor
 @Table(
-        uniqueConstraints = {
-                @UniqueConstraint(columnNames = {"workplace_id", "user_id"})
-        }
+    uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"workplace_id", "user_id"})
+    }
 )
 public class WorkplaceMember extends BaseEntity {
 

@@ -11,9 +11,9 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor
 @Table(
-        uniqueConstraints = {
-                @UniqueConstraint(columnNames = {"request_id", "member_id"})
-        }
+    uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"request_id", "member_id"})
+    }
 )
 public class SubstituteCandidate extends BaseEntity {
 

@@ -12,9 +12,9 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor
 @Table(
-        uniqueConstraints = {
-                @UniqueConstraint(columnNames = {"workplace_id", "week_start_date"})
-        }
+    uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"workplace_id", "week_start_date"})
+    }
 )
 public class Schedule extends BaseEntity {
 
