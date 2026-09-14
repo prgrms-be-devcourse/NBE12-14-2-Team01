@@ -25,8 +25,9 @@ public class Schedule extends BaseEntity {
     @Column(name = "week_start_date", nullable = false)
     private LocalDate weekStartDate;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String status;
+    private ScheduleStatus status;
 
     private LocalDateTime publishedAt;
 }

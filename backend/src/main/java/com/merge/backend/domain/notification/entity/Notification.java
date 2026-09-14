@@ -16,8 +16,9 @@ public class Notification extends BaseEntity {
     @JoinColumn(name = "recipient_member_id", nullable = false)
     private WorkplaceMember recipientMember;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String type;
+    private NotificationType type;
 
     @Column(nullable = false)
     private String message;

@@ -21,8 +21,9 @@ public class SubstituteRequest extends BaseEntity {
     @JoinColumn(name = "requester_member_id", nullable = false)
     private WorkplaceMember requesterMember;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String status;
+    private RequestStatus status;
 
     private LocalDateTime approvedAt;
 

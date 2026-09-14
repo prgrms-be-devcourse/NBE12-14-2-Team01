@@ -26,6 +26,7 @@ public class Shift extends BaseEntity {
     @Column(nullable = false)
     private LocalDateTime endAt;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String status;
+    private ShiftStatus status;
 }
