@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 public class Shift extends BaseEntity {
 
     @Column(nullable = false)
-    int scheduledId;
+    int scheduleId;
 
     @Column(nullable = false)
     int memberId;
