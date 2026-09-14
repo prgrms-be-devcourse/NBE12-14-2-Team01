@@ -1,0 +1,14 @@
+# IntelliJ
+.idea/*
+!.idea/codeStyles/
+!.idea/codeStyles/**
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs / JVM crash
+*.log
+hs_err_pid*
+replay_pid*
