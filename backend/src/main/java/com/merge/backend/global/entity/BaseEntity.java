@@ -1,5 +1,6 @@
 package com.merge.backend.global.entity;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
@@ -23,9 +24,11 @@ public abstract class BaseEntity {
     private Long id;
 
     @CreatedDate
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createDate;
 
     @LastModifiedDate
+    @Column(nullable = false)
     private LocalDateTime modifyDate;
 
 }
