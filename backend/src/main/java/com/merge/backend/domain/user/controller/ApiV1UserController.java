@@ -26,7 +26,7 @@ public class ApiV1UserController {
         @Valid @RequestBody SignupRequest request) {
         User user = userService.join(request.email(), request.password(), request.name());
 
-        UserResponse response = new UserResponse(user.getId(), user.getEmail(), user.getName());
+        UserResponse response = UserResponse.from(user);
 
         return ResponseEntity
             .status(HttpStatus.CREATED)
