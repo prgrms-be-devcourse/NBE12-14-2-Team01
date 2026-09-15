@@ -1,31 +1,131 @@
-//package com.merge.backend.domain.shift.service;
-//
-//import com.merge.backend.domain.shift.entity.RegularShiftPattern;
-//import com.merge.backend.domain.shift.entity.Shift;
-//import java.time.DayOfWeek;
-//import java.time.LocalDateTime;
-//import org.springframework.stereotype.Service;
-//
-//@Service
-//public class ShiftService {
-//
-//    public Shift create(RegularShiftPattern reqBody, int scheduleId) {
-//        LocalDateTime startAt = parseDayOfWeek(String.valueOf(reqBody.getDayOfWeek()));
-//    }
-//
-//    // 한글 요일을 DayOfWeek Enum으로 변환
-//    private LocalDateTime parseDayOfWeek(String dayOfWeekStr) {
-//        DayOfWeek targetDay = switch (dayOfWeekStr) {
-//            case "월요일", "MONDAY" -> DayOfWeek.MONDAY;
-//            case "화요일", "TUESDAY" -> DayOfWeek.TUESDAY;
-//            case "수요일", "WEDNESDAY" -> DayOfWeek.WEDNESDAY;
-//            case "목요일", "THURSDAY" -> DayOfWeek.THURSDAY;
-//            case "금요일", "FRIDAY" -> DayOfWeek.FRIDAY;
-//            case "토요일", "SATURDAY" -> DayOfWeek.SATURDAY;
-//            case "일요일", "SUNDAY" -> DayOfWeek.SUNDAY;
-//            default -> throw new IllegalArgumentException("유효하지 않은 요일입니다: " + dayOfWeekStr);
-//        };
-//
-//        return
-//    }
-//}
+package com.merge.backend.domain.shift.service;
+
+import static com.merge.backend.domain.shift.entity.ShiftStatus.SCHEDULED;
+
+import com.merge.backend.domain.shift.dto.ShiftRequest;
+import com.merge.backend.domain.shift.entity.Schedule;
+import com.merge.backend.domain.shift.entity.ScheduleStatus;
+import com.merge.backend.domain.shift.entity.Shift;
+import com.merge.backend.domain.shift.repository.ScheduleRepository;
+import com.merge.backend.domain.shift.repository.ShiftRepository;
+import com.merge.backend.domain.shift.repository.UnavailableTimeRepository;
+import com.merge.backend.domain.workplace.entity.WorkplaceMember;
+import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
+import com.merge.backend.global.exception.BusinessException;
+import com.merge.backend.global.exception.GlobalErrorCode;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+public class ShiftService {
+
+    private final ScheduleRepository scheduleRepository;
+    private final ShiftRepository shiftRepository;
+    private final WorkplaceMemberRepository workplaceMemberRepository;
+    private final UnavailableTimeRepository unavailableTimeRepository;
+
+    @Transactional
+    public Shift create(ShiftRequest reqBody, Long workplaceId, Long scheduleId) {
+
+        //todo: user 인증 && Role == MANAGER인가
+
+        //스케줄 존재 확인
+        Schedule schedule = scheduleRepository.findById(scheduleId)
+            .orElseThrow(() ->
+                new BusinessException(
+                    GlobalErrorCode.VALIDATION_ERROR //일단 임시로 예외처리함
+                )
+            );
+        //스케줄이 해당 workplace 소속인지 확인
+        if(!schedule.getWorkplace().getId().equals(workplaceId)) {
+            throw new BusinessException(GlobalErrorCode.INVALID_WORKPLACE_VALUE);
+        }
+        //스케줄이 DRAFT인지 확인
+        if(schedule.getStatus() != ScheduleStatus.DRAFT) {
+            throw new BusinessException(GlobalErrorCode.INVALID_STATUS_VALUE);
+        }
+        //WorkplaceMember 존재 확인
+        WorkplaceMember member = workplaceMemberRepository.findById(reqBody.memberId())
+            .orElseThrow(() ->
+                new BusinessException(
+                    GlobalErrorCode.NOT_FOUND_ERROR
+                )
+            );
+        //member가 현 workplace의 일원인지 체크 && 퇴사하지 않았는지
+        if(!member.getWorkplace().getId().equals(workplaceId) || member.getLeftAt() != null) {
+            throw new BusinessException(GlobalErrorCode.INVALID_WORKPLACE_MEMBER_VALUE);
+        }
+        //startAt < endAt
+        if(reqBody.startAt().compareTo(reqBody.endAt()) >= 0) {
+            throw new BusinessException(GlobalErrorCode.INVALID_TIME_VALUE);
+        }
+
+        //Schedule 주차 범위 검증 추가
+        validateShiftInScheduleWeek(schedule, reqBody.startAt(), reqBody.endAt());
+
+        //시간 중복(Overlap) 3단계 검증
+        Long userId = member.getUser().getId();
+        validateShiftOverlap(scheduleId, member.getId(), userId, reqBody.startAt(), reqBody.endAt(), null);
+
+        // confirmUnavailableConflict가 false일 때만 체크)
+        if (!reqBody.confirmUnavailableConflict()) {
+            if (unavailableTimeRepository.existsOverlappingUnavailableTime(userId, reqBody.startAt(), reqBody.endAt())) {
+                // Shift를 생성하지 않고, 관리자 확인 안내 예외/응답을 던짐
+                throw new BusinessException(GlobalErrorCode.UNAVAILABLE_TIME_CONFLICT);
+            }
+        }
+        Shift newShift = new Shift(
+            schedule,
+            member,
+            reqBody.startAt(),
+            reqBody.endAt(),
+            SCHEDULED
+        );
+        return shiftRepository.save(newShift);
+    }
+
+    /**
+     * Shift의 근무 시간이 Schedule의 주차 범위 내에 들어오는지 검증
+     */
+    private void validateShiftInScheduleWeek(Schedule schedule, LocalDateTime startAt, LocalDateTime endAt) {
+        LocalDate weekStartDate = schedule.getWeekStartDate(); // 예: 2026-09-21
+
+        // 주차 범위 계산 [월요일 00:00:00, 다음주 월요일 00:00:00)
+        LocalDateTime scheduleStart = weekStartDate.atStartOfDay();              // 2026-09-21T00:00:00
+        LocalDateTime scheduleEnd = weekStartDate.plusWeeks(1).atStartOfDay();   // 2026-09-28T00:00:00
+
+        // startAt이 scheduleStart보다 앞서거나, endAt이 scheduleEnd보다 뒤에 있으면 예외 발생
+        if (startAt.isBefore(scheduleStart) || endAt.isAfter(scheduleEnd)) {
+            throw new BusinessException(GlobalErrorCode.INVALID_TIME_VALUE); // or SCHEDULE_OUT_OF_BOUNDS_TIME
+        }
+    }
+
+    //Shift 시간 중복 (Overlap) 검증 메서드
+    private void validateShiftOverlap(
+        Long scheduleId,
+        Long memberId,
+        Long userId,
+        java.time.LocalDateTime startAt,
+        java.time.LocalDateTime endAt,
+        Long currentShiftId
+    ) {
+        // 1) 동일 Schedule 내 동일 Member 중복 체크
+        if (shiftRepository.existsOverlappingInSchedule(scheduleId, memberId, startAt, endAt, currentShiftId)) {
+            throw new BusinessException(GlobalErrorCode.INVALID_TIME_VALUE); // 적절한 ErrorCode로 교체 가능
+        }
+
+        // 2) 해당 User의 모든 Workplace 확정 Shift 중복 체크
+        if (shiftRepository.existsOverlappingOfficialShift(userId, ScheduleStatus.PUBLISHED, startAt, endAt, currentShiftId)) {
+            throw new BusinessException(GlobalErrorCode.INVALID_TIME_VALUE);
+        }
+
+        // 3) 해당 User의 UnavailableTime 중복 체크
+        if (unavailableTimeRepository.existsOverlappingUnavailableTime(userId, startAt, endAt)) {
+            throw new BusinessException(GlobalErrorCode.INVALID_TIME_VALUE);
+        }
+    }
+}
