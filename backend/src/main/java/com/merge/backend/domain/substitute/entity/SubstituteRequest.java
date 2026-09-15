@@ -25,6 +25,9 @@ public class SubstituteRequest extends BaseEntity {
     @Column(nullable = false)
     private RequestStatus status;
 
+    @Enumerated(EnumType.STRING)
+    private RequestCloseReason closeReason;
+
     private LocalDateTime approvedAt;
 
     private LocalDateTime closedAt;
