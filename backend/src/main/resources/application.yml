@@ -1,3 +1,14 @@
 spring:
   application:
     name: backend
+
+  profiles:
+    default: dev
+
+  output:
+    ansi:
+      enabled: always
+
+server:
+  servlet:
+    context-path: /api/v1
