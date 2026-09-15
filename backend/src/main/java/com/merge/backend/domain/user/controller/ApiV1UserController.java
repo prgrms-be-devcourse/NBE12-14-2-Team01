@@ -30,7 +30,7 @@ public class ApiV1UserController {
 
         return ResponseEntity
             .status(HttpStatus.CREATED)
-            .body(ApiResponse.success("201", response));
+            .body(ApiResponse.success("201", "회원가입이 완료되었습니다.", response));
     }
 
 }
