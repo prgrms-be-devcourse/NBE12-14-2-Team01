@@ -13,6 +13,7 @@ import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -21,7 +22,8 @@ public class WorkplaceService {
     private final WorkplaceRepository workplaceRepository;
     private final WorkplaceMemberRepository workplaceMemberRepository;
 
-    public WorkplaceCreateResponse createResponse(WorkplaceCreateRequest request, User user) {
+    @Transactional
+    public WorkplaceCreateResponse createWorkplace(WorkplaceCreateRequest request, User user) {
 
         String inviteCode = createInviteCode();
 
@@ -47,12 +49,13 @@ public class WorkplaceService {
         return inviteCode;
     }
 
+    @Transactional
     public WorkplaceJoinResponse joinWorkplace(WorkplaceJoinRequest request, User user) {
-        Workplace workplace = workplaceRepository.findAllByInviteCode(request.getInviteCode())
-            .orElseThrow(() -> new IllegalArgumentException("유효하지않은 초대 코드입니다."));
+        Workplace workplace = workplaceRepository.findByInviteCode(request.getInviteCode())
+            .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 초대 코드입니다."));
 
         if (workplaceMemberRepository.existsByWorkplaceAndUser(workplace, user)) {
-            throw new IllegalArgumentException("이미 참여 중인 근무지입니다.");
+            throw new IllegalStateException("이미 참여 중인 근무지입니다.");
         }
 
         WorkplaceMember member = new WorkplaceMember(workplace, user, WorkplaceRole.EMPLOYEE);

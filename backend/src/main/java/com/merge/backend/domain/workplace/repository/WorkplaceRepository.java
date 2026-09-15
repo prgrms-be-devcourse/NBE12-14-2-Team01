@@ -8,6 +8,6 @@ public interface WorkplaceRepository extends JpaRepository<Workplace, Long> {
 
     boolean existsByInviteCode(String inviteCode);
 
-    Optional<Workplace> findAllByInviteCode(String inviteCode);
+    Optional<Workplace> findByInviteCode(String inviteCode);
 
 }
