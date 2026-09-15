@@ -22,7 +22,8 @@ public class ApiV1UserController {
     private final UserService userService;
 
     @PostMapping
-    public ResponseEntity<ApiResponse<UserResponse>> signup(@Valid @RequestBody SignupRequest request) {
+    public ResponseEntity<ApiResponse<UserResponse>> signup(
+        @Valid @RequestBody SignupRequest request) {
         User user = userService.join(request.email(), request.password(), request.name());
 
         UserResponse response = new UserResponse(user.getId(), user.getEmail(), user.getName());
