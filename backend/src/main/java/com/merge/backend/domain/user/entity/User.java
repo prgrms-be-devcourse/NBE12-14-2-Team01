@@ -22,9 +22,22 @@ public class User extends BaseEntity {
     @Column(nullable = false)
     private String name;
 
+    @Column
+    private String refreshToken;
+
     public User(String email, String passwordHash, String name) {
         this.email = email;
         this.passwordHash = passwordHash;
         this.name = name;
+    }
+
+    public User(Long id, String email, String name) {
+        setId(id);
+        this.email = email;
+        this.name = name;
+    }
+
+    public void updateRefreshToken(String refreshToken) {
+        this.refreshToken = refreshToken;
     }
 }
