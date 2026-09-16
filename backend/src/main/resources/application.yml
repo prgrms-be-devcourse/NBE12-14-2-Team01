@@ -12,3 +12,10 @@ spring:
 server:
   servlet:
     context-path: /api/v1
+
+custom:
+  jwt:
+    #시크릿 키 개발용 더미 값 배포 시 덮어써야 함
+    secret-key: ${JWT_SECRET_KEY:temp-dev-secret-key-change-before-deploy}
+    expireMills: "#{1000L * 60 * 10}"
+    refresh-expire-mills: "#{1000L * 60 * 60 * 24 * 14}"
