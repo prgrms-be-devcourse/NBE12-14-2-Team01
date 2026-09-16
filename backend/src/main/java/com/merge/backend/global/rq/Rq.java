@@ -1,6 +1,5 @@
 package com.merge.backend.global.rq;
 
-import com.merge.backend.domain.user.entity.User;
 import com.merge.backend.global.security.SecurityUser;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,11 +19,10 @@ public class Rq {
     private final HttpServletRequest request;
     private final HttpServletResponse response;
 
-    public User getActor() {
+    public Long getActorId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        SecurityUser user = (SecurityUser) authentication.getPrincipal();
-
-        return new User(user.getId(), user.getUsername(), user.getName());
+        SecurityUser principal = (SecurityUser) authentication.getPrincipal();
+        return principal.getId();
     }
 
     public String getCookieValue(String name, String defaultValue) {
