@@ -17,7 +17,11 @@ import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
 import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import com.merge.backend.global.exception.BusinessException;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,8 +42,21 @@ public class WorkplaceServiceTest {
     @Mock
     private User user;
 
-    @InjectMocks
     private WorkplaceService workplaceService;
+
+    private final Clock clock = Clock.fixed(
+        Instant.parse("2026-09-16T00:00:00Z"),
+        ZoneId.of("Asia/Seoul")
+    );
+
+    @BeforeEach
+    void setUp() {
+        workplaceService = new WorkplaceService(
+            clock,
+            workplaceRepository,
+            workplaceMemberRepository
+        );
+    }
 
     @Test
     @DisplayName("workplace(근무지)를 생성하면 manager(매니저 권한)가 등록된다.")
@@ -48,6 +65,7 @@ public class WorkplaceServiceTest {
 
         when(request.getName()).thenReturn("테스트 매장");
         when(workplaceRepository.existsByInviteCode(any())).thenReturn(false);
+
 
         WorkplaceCreateResponse response = workplaceService.createWorkplace(request, user);
 

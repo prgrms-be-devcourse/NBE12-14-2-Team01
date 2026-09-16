@@ -1,6 +1,5 @@
 package com.merge.backend.domain.workplace.dto.response;
 
-
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -9,9 +8,8 @@ import lombok.Getter;
 @AllArgsConstructor
 public class WorkplaceCreateResponse {
 
-    private Long id;
+    private Long workplaceId;
     private String name;
-    private String inviteCode;
     private WorkplaceRole role;
 
 }

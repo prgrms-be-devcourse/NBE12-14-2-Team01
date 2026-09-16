@@ -8,7 +8,7 @@ import lombok.Getter;
 @AllArgsConstructor
 public class WorkplaceJoinResponse {
 
-    private Long id;
+    private Long workplaceId;
     private String name;
     private WorkplaceRole role;
 

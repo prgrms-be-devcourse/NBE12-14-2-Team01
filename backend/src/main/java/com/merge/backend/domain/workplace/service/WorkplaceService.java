@@ -12,6 +12,8 @@ import com.merge.backend.domain.workplace.exception.WorkplaceErrorCode;
 import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
 import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import com.merge.backend.global.exception.BusinessException;
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class WorkplaceService {
 
+    private final Clock clock;
     private final WorkplaceRepository workplaceRepository;
     private final WorkplaceMemberRepository workplaceMemberRepository;
 
@@ -33,15 +36,24 @@ public class WorkplaceService {
 
         workplaceRepository.save(workplace);
 
-        WorkplaceMember member = new WorkplaceMember(workplace, user, WorkplaceRole.MANAGER);
+        WorkplaceMember member = new WorkplaceMember(
+            workplace,
+            user,
+            WorkplaceRole.MANAGER,
+            LocalDateTime.now(clock)
+        );
 
         workplaceMemberRepository.save(member);
 
-        return new WorkplaceCreateResponse(workplace.getId(), workplace.getName(),
-            workplace.getInviteCode(), WorkplaceRole.MANAGER);
+        return new WorkplaceCreateResponse(
+            workplace.getId(),
+            workplace.getName(),
+            WorkplaceRole.MANAGER
+        );
     }
 
     private String createInviteCode() {
+
         String inviteCode;
 
         do {
@@ -53,6 +65,7 @@ public class WorkplaceService {
 
     @Transactional
     public WorkplaceJoinResponse joinWorkplace(WorkplaceJoinRequest request, User user) {
+
         Workplace workplace = workplaceRepository.findByInviteCode(request.getInviteCode())
             .orElseThrow(() -> new BusinessException(WorkplaceErrorCode.INVALID_INVITE_CODE));
 
@@ -60,11 +73,19 @@ public class WorkplaceService {
             throw new BusinessException(WorkplaceErrorCode.ALREADY_JOINED_WORKPLACE);
         }
 
-        WorkplaceMember member = new WorkplaceMember(workplace, user, WorkplaceRole.EMPLOYEE);
+        WorkplaceMember member = new WorkplaceMember(
+            workplace,
+            user,
+            WorkplaceRole.EMPLOYEE,
+            LocalDateTime.now(clock)
+        );
 
         workplaceMemberRepository.save(member);
 
-        return new WorkplaceJoinResponse(workplace.getId(), workplace.getName(),
-            WorkplaceRole.EMPLOYEE);
+        return new WorkplaceJoinResponse(
+            workplace.getId(),
+            workplace.getName(),
+            WorkplaceRole.EMPLOYEE
+        );
     }
 }

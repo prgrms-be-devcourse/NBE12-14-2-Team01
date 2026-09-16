@@ -12,11 +12,24 @@ public enum WorkplaceErrorCode implements ErrorCode {
     INVALID_INVITE_CODE(
         HttpStatus.NOT_FOUND,
         "WPL-001",
-        "유효하지 않은 초대 코드입니다."),
+        "유효하지 않은 초대 코드입니다."
+    ),
     ALREADY_JOINED_WORKPLACE(
         HttpStatus.CONFLICT,
         "WPL-002",
-        "이미 참여 중인 근무지입니다.");
+        "이미 참여 중인 근무지입니다."
+    ),
+    NOT_WORKPLACE_MEMBER(
+        HttpStatus.FORBIDDEN,
+        "WPL-003",
+        "해당 근무지의 현재 구성원이 아닙니다."
+    ),
+    MANAGER_REQUIRED(
+        HttpStatus.FORBIDDEN,
+        "WPL-004",
+        "관리자 권한이 필요합니다."
+    );
+
 
     private final HttpStatus httpStatus;
     private final String code;

@@ -10,11 +10,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor
-@Table(
-    uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"workplace_id", "user_id"})
-    }
-)
+@Table(uniqueConstraints = {@UniqueConstraint(columnNames = {"workplace_id", "user_id"})})
 public class WorkplaceMember extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -34,10 +30,15 @@ public class WorkplaceMember extends BaseEntity {
 
     private LocalDateTime leftAt;
 
-    public WorkplaceMember(Workplace workplace, User user, WorkplaceRole role) {
+    public WorkplaceMember(
+        Workplace workplace,
+        User user,
+        WorkplaceRole role,
+        LocalDateTime joinedAt
+    ) {
         this.workplace = workplace;
         this.user = user;
         this.role = role;
-        this.joinedAt = LocalDateTime.now();
+        this.joinedAt = joinedAt;
     }
 }
