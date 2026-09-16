@@ -3,10 +3,9 @@ package com.merge.backend.domain.user.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
-public record SignupRequest(
+public record LoginRequest(
     @NotBlank @Email String email,
-    @NotBlank String password,
-    @NotBlank String name
+    @NotBlank String password
 ) {
 
 }
