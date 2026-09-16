@@ -9,12 +9,12 @@ import com.merge.backend.domain.workplace.dto.response.WorkplaceCreateResponse;
 import com.merge.backend.domain.workplace.dto.response.WorkplaceJoinResponse;
 import com.merge.backend.domain.workplace.service.WorkplaceService;
 import com.merge.backend.global.dto.ApiResponse;
+import com.merge.backend.global.rq.Rq;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -28,17 +28,15 @@ public class WorkplaceController {
 
     private final WorkplaceService workplaceService;
     private final UserRepository userRepository;
-
-    // TODO: auth-login PR 머지 후 UserRepository 대신 Rq 주입
-    // private final Rq rq;
+    private final Rq rq;
 
     @PostMapping
     public ResponseEntity<ApiResponse<WorkplaceCreateResponse>> createWorkplace(
-        @Valid @RequestBody WorkplaceCreateRequest request,
-        Authentication authentication
+        @Valid @RequestBody WorkplaceCreateRequest request
     ) {
-        // TODO: auth-login PR 머지 후 User user = rq.getActor(); 로 변경
-        User user = userRepository.findByEmail(authentication.getName())
+        Long userId = rq.getActorId();
+
+        User user = userRepository.findById(userId)
             .orElseThrow();
 
         WorkplaceCreateResponse response =
@@ -55,11 +53,11 @@ public class WorkplaceController {
 
     @PostMapping("/join")
     public ResponseEntity<ApiResponse<WorkplaceJoinResponse>> joinWorkplace(
-        @Valid @RequestBody WorkplaceJoinRequest request,
-        Authentication authentication
+        @Valid @RequestBody WorkplaceJoinRequest request
     ) {
-        // TODO: auth-login PR 머지 후 User user = rq.getActor(); 로 변경
-        User user = userRepository.findByEmail(authentication.getName())
+        Long userId = rq.getActorId();
+
+        User user = userRepository.findById(userId)
             .orElseThrow();
 
         WorkplaceJoinResponse response =
@@ -75,11 +73,10 @@ public class WorkplaceController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<MyWorkplaceResponse>>> getMyWorkplaces(
-        Authentication authentication
-    ) {
-        // TODO: auth-login PR 머지 후 User user = rq.getActor(); 로 변경
-        User user = userRepository.findByEmail(authentication.getName())
+    public ResponseEntity<ApiResponse<List<MyWorkplaceResponse>>> getMyWorkplaces() {
+        Long userId = rq.getActorId();
+
+        User user = userRepository.findById(userId)
             .orElseThrow();
 
         List<MyWorkplaceResponse> response =

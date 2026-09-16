@@ -3,6 +3,7 @@ package com.merge.backend.domain.workplace.service;
 import com.merge.backend.domain.user.entity.User;
 import com.merge.backend.domain.workplace.dto.request.WorkplaceCreateRequest;
 import com.merge.backend.domain.workplace.dto.request.WorkplaceJoinRequest;
+import com.merge.backend.domain.workplace.dto.response.MyWorkplaceResponse;
 import com.merge.backend.domain.workplace.dto.response.WorkplaceCreateResponse;
 import com.merge.backend.domain.workplace.dto.response.WorkplaceJoinResponse;
 import com.merge.backend.domain.workplace.entity.Workplace;
@@ -14,6 +15,7 @@ import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import com.merge.backend.global.exception.BusinessException;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -87,5 +89,18 @@ public class WorkplaceService {
             workplace.getName(),
             WorkplaceRole.EMPLOYEE
         );
+    }
+
+    @Transactional(readOnly = true)
+    public List<MyWorkplaceResponse> getMyWorkplaces(User user) {
+        return workplaceMemberRepository
+            .findAllByUser_IdAndLeftAtIsNull(user.getId())
+            .stream()
+            .map(member -> new MyWorkplaceResponse(
+                member.getWorkplace().getId(),
+                member.getWorkplace().getName(),
+                member.getRole()
+            ))
+            .toList();
     }
 }
