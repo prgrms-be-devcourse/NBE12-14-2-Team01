@@ -9,8 +9,14 @@ import org.springframework.http.HttpStatus;
 @RequiredArgsConstructor
 public enum WorkplaceErrorCode implements ErrorCode {
 
-    INVALID_INVITE_CODE(HttpStatus.NOT_FOUND, "WPL-001", "유효하지 않은 초대 코드입니다."),
-    ALREADY_JOINED_WORKPLACE(HttpStatus.CONFLICT, "WPL-002", "이미 참여 중인 근무지입니다.");
+    INVALID_INVITE_CODE(
+        HttpStatus.NOT_FOUND,
+        "WPL-001",
+        "유효하지 않은 초대 코드입니다."),
+    ALREADY_JOINED_WORKPLACE(
+        HttpStatus.CONFLICT,
+        "WPL-002",
+        "이미 참여 중인 근무지입니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
