@@ -7,7 +7,7 @@ import lombok.Getter;
 
 
 @Getter
-@Builder
+@Builder(access = AccessLevel.PRIVATE)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class ApiResponse<T> {
 
@@ -42,12 +42,7 @@ public class ApiResponse<T> {
         String code,
         String message
     ) {
-        return ApiResponse.<Void>builder()
-            .success(true)
-            .code(code)
-            .message(message)
-            .data(null)
-            .build();
+        return ApiResponse.<Void>success(code, message, null);
     }
 
     //에러(데이터를 같이 보낼 때)
@@ -69,11 +64,6 @@ public class ApiResponse<T> {
         String code,
         String message
     ) {
-        return ApiResponse.<Void>builder()
-            .success(false)
-            .code(code)
-            .message(message)
-            .data(null)
-            .build();
+        return ApiResponse.<Void>error(code, message, null);
     }
 }

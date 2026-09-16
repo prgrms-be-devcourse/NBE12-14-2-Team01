@@ -20,6 +20,12 @@ public enum GlobalErrorCode implements ErrorCode {
         "요청 형식이 올바르지 않습니다."
     ),
 
+    INVALID_REQUEST_PARAMETER(
+        HttpStatus.BAD_REQUEST,
+        "COM-003",
+        "요청 파라미터가 올바르지 않습니다."
+    ),
+
     INVALID_INPUT_VALUE(
         HttpStatus.BAD_REQUEST,
         "COM-003",
