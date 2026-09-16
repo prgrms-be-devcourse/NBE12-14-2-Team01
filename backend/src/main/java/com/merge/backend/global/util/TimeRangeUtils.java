@@ -1,6 +1,7 @@
 package com.merge.backend.global.util;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -15,12 +16,29 @@ public final class TimeRangeUtils {
         return start.isBefore(end);
     }
 
+    public static boolean isValidRange(
+        LocalTime start,
+        LocalTime end
+    ) {
+        return start.isBefore(end);
+    }
+
     // 유효한 두 시간 구간의 겹침 계산
     public static boolean overlaps(
         LocalDateTime aStart,
         LocalDateTime aEnd,
         LocalDateTime bStart,
         LocalDateTime bEnd
+    ) {
+        return aStart.isBefore(bEnd)
+            && bStart.isBefore(aEnd);
+    }
+
+    public static boolean overlaps(
+        LocalTime aStart,
+        LocalTime aEnd,
+        LocalTime bStart,
+        LocalTime bEnd
     ) {
         return aStart.isBefore(bEnd)
             && bStart.isBefore(aEnd);
