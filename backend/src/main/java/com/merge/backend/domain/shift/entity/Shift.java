@@ -16,7 +16,6 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Getter
-@AllArgsConstructor
 @NoArgsConstructor
 public class Shift extends BaseEntity {
 
@@ -37,4 +36,29 @@ public class Shift extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ShiftStatus status;
+
+    public Shift (
+        Schedule schedule,
+        WorkplaceMember member,
+        LocalDateTime startAt,
+        LocalDateTime endAt,
+        ShiftStatus status
+    ) {
+        this.schedule = schedule;
+        this.member = member;
+        this.startAt = startAt;
+        this.endAt = endAt;
+        this.status = status;
+    }
+    public Shift update(
+        WorkplaceMember member,
+        LocalDateTime startAt,
+        LocalDateTime endAt
+        ) {
+        this.member = member;
+        this.startAt = startAt;
+        this.endAt = endAt;
+
+        return this;
+    }
 }
