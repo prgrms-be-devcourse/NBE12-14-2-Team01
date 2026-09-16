@@ -16,6 +16,7 @@ import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
 import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
+import com.merge.backend.global.exception.BusinessException;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -65,6 +66,7 @@ public class WorkplaceServiceTest {
         when(workplaceRepository.findByInviteCode("ABC123")).thenReturn(Optional.of(workplace));
         when(workplaceMemberRepository.existsByWorkplaceAndUser(workplace, user)).thenReturn(true);
 
-        assertThrows(IllegalStateException.class, () -> workplaceService.joinWorkplace(request, user));
+        assertThrows(BusinessException.class,
+            () -> workplaceService.joinWorkplace(request, user));
     }
 }

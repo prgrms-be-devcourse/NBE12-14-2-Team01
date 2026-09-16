@@ -8,8 +8,10 @@ import com.merge.backend.domain.workplace.dto.response.WorkplaceJoinResponse;
 import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
+import com.merge.backend.domain.workplace.exception.WorkplaceErrorCode;
 import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
 import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
+import com.merge.backend.global.exception.BusinessException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -52,10 +54,10 @@ public class WorkplaceService {
     @Transactional
     public WorkplaceJoinResponse joinWorkplace(WorkplaceJoinRequest request, User user) {
         Workplace workplace = workplaceRepository.findByInviteCode(request.getInviteCode())
-            .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 초대 코드입니다."));
+            .orElseThrow(() -> new BusinessException(WorkplaceErrorCode.INVALID_INVITE_CODE));
 
         if (workplaceMemberRepository.existsByWorkplaceAndUser(workplace, user)) {
-            throw new IllegalStateException("이미 참여 중인 근무지입니다.");
+            throw new BusinessException(WorkplaceErrorCode.ALREADY_JOINED_WORKPLACE);
         }
 
         WorkplaceMember member = new WorkplaceMember(workplace, user, WorkplaceRole.EMPLOYEE);
