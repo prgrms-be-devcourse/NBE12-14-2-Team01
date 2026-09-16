@@ -4,9 +4,9 @@ import com.merge.backend.domain.shift.entity.Shift;
 import com.merge.backend.domain.shift.entity.ShiftStatus;
 import java.time.LocalDateTime;
 
-public record ShiftResponse(
+public record ShiftModifyResponse(
 
-    Long scheduleId,
+    Long shiftId,
     Long memberId,
     String memberName,
     LocalDateTime startAt,
@@ -14,11 +14,11 @@ public record ShiftResponse(
     ShiftStatus status
 
 ) {
-    public static ShiftResponse from(Shift shift){
-        return new ShiftResponse(
-            shift.getSchedule().getId(),
+    public static ShiftModifyResponse from(Shift shift) {
+        return new ShiftModifyResponse(
+            shift.getId(),
             shift.getMember().getId(),
-            shift.getMember().getUser().getName(), 
+            shift.getMember().getUser().getName(),
             shift.getStartAt(),
             shift.getEndAt(),
             shift.getStatus()
