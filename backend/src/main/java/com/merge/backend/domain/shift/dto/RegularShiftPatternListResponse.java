@@ -6,7 +6,7 @@ import java.time.DayOfWeek;
 import java.time.LocalTime;
 
 public record RegularShiftPatternListResponse(
-        Long patterId,
+        Long patternId,
         Long memberId,
         String memberName,
         WorkplaceRole role,

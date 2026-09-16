@@ -4,11 +4,12 @@ import com.merge.backend.domain.shift.dto.RegularShiftPatternListResponse;
 import com.merge.backend.domain.shift.dto.RegularShiftPatternReqBody;
 import com.merge.backend.domain.shift.dto.RegularShiftPatternResponse;
 import com.merge.backend.domain.shift.entity.RegularShiftPattern;
+import com.merge.backend.domain.shift.exception.ShiftErrorCode;
 import com.merge.backend.domain.shift.repository.RegularShiftPatternRepository;
 import com.merge.backend.domain.shift.repository.WorkplaceMemberRepository;
 import com.merge.backend.domain.shift.repository.WorkplaceRepository;
-import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
+import com.merge.backend.global.exception.BusinessException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,37 +29,15 @@ public class RegularShiftPatternService {
                          RegularShiftPatternReqBody reqBody)
     {
         //workplace 존재 확인
-        Workplace workplace = workplaceRepository.findById(workplaceId)
-                .orElseThrow(() -> new RuntimeException("존재하지 않는 workplace 입니다."));
+        validateWorkplaceExists(workplaceId);
 
         //member 조회
-        WorkplaceMember workplaceMember = workplaceMemberRepository.findById(reqBody.memberId())
-                .orElseThrow(() -> new RuntimeException("존재하지 않는 user입니다."));
-
-        //다른 workplace의 member인지 확인
-        if(!workplaceMember.getWorkplace().getId().equals(workplaceId)) {
-            throw new IllegalArgumentException("올바른 소속이 아닙니다.");
-        }
-
-        //현재 member인지 확인
-        if(workplaceMember.getLeftAt() != null) {
-            throw new IllegalArgumentException("현재 workplace의 구성원이 아닙니다.");
-        }
+        WorkplaceMember workplaceMember = getActiveMember(workplaceId, reqBody.memberId());
 
         //끝시간 확인
-        if(!reqBody.startTime().isBefore(reqBody.endTime())) {
-            throw new RuntimeException("시작 시간은 끝나는 시간보다 빨라야합니다");
-        }
+        validateTime(reqBody);
 
-
-        List<RegularShiftPattern> patterns = regularShiftPatternRepository.findByMemberIdAndDayOfWeek(reqBody.memberId(), reqBody.dayOfWeek());
-
-        for(RegularShiftPattern pattern : patterns) {
-            if(reqBody.startTime().isBefore(pattern.getEndTime()) &&
-            pattern.getStartTime().isBefore(reqBody.endTime())) {
-                throw new RuntimeException("기존 정기 근무 시간과 겹칩니다.");
-            }
-        }
+        validateOverlap(reqBody, null);
 
         RegularShiftPattern pattern = new RegularShiftPattern(
                 workplaceMember,
@@ -81,54 +60,15 @@ public class RegularShiftPatternService {
     }
 
     public RegularShiftPatternResponse update(Long workplaceId, Long patternId, RegularShiftPatternReqBody reqBody) {
-        Workplace workplace = workplaceRepository.findById(workplaceId).orElseThrow(
-                () -> new RuntimeException("존재하지 않는 근무지입니다.")
-        );
+        validateWorkplaceExists(workplaceId);
 
-        WorkplaceMember member = workplaceMemberRepository.findById(reqBody.memberId()).orElseThrow(
-                () -> new RuntimeException("존재하지 않는 근로자입니다.")
-        );
+        RegularShiftPattern pattern = getPatternInWorkplace(workplaceId, patternId);
 
-        RegularShiftPattern pattern = regularShiftPatternRepository.findById(patternId).orElseThrow(
-                () -> new RuntimeException("존재하지 않는 RegularPattern입니다.")
-        );
+        WorkplaceMember member = getActiveMember(workplaceId, reqBody.memberId());
 
-        // 이 pattern이 해당 workplace 소속인지 확인
-        if(!pattern
-                .getMember()
-                .getWorkplace()
-                .getId()
-                .equals(workplaceId)) {
-            throw new RuntimeException("해당 workplace의 정기 근무가 아닙니다");
-        }
+        validateTime(reqBody);
 
-        if(!member.getWorkplace().getId().equals(workplaceId)) {
-            throw new IllegalArgumentException("해당 workplace의 구성원이 아닙니다");
-        }
-
-        if(member.getLeftAt()!=null) {
-            throw new IllegalArgumentException("현재 근무중이 아닙니다");
-        }
-
-        if(!reqBody.startTime().isBefore(reqBody.endTime())) {
-            throw new IllegalArgumentException("시작 시간은 종료 시간보다 빨라야 합니다");
-        }
-
-        List<RegularShiftPattern> patterns = regularShiftPatternRepository.findByMemberIdAndDayOfWeek(
-                reqBody.memberId(),
-                reqBody.dayOfWeek()
-        );
-
-        for(RegularShiftPattern otherPattern : patterns) {
-            if(otherPattern.getId().equals(patternId)) {
-                continue;
-            }
-
-            if(reqBody.startTime().isBefore(otherPattern.getEndTime())
-            && otherPattern.getStartTime().isBefore(reqBody.endTime())) {
-                throw new IllegalArgumentException("기존 정기 근무 시간과 겹칩니다.");
-            }
-        }
+        validateOverlap(reqBody, patternId);
 
         pattern.update(
                 member,
@@ -152,8 +92,10 @@ public class RegularShiftPatternService {
 
     public List<RegularShiftPatternListResponse> findAll(Long workplaceId) {
 
-        Workplace workplace = workplaceRepository.findById(workplaceId).orElseThrow(
-                () -> new IllegalArgumentException("존재하지 않는 근무지입니다.")
+        workplaceRepository.findById(workplaceId).orElseThrow(
+                () -> new BusinessException(
+                        ShiftErrorCode.WORKPLACE_NOT_FOUND
+                )
         );
 
         List<RegularShiftPattern> patterns = regularShiftPatternRepository.findByMemberWorkplaceIdAndMemberLeftAtIsNull(workplaceId);
@@ -175,18 +117,115 @@ public class RegularShiftPatternService {
     public void delete(Long workplaceId, Long patternId) {
 
         workplaceRepository.findById(workplaceId).orElseThrow(
-                () -> new IllegalArgumentException("존재하지 않는 근무지 입니다.")
+                () -> new BusinessException(
+                        ShiftErrorCode.WORKPLACE_NOT_FOUND
+                )
         );
 
         RegularShiftPattern pattern = regularShiftPatternRepository.findById(patternId).orElseThrow(
-                () -> new IllegalArgumentException("존재하지 않는 정기 근무입니다.")
+                () -> new BusinessException(
+                        ShiftErrorCode.PATTERN_NOT_FOUND
+                )
         );
 
         if(!pattern.getMember().getWorkplace().getId().equals(workplaceId)) {
-            throw new IllegalArgumentException("해당 workplace의 정기근무가 아닙니다.");
+            throw new BusinessException(
+                    ShiftErrorCode.PATTERN_NOT_IN_WORKPLACE
+            );
         }
 
         regularShiftPatternRepository.delete(pattern);
 
+    }
+
+    private void validateWorkplaceExists(Long workplaceId) {
+        if (!workplaceRepository.existsById(workplaceId)) {
+            throw new BusinessException(
+                    ShiftErrorCode.WORKPLACE_NOT_FOUND
+            );
+        }
+    }
+
+    private WorkplaceMember getActiveMember(Long workplaceId, Long memberId) {
+        WorkplaceMember member =
+                workplaceMemberRepository.findById(memberId)
+                        .orElseThrow(() ->
+                                new BusinessException(
+                                        ShiftErrorCode.MEMBER_NOT_FOUND
+                                )
+                        );
+
+        if (!member.getWorkplace().getId().equals(workplaceId)) {
+            throw new BusinessException(
+                    ShiftErrorCode.MEMBER_NOT_IN_WORKPLACE
+            );
+        }
+
+        if (member.getLeftAt() != null) {
+            throw new BusinessException(
+                    ShiftErrorCode.MEMBER_NOT_ACTIVE
+            );
+        }
+
+        return member;
+    }
+
+    private RegularShiftPattern getPatternInWorkplace(
+            Long workplaceId,
+            Long patternId
+    ) {
+        RegularShiftPattern pattern =
+                regularShiftPatternRepository.findById(patternId)
+                        .orElseThrow(() ->
+                                new BusinessException(
+                                        ShiftErrorCode.PATTERN_NOT_FOUND
+                                )
+                        );
+
+        if (!pattern.getMember()
+                .getWorkplace()
+                .getId()
+                .equals(workplaceId)) {
+
+            throw new BusinessException(
+                    ShiftErrorCode.PATTERN_NOT_IN_WORKPLACE
+            );
+        }
+
+        return pattern;
+    }
+
+    private void validateTime(RegularShiftPatternReqBody reqBody) {
+        if (!reqBody.startTime().isBefore(reqBody.endTime())) {
+            throw new BusinessException(
+                    ShiftErrorCode.INVALID_PATTERN_TIME
+            );
+        }
+    }
+
+    private void validateOverlap(RegularShiftPatternReqBody reqBody, Long excludePatternId) {
+        List<RegularShiftPattern> patterns =
+                regularShiftPatternRepository
+                        .findByMemberIdAndDayOfWeek(
+                                reqBody.memberId(),
+                                reqBody.dayOfWeek()
+                        );
+
+        boolean overlap = patterns.stream()
+                .filter(pattern ->
+                        excludePatternId == null
+                                || !pattern.getId().equals(excludePatternId)
+                )
+                .anyMatch(pattern ->
+                        reqBody.startTime().isBefore(pattern.getEndTime())
+                                && pattern.getStartTime()
+                                .isBefore(reqBody.endTime())
+                );
+
+        if (overlap) {
+            throw new BusinessException(
+                    ShiftErrorCode.PATTERN_TIME_OVERLAP
+            );
+        }
     }
 }

@@ -6,14 +6,16 @@ import com.merge.backend.domain.shift.dto.RegularShiftPatternResponse;
 import com.merge.backend.domain.shift.entity.RegularShiftPattern;
 import com.merge.backend.domain.shift.service.RegularShiftPatternService;
 import com.merge.backend.global.dto.ApiResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/workplaces/{workplaceId}/regular-shift-patterns")
+@RequestMapping("/workplaces/{workplaceId}/regular-shift-patterns")
 public class RegularShiftPatternController {
 
     private final RegularShiftPatternService regularShiftPatternService;
@@ -30,10 +32,11 @@ public class RegularShiftPatternController {
         );
     }
 
+    @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("")
     public ApiResponse<RegularShiftPatternResponse> register(
             @PathVariable Long workplaceId,
-            @RequestBody RegularShiftPatternReqBody reqBody
+            @Valid @RequestBody RegularShiftPatternReqBody reqBody
             ) {
 
         RegularShiftPatternResponse newRegularShiftPattern = regularShiftPatternService.register(
@@ -53,7 +56,7 @@ public class RegularShiftPatternController {
     public ApiResponse<RegularShiftPatternResponse> update(
             @PathVariable Long workplaceId,
             @PathVariable Long patternId,
-            @RequestBody RegularShiftPatternReqBody reqBody
+            @Valid @RequestBody RegularShiftPatternReqBody reqBody
     ) {
         RegularShiftPatternResponse updatedRegularShiftPattern = regularShiftPatternService.update(workplaceId, patternId, reqBody);
 
