@@ -10,7 +10,10 @@ import static org.mockito.Mockito.when;
 import com.merge.backend.domain.user.entity.User;
 import com.merge.backend.domain.workplace.dto.request.WorkplaceCreateRequest;
 import com.merge.backend.domain.workplace.dto.request.WorkplaceJoinRequest;
+import com.merge.backend.domain.workplace.dto.response.MyWorkplaceResponse;
 import com.merge.backend.domain.workplace.dto.response.WorkplaceCreateResponse;
+import com.merge.backend.domain.workplace.dto.response.WorkplaceInviteCodeResponse;
+import com.merge.backend.domain.workplace.dto.response.WorkplaceMemberResponse;
 import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
@@ -20,13 +23,13 @@ import com.merge.backend.global.exception.BusinessException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -38,6 +41,9 @@ public class WorkplaceServiceTest {
 
     @Mock
     private WorkplaceMemberRepository workplaceMemberRepository;
+
+    @Mock
+    private WorkplaceMemberService workplaceMemberService;
 
     @Mock
     private User user;
@@ -54,7 +60,8 @@ public class WorkplaceServiceTest {
         workplaceService = new WorkplaceService(
             clock,
             workplaceRepository,
-            workplaceMemberRepository
+            workplaceMemberRepository,
+            workplaceMemberService
         );
     }
 
@@ -65,7 +72,6 @@ public class WorkplaceServiceTest {
 
         when(request.getName()).thenReturn("테스트 매장");
         when(workplaceRepository.existsByInviteCode(any())).thenReturn(false);
-
 
         WorkplaceCreateResponse response = workplaceService.createWorkplace(request, user);
 
@@ -91,5 +97,93 @@ public class WorkplaceServiceTest {
         when(workplaceMemberRepository.existsByWorkplaceAndUser(workplace, user)).thenReturn(true);
 
         assertThrows(BusinessException.class, () -> workplaceService.joinWorkplace(request, user));
+    }
+
+    @Test
+    @DisplayName("사용자의 소속 Workplace 목록을 조회한다.")
+    void test3() {
+        Workplace workplace = mock(Workplace.class);
+        WorkplaceMember member = mock(WorkplaceMember.class);
+
+        when(user.getId()).thenReturn(1L);
+        when(workplaceMemberRepository.findAllByUser_IdAndLeftAtIsNull(1L))
+            .thenReturn(List.of(member));
+
+        when(member.getWorkplace()).thenReturn(workplace);
+        when(workplace.getId()).thenReturn(10L);
+        when(workplace.getName()).thenReturn("테스트 매장");
+        when(member.getRole()).thenReturn(WorkplaceRole.MANAGER);
+
+        List<MyWorkplaceResponse> response =
+            workplaceService.getMyWorkplaces(user);
+
+        assertEquals(1, response.size());
+        assertEquals(10L, response.get(0).getWorkplaceId());
+        assertEquals("테스트 매장", response.get(0).getName());
+        assertEquals(WorkplaceRole.MANAGER, response.get(0).getRole());
+    }
+
+    @Test
+    @DisplayName("소속 Workplace가 없으면 빈 목록을 반환한다.")
+    void test4() {
+        when(user.getId()).thenReturn(1L);
+        when(workplaceMemberRepository.findAllByUser_IdAndLeftAtIsNull(1L))
+            .thenReturn(List.of());
+
+        List<MyWorkplaceResponse> response =
+            workplaceService.getMyWorkplaces(user);
+
+        assertEquals(0, response.size());
+    }
+
+    @Test
+    @DisplayName("관리자는 Workplace의 현재 멤버 목록을 조회한다.")
+    void test5() {
+        Workplace workplace = mock(Workplace.class);
+        User memberUser = mock(User.class);
+        WorkplaceMember member = mock(WorkplaceMember.class);
+
+        when(workplaceRepository.findById(10L))
+            .thenReturn(Optional.of(workplace));
+
+        when(workplaceMemberRepository
+            .findAllByWorkplace_IdAndLeftAtIsNull(10L))
+            .thenReturn(List.of(member));
+
+        when(member.getId()).thenReturn(100L);
+        when(member.getUser()).thenReturn(memberUser);
+        when(memberUser.getName()).thenReturn("홍길동");
+        when(memberUser.getEmail()).thenReturn("test@test.com");
+        when(member.getRole()).thenReturn(WorkplaceRole.EMPLOYEE);
+
+        List<WorkplaceMemberResponse> response =
+            workplaceService.getWorkplaceMembers(10L, 1L);
+
+        assertEquals(1, response.size());
+        assertEquals(100L, response.get(0).getMemberId());
+        assertEquals("홍길동", response.get(0).getName());
+        assertEquals("test@test.com", response.get(0).getEmail());
+        assertEquals(WorkplaceRole.EMPLOYEE, response.get(0).getRole());
+
+        verify(workplaceMemberService).requireManager(1L, 10L);
+    }
+
+    @Test
+    @DisplayName("관리자는 Workplace의 초대 코드를 조회한다.")
+    void test6() {
+        Workplace workplace = mock(Workplace.class);
+
+        when(workplaceRepository.findById(10L))
+            .thenReturn(Optional.of(workplace));
+        when(workplace.getId()).thenReturn(10L);
+        when(workplace.getInviteCode()).thenReturn("ABCD1234");
+
+        WorkplaceInviteCodeResponse response =
+            workplaceService.getInviteCode(10L, 1L);
+
+        assertEquals(10L, response.getWorkplaceId());
+        assertEquals("ABCD1234", response.getInviteCode());
+
+        verify(workplaceMemberService).requireManager(1L, 10L);
     }
 }
