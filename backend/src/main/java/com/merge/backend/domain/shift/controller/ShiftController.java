@@ -31,7 +31,9 @@ public class ShiftController {
     public ResponseEntity<ApiResponse<ShiftDetailResponse>> detail(
         @PathVariable Long shiftId
     ){
-        Shift shift = shiftService.detail(shiftId);
+        Long currentUserId = rq.getActorId();
+
+        Shift shift = shiftService.detail(shiftId, currentUserId);
 
         return ResponseEntity.status(200).body(
             ApiResponse.success(
@@ -46,7 +48,7 @@ public class ShiftController {
         @PathVariable Long scheduleId,
         @Valid @RequestBody ShiftRequest reqBody
     ){
-        Shift shift = shiftService.create(reqBody, workplaceId, scheduleId);
+        Shift shift = shiftService.create(reqBody, workplaceId, scheduleId, rq.getActorId());
 
         return ResponseEntity.status(201).body(
             ApiResponse.success(
@@ -68,7 +70,8 @@ public class ShiftController {
             workplaceId,
             scheduleId,
             shiftId,
-            reqBody
+            reqBody,
+            rq.getActorId()
         );
         return ResponseEntity.status(200).body(
             ApiResponse.success(
