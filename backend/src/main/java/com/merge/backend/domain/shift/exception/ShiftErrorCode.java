@@ -84,7 +84,7 @@ public enum ShiftErrorCode implements ErrorCode {
         "해당 근무는 취소되었습니다."
     ),
     FORBIDDEN_ACCESS(
-        HttpStatus.NOT_FOUND,
+        HttpStatus.FORBIDDEN,
         "SFT-403",
         "잘못된 권한입니다."
     ),
