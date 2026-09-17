@@ -2,13 +2,14 @@ package com.merge.backend.domain.shift.controller;
 
 import com.merge.backend.domain.shift.entity.RegularShiftPattern;
 import com.merge.backend.domain.shift.repository.RegularShiftPatternRepository;
-import com.merge.backend.domain.shift.repository.WorkplaceMemberRepository;
-import com.merge.backend.domain.shift.repository.WorkplaceRepository;
+import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
+import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import com.merge.backend.domain.user.entity.User;
 import com.merge.backend.domain.user.repository.UserRepository;
 import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
+import com.merge.backend.global.rq.Rq;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -30,12 +32,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.mockito.BDDMockito.given;
 
 @SpringBootTest
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @Transactional
 class RegularShiftPatternControllerTest {
+
+    @MockitoBean
+    private Rq rq;
 
     @Autowired
     private MockMvc mvc;
@@ -94,6 +100,8 @@ class RegularShiftPatternControllerTest {
         // 4. 실제 생성된 ID 저장
         workplaceId = workplace.getId();
         memberId = member.getId();
+
+        given(rq.getActorId()).willReturn(user.getId());
     }
 
 
@@ -1806,5 +1814,206 @@ class RegularShiftPatternControllerTest {
                 regularShiftPatternRepository
                         .findById(pattern.getId())
         ).isEmpty();
+    }
+
+    @Test
+    @DisplayName("정기 근무 등록 실패 - EMPLOYEE는 등록할 수 없다")
+    void t42() throws Exception {
+
+        Workplace workplace =
+                workplaceRepository.findById(workplaceId)
+                        .orElseThrow();
+
+        User employeeUser =
+                createUser(
+                        "employee@test.com",
+                        "일반 근로자"
+                );
+
+        createMember(
+                workplace,
+                employeeUser,
+                WorkplaceRole.EMPLOYEE,
+                null
+        );
+
+        // 이번 요청을 보내는 로그인 사용자를 EMPLOYEE로 변경
+        given(rq.getActorId())
+                .willReturn(employeeUser.getId());
+
+        ResultActions resultActions = mvc
+                .perform(
+                        post("/workplaces/%d/regular-shift-patterns"
+                                .formatted(workplaceId))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                {
+                                    "memberId": %d,
+                                    "dayOfWeek": "MONDAY",
+                                    "startTime": "09:00",
+                                    "endTime": "14:00"
+                                }
+                                """.formatted(memberId))
+                )
+                .andDo(print());
+
+        resultActions
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("SHIFT-009"));
+    }
+
+    @Test
+    @DisplayName("정기 근무 조회 실패 - EMPLOYEE는 조회할 수 없다")
+    void t43() throws Exception {
+
+        Workplace workplace =
+                workplaceRepository.findById(workplaceId)
+                        .orElseThrow();
+
+        User employeeUser =
+                createUser(
+                        "employee43@test.com",
+                        "일반 근로자"
+                );
+
+        createMember(
+                workplace,
+                employeeUser,
+                WorkplaceRole.EMPLOYEE,
+                null
+        );
+
+        // 현재 로그인 사용자를 EMPLOYEE로 설정
+        given(rq.getActorId())
+                .willReturn(employeeUser.getId());
+
+        ResultActions resultActions = mvc
+                .perform(
+                        get("/workplaces/%d/regular-shift-patterns"
+                                .formatted(workplaceId))
+                )
+                .andDo(print());
+
+        resultActions
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("SHIFT-009"));
+    }
+
+
+    @Test
+    @DisplayName("정기 근무 수정 실패 - EMPLOYEE는 수정할 수 없다")
+    void t44() throws Exception {
+
+        // 수정 대상 Pattern은 미리 만들어둔다.
+        RegularShiftPattern pattern =
+                createPattern(
+                        member,
+                        DayOfWeek.MONDAY,
+                        LocalTime.of(9, 0),
+                        LocalTime.of(14, 0)
+                );
+
+        Workplace workplace =
+                workplaceRepository.findById(workplaceId)
+                        .orElseThrow();
+
+        User employeeUser =
+                createUser(
+                        "employee44@test.com",
+                        "일반 근로자"
+                );
+
+        createMember(
+                workplace,
+                employeeUser,
+                WorkplaceRole.EMPLOYEE,
+                null
+        );
+
+        // 현재 로그인 사용자를 EMPLOYEE로 설정
+        given(rq.getActorId())
+                .willReturn(employeeUser.getId());
+
+        ResultActions resultActions = mvc
+                .perform(
+                        put("/workplaces/%d/regular-shift-patterns/%d"
+                                .formatted(
+                                        workplaceId,
+                                        pattern.getId()
+                                ))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                {
+                                    "memberId": %d,
+                                    "dayOfWeek": "TUESDAY",
+                                    "startTime": "10:00",
+                                    "endTime": "15:00"
+                                }
+                                """.formatted(memberId))
+                )
+                .andDo(print());
+
+        resultActions
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("SHIFT-009"));
+    }
+
+
+    @Test
+    @DisplayName("정기 근무 삭제 실패 - EMPLOYEE는 삭제할 수 없다")
+    void t45() throws Exception {
+
+        // 삭제 대상 Pattern은 미리 만들어둔다.
+        RegularShiftPattern pattern =
+                createPattern(
+                        member,
+                        DayOfWeek.MONDAY,
+                        LocalTime.of(9, 0),
+                        LocalTime.of(14, 0)
+                );
+
+        Workplace workplace =
+                workplaceRepository.findById(workplaceId)
+                        .orElseThrow();
+
+        User employeeUser =
+                createUser(
+                        "employee45@test.com",
+                        "일반 근로자"
+                );
+
+        createMember(
+                workplace,
+                employeeUser,
+                WorkplaceRole.EMPLOYEE,
+                null
+        );
+
+        // 현재 로그인 사용자를 EMPLOYEE로 설정
+        given(rq.getActorId())
+                .willReturn(employeeUser.getId());
+
+        ResultActions resultActions = mvc
+                .perform(
+                        delete("/workplaces/%d/regular-shift-patterns/%d"
+                                .formatted(
+                                        workplaceId,
+                                        pattern.getId()
+                                ))
+                )
+                .andDo(print());
+
+        resultActions
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("SHIFT-009"));
+
+        // 권한이 없어서 실패했으므로 실제 Pattern도 삭제되면 안 됨
+        assertThat(
+                regularShiftPatternRepository.findById(pattern.getId())
+        ).isPresent();
     }
 }

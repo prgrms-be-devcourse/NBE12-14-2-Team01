@@ -54,6 +54,12 @@ public enum ShiftErrorCode implements ErrorCode {
             HttpStatus.BAD_REQUEST,
             "SHIFT-008",
             "해당 근무지의 정기 근무가 아닙니다."
+    ),
+
+    MANAGER_REQUIRED(
+            HttpStatus.FORBIDDEN,
+        "SHIFT-009",
+                "관리자 권한이 필요합니다."
     );
 
     private final HttpStatus httpStatus;

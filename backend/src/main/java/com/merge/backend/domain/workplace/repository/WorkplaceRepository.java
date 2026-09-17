@@ -1,4 +1,4 @@
-package com.merge.backend.domain.shift.repository;
+package com.merge.backend.domain.workplace.repository;
 
 import com.merge.backend.domain.workplace.entity.Workplace;
 import org.springframework.data.jpa.repository.JpaRepository;

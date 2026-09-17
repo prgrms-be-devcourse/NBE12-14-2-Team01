@@ -6,10 +6,12 @@ import com.merge.backend.domain.shift.dto.RegularShiftPatternResponse;
 import com.merge.backend.domain.shift.entity.RegularShiftPattern;
 import com.merge.backend.domain.shift.exception.ShiftErrorCode;
 import com.merge.backend.domain.shift.repository.RegularShiftPatternRepository;
-import com.merge.backend.domain.shift.repository.WorkplaceMemberRepository;
-import com.merge.backend.domain.shift.repository.WorkplaceRepository;
+import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
+import com.merge.backend.domain.workplace.entity.WorkplaceRole;
+import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
 import com.merge.backend.global.exception.BusinessException;
+import com.merge.backend.global.rq.Rq;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,12 +26,13 @@ public class RegularShiftPatternService {
     private final RegularShiftPatternRepository regularShiftPatternRepository;
     private final WorkplaceMemberRepository workplaceMemberRepository;
     private final WorkplaceRepository workplaceRepository;
+    private final Rq rq;
 
     public RegularShiftPatternResponse register(Long workplaceId,
-                         RegularShiftPatternReqBody reqBody)
-    {
+                                                RegularShiftPatternReqBody reqBody) {
         //workplace 존재 확인
         validateWorkplaceExists(workplaceId);
+        requireManager(workplaceId);
 
         //member 조회
         WorkplaceMember workplaceMember = getActiveMember(workplaceId, reqBody.memberId());
@@ -37,6 +40,7 @@ public class RegularShiftPatternService {
         //끝시간 확인
         validateTime(reqBody);
 
+        //겹치는 시간 확인
         validateOverlap(reqBody, null);
 
         RegularShiftPattern pattern = new RegularShiftPattern(
@@ -46,7 +50,7 @@ public class RegularShiftPatternService {
                 reqBody.endTime()
         );
 
-        RegularShiftPattern savedPattern =  regularShiftPatternRepository.save(pattern);
+        RegularShiftPattern savedPattern = regularShiftPatternRepository.save(pattern);
 
         return new RegularShiftPatternResponse(
                 savedPattern.getId(),
@@ -60,7 +64,10 @@ public class RegularShiftPatternService {
     }
 
     public RegularShiftPatternResponse update(Long workplaceId, Long patternId, RegularShiftPatternReqBody reqBody) {
+
         validateWorkplaceExists(workplaceId);
+
+        requireManager(workplaceId);
 
         RegularShiftPattern pattern = getPatternInWorkplace(workplaceId, patternId);
 
@@ -92,11 +99,9 @@ public class RegularShiftPatternService {
 
     public List<RegularShiftPatternListResponse> findAll(Long workplaceId) {
 
-        workplaceRepository.findById(workplaceId).orElseThrow(
-                () -> new BusinessException(
-                        ShiftErrorCode.WORKPLACE_NOT_FOUND
-                )
-        );
+        validateWorkplaceExists(workplaceId);
+
+        requireManager(workplaceId);
 
         List<RegularShiftPattern> patterns = regularShiftPatternRepository.findByMemberWorkplaceIdAndMemberLeftAtIsNull(workplaceId);
 
@@ -116,23 +121,11 @@ public class RegularShiftPatternService {
 
     public void delete(Long workplaceId, Long patternId) {
 
-        workplaceRepository.findById(workplaceId).orElseThrow(
-                () -> new BusinessException(
-                        ShiftErrorCode.WORKPLACE_NOT_FOUND
-                )
-        );
+        validateWorkplaceExists(workplaceId);
 
-        RegularShiftPattern pattern = regularShiftPatternRepository.findById(patternId).orElseThrow(
-                () -> new BusinessException(
-                        ShiftErrorCode.PATTERN_NOT_FOUND
-                )
-        );
+        requireManager(workplaceId);
 
-        if(!pattern.getMember().getWorkplace().getId().equals(workplaceId)) {
-            throw new BusinessException(
-                    ShiftErrorCode.PATTERN_NOT_IN_WORKPLACE
-            );
-        }
+        RegularShiftPattern pattern = getPatternInWorkplace(workplaceId, patternId);
 
         regularShiftPatternRepository.delete(pattern);
 
@@ -225,6 +218,29 @@ public class RegularShiftPatternService {
         if (overlap) {
             throw new BusinessException(
                     ShiftErrorCode.PATTERN_TIME_OVERLAP
+            );
+        }
+    }
+
+    private void requireManager(Long workplaceId) {
+        Long actorId = rq.getActorId();
+
+        WorkplaceMember actorMember = workplaceMemberRepository.findByWorkplaceIdAndUserId(workplaceId, actorId)
+                .orElseThrow(
+                        () -> new BusinessException(
+                                ShiftErrorCode.MEMBER_NOT_IN_WORKPLACE
+                        )
+                );
+
+        if (actorMember.getLeftAt() != null) {
+            throw new BusinessException(
+                    ShiftErrorCode.MEMBER_NOT_ACTIVE
+            );
+        }
+
+        if (actorMember.getRole() != WorkplaceRole.MANAGER) {
+            throw new BusinessException(
+                    ShiftErrorCode.MANAGER_REQUIRED
             );
         }
     }
