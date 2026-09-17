@@ -13,6 +13,7 @@ import com.merge.backend.domain.shift.repository.UnavailableTimeRepository;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
 import com.merge.backend.global.exception.BusinessException;
+import com.merge.backend.global.util.TimeRangeUtils;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
@@ -60,8 +61,13 @@ public class ShiftService {
             throw new BusinessException(ShiftErrorCode.INVALID_WORKPLACE_MEMBER_VALUE);
         }
         //startAt < endAt
-        if(reqBody.startAt().compareTo(reqBody.endAt()) >= 0) {
-            throw new BusinessException(ShiftErrorCode.INVALID_BEFORE_AFTER_VALUE);
+        if (!TimeRangeUtils.isValidRange(
+            reqBody.startAt(),
+            reqBody.endAt()
+        )) {
+            throw new BusinessException(
+                ShiftErrorCode.INVALID_BEFORE_AFTER_VALUE
+            );
         }
 
         //Schedule 주차 범위 검증 추가
@@ -184,8 +190,13 @@ public class ShiftService {
         }
 
         //startAt < endAt
-        if(reqBody.startAt().compareTo(reqBody.endAt()) >= 0) {
-            throw new BusinessException(ShiftErrorCode.INVALID_BEFORE_AFTER_VALUE);
+        if (!TimeRangeUtils.isValidRange(
+            reqBody.startAt(),
+            reqBody.endAt()
+        )) {
+            throw new BusinessException(
+                ShiftErrorCode.INVALID_BEFORE_AFTER_VALUE
+            );
         }
 
         //Schedule 주차 범위 검증 추가
