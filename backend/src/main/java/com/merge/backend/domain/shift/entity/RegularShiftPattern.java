@@ -27,4 +27,28 @@ public class RegularShiftPattern extends BaseEntity {
 
     @Column(nullable = false)
     private LocalTime endTime;
+
+    public RegularShiftPattern(
+            WorkplaceMember member,
+            DayOfWeek dayOfWeek,
+            LocalTime startTime,
+            LocalTime endTime
+    ) {
+        this.member = member;
+        this.dayOfWeek = dayOfWeek;
+        this.startTime = startTime;
+        this.endTime = endTime;
+    }
+
+    public void update(
+            WorkplaceMember member,
+            DayOfWeek dayOfWeek,
+            LocalTime startTime,
+            LocalTime endTime
+    ) {
+        this.member = member;
+        this.dayOfWeek = dayOfWeek;
+        this.startTime = startTime;
+        this.endTime = endTime;
+    }
 }
