@@ -5,7 +5,9 @@ import com.merge.backend.domain.workplace.dto.request.WorkplaceCreateRequest;
 import com.merge.backend.domain.workplace.dto.request.WorkplaceJoinRequest;
 import com.merge.backend.domain.workplace.dto.response.MyWorkplaceResponse;
 import com.merge.backend.domain.workplace.dto.response.WorkplaceCreateResponse;
+import com.merge.backend.domain.workplace.dto.response.WorkplaceInviteCodeResponse;
 import com.merge.backend.domain.workplace.dto.response.WorkplaceJoinResponse;
+import com.merge.backend.domain.workplace.dto.response.WorkplaceMemberResponse;
 import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
@@ -28,6 +30,7 @@ public class WorkplaceService {
     private final Clock clock;
     private final WorkplaceRepository workplaceRepository;
     private final WorkplaceMemberRepository workplaceMemberRepository;
+    private final WorkplaceMemberService workplaceMemberService;
 
     @Transactional
     public WorkplaceCreateResponse createWorkplace(WorkplaceCreateRequest request, User user) {
@@ -102,5 +105,49 @@ public class WorkplaceService {
                 member.getRole()
             ))
             .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<WorkplaceMemberResponse> getWorkplaceMembers(
+        Long workplaceId,
+        Long actorUserId
+    ) {
+
+        getWorkplace(workplaceId);
+
+        workplaceMemberService.requireManager(actorUserId, workplaceId);
+
+        return workplaceMemberRepository
+            .findAllByWorkplace_IdAndLeftAtIsNull(workplaceId)
+            .stream()
+            .map(member -> new WorkplaceMemberResponse(
+                member.getId(),
+                member.getUser().getName(),
+                member.getUser().getEmail(),
+                member.getRole()
+            ))
+            .toList();
+    }
+
+    private Workplace getWorkplace(Long workplaceId) {
+        return workplaceRepository.findById(workplaceId)
+            .orElseThrow(() -> new BusinessException(
+                WorkplaceErrorCode.WORKPLACE_NOT_FOUND
+            ));
+    }
+
+    @Transactional(readOnly = true)
+    public WorkplaceInviteCodeResponse getInviteCode(
+        Long workplaceId,
+        Long actorUserId
+    ) {
+        Workplace workplace = getWorkplace(workplaceId);
+
+        workplaceMemberService.requireManager(actorUserId, workplaceId);
+
+        return new WorkplaceInviteCodeResponse(
+            workplace.getId(),
+            workplace.getInviteCode()
+        );
     }
 }

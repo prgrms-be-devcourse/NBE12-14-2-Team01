@@ -28,6 +28,11 @@ public enum WorkplaceErrorCode implements ErrorCode {
         HttpStatus.FORBIDDEN,
         "WPL-004",
         "관리자 권한이 필요합니다."
+    ),
+    WORKPLACE_NOT_FOUND(
+        HttpStatus.NOT_FOUND,
+        "WPL-005",
+        "존재하지 않는 근무지입니다."
     );
 
 

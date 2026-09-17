@@ -6,7 +6,9 @@ import com.merge.backend.domain.workplace.dto.request.WorkplaceCreateRequest;
 import com.merge.backend.domain.workplace.dto.request.WorkplaceJoinRequest;
 import com.merge.backend.domain.workplace.dto.response.MyWorkplaceResponse;
 import com.merge.backend.domain.workplace.dto.response.WorkplaceCreateResponse;
+import com.merge.backend.domain.workplace.dto.response.WorkplaceInviteCodeResponse;
 import com.merge.backend.domain.workplace.dto.response.WorkplaceJoinResponse;
+import com.merge.backend.domain.workplace.dto.response.WorkplaceMemberResponse;
 import com.merge.backend.domain.workplace.service.WorkplaceService;
 import com.merge.backend.global.dto.ApiResponse;
 import com.merge.backend.global.rq.Rq;
@@ -16,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -85,6 +88,38 @@ public class WorkplaceController {
         return ResponseEntity.ok(ApiResponse.success(
             "200",
             "소속 Workplace 목록을 조회했습니다.",
+            response
+        ));
+    }
+
+    @GetMapping("/{workplaceId}/members")
+    public ResponseEntity<ApiResponse<List<WorkplaceMemberResponse>>> getWorkplaceMembers(
+        @PathVariable Long workplaceId
+    ) {
+        Long actorUserId = rq.getActorId();
+
+        List<WorkplaceMemberResponse> response =
+            workplaceService.getWorkplaceMembers(workplaceId, actorUserId);
+
+        return ResponseEntity.ok(ApiResponse.success(
+            "200",
+            "Workplace 멤버 목록을 조회했습니다.",
+            response
+        ));
+    }
+
+    @GetMapping("/{workplaceId}/invite-code")
+    public ResponseEntity<ApiResponse<WorkplaceInviteCodeResponse>> getInviteCode(
+        @PathVariable Long workplaceId
+    ) {
+        Long actorUserId = rq.getActorId();
+
+        WorkplaceInviteCodeResponse response =
+            workplaceService.getInviteCode(workplaceId, actorUserId);
+
+        return ResponseEntity.ok(ApiResponse.success(
+            "200",
+            "Workplace 초대 코드를 조회했습니다.",
             response
         ));
     }
