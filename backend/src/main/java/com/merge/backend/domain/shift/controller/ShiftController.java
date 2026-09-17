@@ -11,6 +11,7 @@ import com.merge.backend.global.rq.Rq;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -80,5 +81,20 @@ public class ShiftController {
                 ShiftModifyResponse.from(modifiedShift))
         );
     }
+    @DeleteMapping("/workplaces/{workplaceId}/schedules/{scheduleId}/shifts/{shiftId}")
+    public ResponseEntity<ApiResponse<Void>> delete(
+        @PathVariable Long workplaceId,
+        @PathVariable Long scheduleId,
+        @PathVariable Long shiftId
+    ){
+        shiftService.delete(workplaceId, scheduleId, shiftId, rq.getActorId());
 
+        return ResponseEntity.status(200).body(
+            ApiResponse.success(
+                "200",
+                "근무가 삭제되었습니다.",
+                null
+            )
+        );
+    }
 }

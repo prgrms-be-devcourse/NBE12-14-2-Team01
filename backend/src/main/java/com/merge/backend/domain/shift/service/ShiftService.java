@@ -11,10 +11,11 @@ import com.merge.backend.domain.shift.exception.ShiftErrorCode;
 import com.merge.backend.domain.shift.repository.ScheduleRepository;
 import com.merge.backend.domain.shift.repository.ShiftRepository;
 import com.merge.backend.domain.shift.repository.UnavailableTimeRepository;
-import com.merge.backend.domain.user.exception.UserErrorCode;
+import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
+import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import com.merge.backend.global.exception.BusinessException;
 import com.merge.backend.global.util.TimeRangeUtils;
 import java.time.LocalDate;
@@ -30,6 +31,7 @@ public class ShiftService {
     private final ScheduleRepository scheduleRepository;
     private final ShiftRepository shiftRepository;
     private final WorkplaceMemberRepository workplaceMemberRepository;
+    private final WorkplaceRepository workplaceRepository;
     private final UnavailableTimeRepository unavailableTimeRepository;
 
     @Transactional(readOnly = true)
@@ -277,5 +279,40 @@ public class ShiftService {
             reqBody.startAt(),
             reqBody.endAt()
         );
+    }
+
+    public void delete(Long workplaceId, Long scheduleId, Long shiftId, Long actorId) {
+
+        Workplace workplace = workplaceRepository.findById(workplaceId)
+            .orElseThrow(() ->
+                new BusinessException(ShiftErrorCode.NOT_FOUND_WORKPLACE_ERROR)
+            );
+        //나중에 workplace의 매니저 인가 로직으로 변환
+        if(isNotManager(workplaceId, actorId)){
+            throw new BusinessException(ShiftErrorCode.FORBIDDEN_ACCESS);
+        }
+        //스케줄 존재 확인
+        Schedule schedule = scheduleRepository.findById(scheduleId)
+            .orElseThrow(() ->
+                new BusinessException(
+                    ShiftErrorCode.NOT_FOUND_SCHEDULE_ERROR)
+            );
+        //스케줄이 해당 workplace 소속인지 확인
+        if(!schedule.getWorkplace().getId().equals(workplaceId)) {
+            throw new BusinessException(ShiftErrorCode.INVALID_WORKPLACE_VALUE);
+        }
+        //스케줄이 DRAFT인지 확인
+        if(schedule.getStatus() != ScheduleStatus.DRAFT) {
+            throw new BusinessException(ShiftErrorCode.INVALID_STATUS_VALUE);
+        }
+        //shift 존재 확인
+        Shift shift = shiftRepository.findById(shiftId)
+            .orElseThrow(() -> new BusinessException(ShiftErrorCode.NOT_FOUND_ERROR)
+            );
+        //shift가 해당 schedule 소속인지
+        if(!shift.getSchedule().getId().equals(scheduleId)){
+            throw new BusinessException(ShiftErrorCode.INVALID_SHIFT_VALUE);
+        }
+        shiftRepository.deleteById(shiftId);
     }
 }

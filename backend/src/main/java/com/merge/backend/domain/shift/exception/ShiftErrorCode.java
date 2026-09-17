@@ -109,6 +109,11 @@ public enum ShiftErrorCode implements ErrorCode {
         HttpStatus.NOT_FOUND,
         "SFT-404",
         "해당 근무를 찾을 수 없습니다."
+    ),
+    NOT_FOUND_WORKPLACE_ERROR(
+        HttpStatus.NOT_FOUND,
+        "SFT-404",
+        "해당 근무지를 찾을 수 없습니다."
     );
 
     private final HttpStatus httpStatus;
