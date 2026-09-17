@@ -73,6 +73,16 @@ public enum ShiftErrorCode implements ErrorCode {
         "SFT-011",
         "근무 시작일과 종료일은 같아야 합니다."
     ),
+    NOT_PUBLISHED_SHIFT(
+        HttpStatus.NOT_FOUND,
+        "SFT-012",
+        "해당 근무는 확정되지 않았습니다."
+    ),
+    IS_CANCELED_SHIFT(
+        HttpStatus.NOT_FOUND,
+        "SFT-012",
+        "해당 근무는 취소되었습니다."
+    ),
     UNAVAILABLE_TIME_CONFLICT(
         HttpStatus.BAD_REQUEST,
         "UNAVAILABLE_TIME_CONFLICT",
