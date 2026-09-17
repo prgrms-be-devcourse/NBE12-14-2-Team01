@@ -31,6 +31,23 @@ public class ShiftService {
     private final UnavailableTimeRepository unavailableTimeRepository;
 
     @Transactional
+    public Shift detail(Long shiftId) {
+        Shift shift = shiftRepository.findById(shiftId)
+            .orElseThrow(() ->
+                new BusinessException(ShiftErrorCode.NOT_FOUND_SHIFT_ERROR));
+
+        //조회할 근무가 PUBLISHED 되지 않았다면
+        if(shift.getSchedule().getStatus() != ScheduleStatus.PUBLISHED) {
+            throw new BusinessException(ShiftErrorCode.NOT_PUBLISHED_SHIFT);
+        }
+
+        //취소된 근무를 조회하려 할 시
+        if(shift.getStatus() != ShiftStatus.SCHEDULED) {
+            throw new BusinessException(ShiftErrorCode.IS_CANCELED_SHIFT);
+        }
+        return shift;
+    }
+    @Transactional
     public Shift create(ShiftRequest reqBody, Long workplaceId, Long scheduleId) {
 
         //todo: user 인증 && Role == MANAGER인가
