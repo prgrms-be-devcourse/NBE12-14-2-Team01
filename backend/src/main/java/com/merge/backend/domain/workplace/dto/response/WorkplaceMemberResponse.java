@@ -1,15 +1,20 @@
 package com.merge.backend.domain.workplace.dto.response;
 
+import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
 
-@Getter
-@AllArgsConstructor
-public class WorkplaceMemberResponse {
-
-    private Long memberId;
-    private String name;
-    private String email;
-    private WorkplaceRole role;
+public record WorkplaceMemberResponse(
+    Long memberId,
+    String name,
+    String email,
+    WorkplaceRole role
+) {
+    public static WorkplaceMemberResponse from(WorkplaceMember member) {
+        return new WorkplaceMemberResponse(
+            member.getId(),
+            member.getUser().getName(),
+            member.getUser().getEmail(),
+            member.getRole()
+        );
+    }
 }

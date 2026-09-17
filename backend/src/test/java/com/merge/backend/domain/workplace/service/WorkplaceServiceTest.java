@@ -8,12 +8,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.merge.backend.domain.user.entity.User;
-import com.merge.backend.domain.workplace.dto.request.WorkplaceCreateRequest;
-import com.merge.backend.domain.workplace.dto.request.WorkplaceJoinRequest;
-import com.merge.backend.domain.workplace.dto.response.MyWorkplaceResponse;
-import com.merge.backend.domain.workplace.dto.response.WorkplaceCreateResponse;
-import com.merge.backend.domain.workplace.dto.response.WorkplaceInviteCodeResponse;
-import com.merge.backend.domain.workplace.dto.response.WorkplaceMemberResponse;
 import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
@@ -68,12 +62,9 @@ public class WorkplaceServiceTest {
     @Test
     @DisplayName("workplace(근무지)를 생성하면 manager(매니저 권한)가 등록된다.")
     void test1() {
-        WorkplaceCreateRequest request = mock(WorkplaceCreateRequest.class);
-
-        when(request.getName()).thenReturn("테스트 매장");
         when(workplaceRepository.existsByInviteCode(any())).thenReturn(false);
 
-        WorkplaceCreateResponse response = workplaceService.createWorkplace(request, user);
+        workplaceService.createWorkplace("테스트 매장", user);
 
         ArgumentCaptor<WorkplaceMember> memberCaptor =
             ArgumentCaptor.forClass(WorkplaceMember.class);
@@ -81,22 +72,24 @@ public class WorkplaceServiceTest {
         verify(workplaceRepository).save(any(Workplace.class));
         verify(workplaceMemberRepository).save(memberCaptor.capture());
 
-        assertEquals("테스트 매장", response.getName());
-        assertEquals(WorkplaceRole.MANAGER, response.getRole());
         assertEquals(WorkplaceRole.MANAGER, memberCaptor.getValue().getRole());
     }
 
     @Test
     @DisplayName("이미 참여 중인 사용자는 다시 참여할 수 없다.")
     void test2() {
-        WorkplaceJoinRequest request = mock(WorkplaceJoinRequest.class);
         Workplace workplace = mock(Workplace.class);
 
-        when(request.getInviteCode()).thenReturn("ABC123");
-        when(workplaceRepository.findByInviteCode("ABC123")).thenReturn(Optional.of(workplace));
-        when(workplaceMemberRepository.existsByWorkplaceAndUser(workplace, user)).thenReturn(true);
+        when(workplaceRepository.findByInviteCode("ABC123"))
+            .thenReturn(Optional.of(workplace));
 
-        assertThrows(BusinessException.class, () -> workplaceService.joinWorkplace(request, user));
+        when(workplaceMemberRepository.existsByWorkplaceAndUser(workplace, user))
+            .thenReturn(true);
+
+        assertThrows(
+            BusinessException.class,
+            () -> workplaceService.joinWorkplace("ABC123", user)
+        );
     }
 
     @Test
@@ -114,12 +107,12 @@ public class WorkplaceServiceTest {
         when(workplace.getName()).thenReturn("테스트 매장");
         when(member.getRole()).thenReturn(WorkplaceRole.MANAGER);
 
-        List<MyWorkplaceResponse> response =
+        List<WorkplaceMember> response =
             workplaceService.getMyWorkplaces(user);
 
         assertEquals(1, response.size());
-        assertEquals(10L, response.get(0).getWorkplaceId());
-        assertEquals("테스트 매장", response.get(0).getName());
+        assertEquals(10L, response.get(0).getWorkplace().getId());
+        assertEquals("테스트 매장", response.get(0).getWorkplace().getName());
         assertEquals(WorkplaceRole.MANAGER, response.get(0).getRole());
     }
 
@@ -130,7 +123,7 @@ public class WorkplaceServiceTest {
         when(workplaceMemberRepository.findAllByUser_IdAndLeftAtIsNull(1L))
             .thenReturn(List.of());
 
-        List<MyWorkplaceResponse> response =
+        List<WorkplaceMember> response =
             workplaceService.getMyWorkplaces(user);
 
         assertEquals(0, response.size());
@@ -156,13 +149,12 @@ public class WorkplaceServiceTest {
         when(memberUser.getEmail()).thenReturn("test@test.com");
         when(member.getRole()).thenReturn(WorkplaceRole.EMPLOYEE);
 
-        List<WorkplaceMemberResponse> response =
+        List<WorkplaceMember> response =
             workplaceService.getWorkplaceMembers(10L, 1L);
 
-        assertEquals(1, response.size());
-        assertEquals(100L, response.get(0).getMemberId());
-        assertEquals("홍길동", response.get(0).getName());
-        assertEquals("test@test.com", response.get(0).getEmail());
+        assertEquals(100L, response.get(0).getId());
+        assertEquals("홍길동", response.get(0).getUser().getName());
+        assertEquals("test@test.com", response.get(0).getUser().getEmail());
         assertEquals(WorkplaceRole.EMPLOYEE, response.get(0).getRole());
 
         verify(workplaceMemberService).requireManager(1L, 10L);
@@ -178,10 +170,10 @@ public class WorkplaceServiceTest {
         when(workplace.getId()).thenReturn(10L);
         when(workplace.getInviteCode()).thenReturn("ABCD1234");
 
-        WorkplaceInviteCodeResponse response =
+        Workplace response =
             workplaceService.getInviteCode(10L, 1L);
 
-        assertEquals(10L, response.getWorkplaceId());
+        assertEquals(10L, response.getId());
         assertEquals("ABCD1234", response.getInviteCode());
 
         verify(workplaceMemberService).requireManager(1L, 10L);

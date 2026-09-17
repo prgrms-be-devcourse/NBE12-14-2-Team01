@@ -9,6 +9,8 @@ import com.merge.backend.domain.workplace.dto.response.WorkplaceCreateResponse;
 import com.merge.backend.domain.workplace.dto.response.WorkplaceInviteCodeResponse;
 import com.merge.backend.domain.workplace.dto.response.WorkplaceJoinResponse;
 import com.merge.backend.domain.workplace.dto.response.WorkplaceMemberResponse;
+import com.merge.backend.domain.workplace.entity.Workplace;
+import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.service.WorkplaceService;
 import com.merge.backend.global.dto.ApiResponse;
 import com.merge.backend.global.rq.Rq;
@@ -41,8 +43,11 @@ public class WorkplaceController {
 
         User user = userService.getById(userId);
 
+        WorkplaceMember member =
+            workplaceService.createWorkplace(request.name(), user);
+
         WorkplaceCreateResponse response =
-            workplaceService.createWorkplace(request, user);
+            WorkplaceCreateResponse.from(member);
 
         return ResponseEntity
             .status(HttpStatus.CREATED)
@@ -61,8 +66,11 @@ public class WorkplaceController {
 
         User user = userService.getById(userId);
 
+        WorkplaceMember member =
+            workplaceService.joinWorkplace(request.inviteCode(), user);
+
         WorkplaceJoinResponse response =
-            workplaceService.joinWorkplace(request, user);
+            WorkplaceJoinResponse.from(member);
 
         return ResponseEntity
             .status(HttpStatus.CREATED)
@@ -80,7 +88,10 @@ public class WorkplaceController {
         User user = userService.getById(userId);
 
         List<MyWorkplaceResponse> response =
-            workplaceService.getMyWorkplaces(user);
+            workplaceService.getMyWorkplaces(user)
+                .stream()
+                .map(MyWorkplaceResponse::from)
+                .toList();
 
         return ResponseEntity.ok(ApiResponse.success(
             "200",
@@ -96,11 +107,15 @@ public class WorkplaceController {
         Long actorUserId = rq.getActorId();
 
         List<WorkplaceMemberResponse> response =
-            workplaceService.getWorkplaceMembers(workplaceId, actorUserId);
+            workplaceService
+                .getWorkplaceMembers(workplaceId, actorUserId)
+                .stream()
+                .map(WorkplaceMemberResponse::from)
+                .toList();
 
         return ResponseEntity.ok(ApiResponse.success(
             "200",
-            "Workplace 멤버 목록을 조회했습니다.",
+            "Workplace 구성원 목록을 조회했습니다.",
             response
         ));
     }
@@ -111,8 +126,11 @@ public class WorkplaceController {
     ) {
         Long actorUserId = rq.getActorId();
 
-        WorkplaceInviteCodeResponse response =
+        Workplace workplace =
             workplaceService.getInviteCode(workplaceId, actorUserId);
+
+        WorkplaceInviteCodeResponse response =
+            WorkplaceInviteCodeResponse.from(workplace);
 
         return ResponseEntity.ok(ApiResponse.success(
             "200",

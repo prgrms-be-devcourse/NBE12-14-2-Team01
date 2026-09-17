@@ -1,13 +1,6 @@
 package com.merge.backend.domain.workplace.service;
 
 import com.merge.backend.domain.user.entity.User;
-import com.merge.backend.domain.workplace.dto.request.WorkplaceCreateRequest;
-import com.merge.backend.domain.workplace.dto.request.WorkplaceJoinRequest;
-import com.merge.backend.domain.workplace.dto.response.MyWorkplaceResponse;
-import com.merge.backend.domain.workplace.dto.response.WorkplaceCreateResponse;
-import com.merge.backend.domain.workplace.dto.response.WorkplaceInviteCodeResponse;
-import com.merge.backend.domain.workplace.dto.response.WorkplaceJoinResponse;
-import com.merge.backend.domain.workplace.dto.response.WorkplaceMemberResponse;
 import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
@@ -33,11 +26,11 @@ public class WorkplaceService {
     private final WorkplaceMemberService workplaceMemberService;
 
     @Transactional
-    public WorkplaceCreateResponse createWorkplace(WorkplaceCreateRequest request, User user) {
+    public WorkplaceMember createWorkplace(String name, User user) {
 
         String inviteCode = createInviteCode();
 
-        Workplace workplace = new Workplace(request.getName(), inviteCode);
+        Workplace workplace = new Workplace(name, inviteCode);
 
         workplaceRepository.save(workplace);
 
@@ -48,13 +41,7 @@ public class WorkplaceService {
             LocalDateTime.now(clock)
         );
 
-        workplaceMemberRepository.save(member);
-
-        return new WorkplaceCreateResponse(
-            workplace.getId(),
-            workplace.getName(),
-            WorkplaceRole.MANAGER
-        );
+        return workplaceMemberRepository.save(member);
     }
 
     private String createInviteCode() {
@@ -69,9 +56,9 @@ public class WorkplaceService {
     }
 
     @Transactional
-    public WorkplaceJoinResponse joinWorkplace(WorkplaceJoinRequest request, User user) {
+    public WorkplaceMember joinWorkplace(String inviteCode, User user) {
 
-        Workplace workplace = workplaceRepository.findByInviteCode(request.getInviteCode())
+        Workplace workplace = workplaceRepository.findByInviteCode(inviteCode)
             .orElseThrow(() -> new BusinessException(WorkplaceErrorCode.INVALID_INVITE_CODE));
 
         if (workplaceMemberRepository.existsByWorkplaceAndUser(workplace, user)) {
@@ -85,30 +72,17 @@ public class WorkplaceService {
             LocalDateTime.now(clock)
         );
 
-        workplaceMemberRepository.save(member);
-
-        return new WorkplaceJoinResponse(
-            workplace.getId(),
-            workplace.getName(),
-            WorkplaceRole.EMPLOYEE
-        );
+        return workplaceMemberRepository.save(member);
     }
 
     @Transactional(readOnly = true)
-    public List<MyWorkplaceResponse> getMyWorkplaces(User user) {
+    public List<WorkplaceMember> getMyWorkplaces(User user) {
         return workplaceMemberRepository
-            .findAllByUser_IdAndLeftAtIsNull(user.getId())
-            .stream()
-            .map(member -> new MyWorkplaceResponse(
-                member.getWorkplace().getId(),
-                member.getWorkplace().getName(),
-                member.getRole()
-            ))
-            .toList();
+            .findAllByUser_IdAndLeftAtIsNull(user.getId());
     }
 
     @Transactional(readOnly = true)
-    public List<WorkplaceMemberResponse> getWorkplaceMembers(
+    public List<WorkplaceMember> getWorkplaceMembers(
         Long workplaceId,
         Long actorUserId
     ) {
@@ -118,15 +92,7 @@ public class WorkplaceService {
         workplaceMemberService.requireManager(actorUserId, workplaceId);
 
         return workplaceMemberRepository
-            .findAllByWorkplace_IdAndLeftAtIsNull(workplaceId)
-            .stream()
-            .map(member -> new WorkplaceMemberResponse(
-                member.getId(),
-                member.getUser().getName(),
-                member.getUser().getEmail(),
-                member.getRole()
-            ))
-            .toList();
+            .findAllByWorkplace_IdAndLeftAtIsNull(workplaceId);
     }
 
     private Workplace getWorkplace(Long workplaceId) {
@@ -137,7 +103,7 @@ public class WorkplaceService {
     }
 
     @Transactional(readOnly = true)
-    public WorkplaceInviteCodeResponse getInviteCode(
+    public Workplace getInviteCode(
         Long workplaceId,
         Long actorUserId
     ) {
@@ -145,9 +111,6 @@ public class WorkplaceService {
 
         workplaceMemberService.requireManager(actorUserId, workplaceId);
 
-        return new WorkplaceInviteCodeResponse(
-            workplace.getId(),
-            workplace.getInviteCode()
-        );
+        return workplace;
     }
 }
