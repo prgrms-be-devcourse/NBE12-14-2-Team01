@@ -50,11 +50,12 @@ public class Shift extends BaseEntity {
         this.endAt = endAt;
         this.status = status;
     }
+
     public Shift update(
         WorkplaceMember member,
         LocalDateTime startAt,
         LocalDateTime endAt
-        ) {
+    ) {
         this.member = member;
         this.startAt = startAt;
         this.endAt = endAt;
