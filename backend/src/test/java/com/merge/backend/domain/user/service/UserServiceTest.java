@@ -136,4 +136,24 @@ class UserServiceTest {
             .extracting("errorCode")
             .isEqualTo(UserErrorCode.INVALID_REFRESH_TOKEN);
     }
+
+    @Test
+    void id로_유저를_조회한다() {
+        User user = new User(1L, "test@example.com", "이름");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        User result = userService.getById(1L);
+
+        assertThat(result).isEqualTo(user);
+    }
+
+    @Test
+    void 존재하지_않는_id로_조회하면_예외가_발생한다() {
+        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.getById(1L))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode")
+            .isEqualTo(UserErrorCode.AUTHENTICATION_REQUIRED);
+    }
 }

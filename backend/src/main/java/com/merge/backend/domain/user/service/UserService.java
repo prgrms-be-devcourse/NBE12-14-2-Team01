@@ -38,6 +38,12 @@ public class UserService {
         return user;
     }
 
+    public User getById(Long id) {
+        return userRepository.findById(id)
+            .orElseThrow(() -> new
+                BusinessException(UserErrorCode.AUTHENTICATION_REQUIRED));
+    }
+
     public String genAccessToken(User user) {
         return authTokenService.genAccessToken(user);
     }
