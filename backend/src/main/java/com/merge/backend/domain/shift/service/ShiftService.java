@@ -6,6 +6,7 @@ import com.merge.backend.domain.shift.dto.ShiftRequest;
 import com.merge.backend.domain.shift.entity.Schedule;
 import com.merge.backend.domain.shift.entity.ScheduleStatus;
 import com.merge.backend.domain.shift.entity.Shift;
+import com.merge.backend.domain.shift.entity.ShiftStatus;
 import com.merge.backend.domain.shift.exception.ShiftErrorCode;
 import com.merge.backend.domain.shift.repository.ScheduleRepository;
 import com.merge.backend.domain.shift.repository.ShiftRepository;
@@ -60,6 +61,10 @@ public class ShiftService {
         if(!member.getWorkplace().getId().equals(workplaceId) || member.getLeftAt() != null) {
             throw new BusinessException(ShiftErrorCode.INVALID_WORKPLACE_MEMBER_VALUE);
         }
+        //p0에서는 자정을 넘어가는 근무는 존재하지 않는다.
+        if (!reqBody.startAt().toLocalDate().equals(reqBody.endAt().toLocalDate())) {
+            throw new BusinessException(ShiftErrorCode.INVALID_SHIFT_SAME_DAY);
+        }
         //startAt < endAt
         if (!TimeRangeUtils.isValidRange(
             reqBody.startAt(),
@@ -69,7 +74,6 @@ public class ShiftService {
                 ShiftErrorCode.INVALID_BEFORE_AFTER_VALUE
             );
         }
-
         //Schedule 주차 범위 검증 추가
         validateShiftInScheduleWeek(schedule, reqBody.startAt(), reqBody.endAt());
 
@@ -77,7 +81,7 @@ public class ShiftService {
         Long userId = member.getUser().getId();
         validateShiftOverlap(
             scheduleId, member.getId(), userId,
-            reqBody.startAt(), reqBody.endAt(), null
+            reqBody.startAt(), reqBody.endAt(), null, SCHEDULED
         );
 
         // confirmUnavailableConflict가 false일 때만 체크)
@@ -126,18 +130,19 @@ public class ShiftService {
         Long userId,
         java.time.LocalDateTime startAt,
         java.time.LocalDateTime endAt,
-        Long currentShiftId
+        Long currentShiftId,
+        ShiftStatus status
     ) {
         // 1) 동일 Schedule 내 동일 Member 중복 체크
         if (shiftRepository.existsOverlappingInSchedule(
-            scheduleId, memberId, startAt, endAt, currentShiftId)
+            scheduleId, memberId, startAt, endAt, currentShiftId, status)
         ) {
             throw new BusinessException(ShiftErrorCode.DUPLICATE_LOCAL_SCHEDULE_TIME);
         }
 
         // 2) 해당 User의 모든 Workplace 확정 Shift 중복 체크
         if (shiftRepository.existsOverlappingOfficialShift(
-            userId, ScheduleStatus.PUBLISHED, startAt, endAt, currentShiftId)
+            userId, ScheduleStatus.PUBLISHED, startAt, endAt, currentShiftId, status)
         ) {
             throw new BusinessException(ShiftErrorCode.DUPLICATE_GLOBAL_SCHEDULE_TIME);
         }
@@ -188,7 +193,10 @@ public class ShiftService {
             member.getLeftAt() != null) {
             throw new BusinessException(ShiftErrorCode.INVALID_WORKPLACE_MEMBER_VALUE);
         }
-
+        //p0에서는 자정을 넘어가는 근무는 존재하지 않는다.
+        if (!reqBody.startAt().toLocalDate().equals(reqBody.endAt().toLocalDate())) {
+            throw new BusinessException(ShiftErrorCode.INVALID_SHIFT_SAME_DAY);
+        }
         //startAt < endAt
         if (!TimeRangeUtils.isValidRange(
             reqBody.startAt(),
@@ -208,7 +216,7 @@ public class ShiftService {
         //자기 자신은 overlap 검사에서 제외
         validateShiftOverlap(
             scheduleId, member.getId(), userId,
-            reqBody.startAt(), reqBody.endAt(), shiftId
+            reqBody.startAt(), reqBody.endAt(), shiftId, shift.getStatus()
         );
 
         // confirmUnavailableConflict가 false일 때만 체크)

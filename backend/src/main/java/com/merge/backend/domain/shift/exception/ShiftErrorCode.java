@@ -68,6 +68,11 @@ public enum ShiftErrorCode implements ErrorCode {
         "다른 근무지에서 중복되는 근무가 있습니다."
     ),
 
+    INVALID_SHIFT_SAME_DAY(
+        HttpStatus.BAD_REQUEST,
+        "SFT-011",
+        "근무 시작일과 종료일은 같아야 합니다."
+    ),
     UNAVAILABLE_TIME_CONFLICT(
         HttpStatus.BAD_REQUEST,
         "UNAVAILABLE_TIME_CONFLICT",
