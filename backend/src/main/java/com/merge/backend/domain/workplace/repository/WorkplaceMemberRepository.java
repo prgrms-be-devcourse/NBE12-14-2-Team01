@@ -19,4 +19,9 @@ public interface WorkplaceMemberRepository extends JpaRepository<WorkplaceMember
     List<WorkplaceMember> findAllByUser_IdAndLeftAtIsNull(Long userId);
 
     List<WorkplaceMember> findAllByWorkplace_IdAndLeftAtIsNull(Long workplaceId);
+
+    Optional<WorkplaceMember> findByWorkplaceIdAndUserId(
+        Long workplaceId,
+        Long userId
+    );
 }

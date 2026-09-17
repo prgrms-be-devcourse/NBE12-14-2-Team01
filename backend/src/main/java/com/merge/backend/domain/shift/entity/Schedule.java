@@ -30,4 +30,14 @@ public class Schedule extends BaseEntity {
     private ScheduleStatus status;
 
     private LocalDateTime publishedAt;
+
+    public Schedule(
+        Workplace workplace,
+        LocalDate weekStartDate
+    ) {
+        this.workplace = workplace;
+        this.weekStartDate = weekStartDate;
+        this.status = ScheduleStatus.DRAFT;
+        this.publishedAt = null;
+    }
 }
