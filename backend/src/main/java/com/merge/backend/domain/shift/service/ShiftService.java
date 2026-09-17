@@ -32,7 +32,7 @@ public class ShiftService {
     private final WorkplaceMemberRepository workplaceMemberRepository;
     private final UnavailableTimeRepository unavailableTimeRepository;
 
-    @Transactional
+    @Transactional(readOnly = true)
     public Shift detail(Long shiftId, Long currentUserId) {
         Shift shift = shiftRepository.findById(shiftId)
             .orElseThrow(() ->
@@ -58,9 +58,9 @@ public class ShiftService {
     public Shift create(ShiftRequest reqBody, Long workplaceId, Long scheduleId, Long actorId) {
 
         //요청 사용자 해당 매장의 MANAGER 권한을 가지고 있는지
-        if(isNotManager(workplaceId, actorId)){
-           throw new BusinessException(ShiftErrorCode.FORBIDDEN_ACCESS);
-        };
+        if(isNotManager(workplaceId, actorId)) {
+            throw new BusinessException(ShiftErrorCode.FORBIDDEN_ACCESS);
+        }
 
         //스케줄 존재 확인
         Schedule schedule = scheduleRepository.findById(scheduleId)
@@ -177,8 +177,10 @@ public class ShiftService {
     //요청자가 해당 workplaceId의 MANAGER 권한을 보유하고 있는지
     private boolean isNotManager(Long workplaceId, Long actorId) {
 
-        WorkplaceMember requester = workplaceMemberRepository.findByWorkplaceIdAndUserId(workplaceId, actorId)
-            .orElseThrow(() -> new BusinessException(ShiftErrorCode.INVALID_WORKPLACE_MEMBER_VALUE));
+        WorkplaceMember requester = workplaceMemberRepository
+            .findByWorkplaceIdAndUserId(workplaceId, actorId)
+            .orElseThrow(() ->
+                new BusinessException(ShiftErrorCode.INVALID_WORKPLACE_MEMBER_VALUE));
 
         if (requester.getRole().equals(WorkplaceRole.MANAGER)) {
             return false;
