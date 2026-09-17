@@ -6,9 +6,9 @@ import com.merge.backend.domain.shift.dto.ShiftRequest;
 import com.merge.backend.domain.shift.entity.Shift;
 import com.merge.backend.domain.shift.service.ShiftService;
 import com.merge.backend.global.dto.ApiResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -27,7 +27,7 @@ public class ShiftController {
     public ResponseEntity<ApiResponse<ShiftCreateResponse>> create(
         @PathVariable Long workplaceId,
         @PathVariable Long scheduleId,
-        @RequestBody ShiftRequest reqBody
+        @Valid @RequestBody ShiftRequest reqBody
     ){
         Shift shift = shiftService.create(reqBody, workplaceId, scheduleId);
 
@@ -44,7 +44,7 @@ public class ShiftController {
         @PathVariable Long workplaceId,
         @PathVariable Long scheduleId,
         @PathVariable Long shiftId,
-        @RequestBody ShiftRequest reqBody
+        @Valid @RequestBody ShiftRequest reqBody
     ){
 
         Shift modifiedShift = shiftService.modify(

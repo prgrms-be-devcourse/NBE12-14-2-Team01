@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 
 public record ShiftCreateResponse(
 
-    Long scheduleId,
+    Long shiftId,
     Long memberId,
     String memberName,
     LocalDateTime startAt,
@@ -16,7 +16,7 @@ public record ShiftCreateResponse(
 ) {
     public static ShiftCreateResponse from(Shift shift){
         return new ShiftCreateResponse(
-            shift.getSchedule().getId(),
+            shift.getId(),
             shift.getMember().getId(),
             shift.getMember().getUser().getName(),
             shift.getStartAt(),
