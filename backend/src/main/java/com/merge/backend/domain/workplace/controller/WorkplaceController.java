@@ -1,7 +1,7 @@
 package com.merge.backend.domain.workplace.controller;
 
 import com.merge.backend.domain.user.entity.User;
-import com.merge.backend.domain.user.repository.UserRepository;
+import com.merge.backend.domain.user.service.UserService;
 import com.merge.backend.domain.workplace.dto.request.WorkplaceCreateRequest;
 import com.merge.backend.domain.workplace.dto.request.WorkplaceJoinRequest;
 import com.merge.backend.domain.workplace.dto.response.MyWorkplaceResponse;
@@ -30,7 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class WorkplaceController {
 
     private final WorkplaceService workplaceService;
-    private final UserRepository userRepository;
+    private final UserService userService;
     private final Rq rq;
 
     @PostMapping
@@ -39,8 +39,7 @@ public class WorkplaceController {
     ) {
         Long userId = rq.getActorId();
 
-        User user = userRepository.findById(userId)
-            .orElseThrow();
+        User user = userService.getById(userId);
 
         WorkplaceCreateResponse response =
             workplaceService.createWorkplace(request, user);
@@ -60,8 +59,7 @@ public class WorkplaceController {
     ) {
         Long userId = rq.getActorId();
 
-        User user = userRepository.findById(userId)
-            .orElseThrow();
+        User user = userService.getById(userId);
 
         WorkplaceJoinResponse response =
             workplaceService.joinWorkplace(request, user);
@@ -79,8 +77,7 @@ public class WorkplaceController {
     public ResponseEntity<ApiResponse<List<MyWorkplaceResponse>>> getMyWorkplaces() {
         Long userId = rq.getActorId();
 
-        User user = userRepository.findById(userId)
-            .orElseThrow();
+        User user = userService.getById(userId);
 
         List<MyWorkplaceResponse> response =
             workplaceService.getMyWorkplaces(user);
