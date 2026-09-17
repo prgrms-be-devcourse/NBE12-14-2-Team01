@@ -25,7 +25,12 @@ public class SecurityConfig {
     SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST, "/auth/signup", "/auth/login", "/auth/refresh")
+                        .requestMatchers(
+                                HttpMethod.POST
+                                , "/auth/signup"
+                                , "/auth/login"
+                                , "/auth/refresh"
+                        )
                         .permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/signup").permitAll()
                         // H2 Console 테스트용
@@ -43,7 +48,8 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .addFilterBefore(customAuthenticationFilter,
-                        UsernamePasswordAuthenticationFilter.class)
+                        UsernamePasswordAuthenticationFilter.class
+                )
 
                 //토큰 없는 요청은 Spring Security가 기본처리 하는데 대신 ApiResponse 형식으로 통일
                 .exceptionHandling(exceptionHandling -> exceptionHandling
@@ -56,7 +62,7 @@ public class SecurityConfig {
                             );
                             response.getWriter().write(body);
                         })
-                );
+            );
 
         return http.build();
     }

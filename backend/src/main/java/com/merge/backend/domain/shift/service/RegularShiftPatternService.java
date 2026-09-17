@@ -63,7 +63,11 @@ public class RegularShiftPatternService {
 
     }
 
-    public RegularShiftPatternResponse update(Long workplaceId, Long patternId, RegularShiftPatternReqBody reqBody) {
+    public RegularShiftPatternResponse update(
+            Long workplaceId
+            , Long patternId
+            , RegularShiftPatternReqBody reqBody
+    ) {
 
         validateWorkplaceExists(workplaceId);
 
@@ -103,7 +107,9 @@ public class RegularShiftPatternService {
 
         requireManager(workplaceId);
 
-        List<RegularShiftPattern> patterns = regularShiftPatternRepository.findByMemberWorkplaceIdAndMemberLeftAtIsNull(workplaceId);
+        List<RegularShiftPattern> patterns =
+                regularShiftPatternRepository
+                        .findByMemberWorkplaceIdAndMemberLeftAtIsNull(workplaceId);
 
         return patterns.stream()
                 .map(pattern -> new RegularShiftPatternListResponse(
@@ -225,7 +231,9 @@ public class RegularShiftPatternService {
     private void requireManager(Long workplaceId) {
         Long actorId = rq.getActorId();
 
-        WorkplaceMember actorMember = workplaceMemberRepository.findByWorkplaceIdAndUserId(workplaceId, actorId)
+        WorkplaceMember actorMember =
+                workplaceMemberRepository
+                        .findByWorkplaceIdAndUserId(workplaceId, actorId)
                 .orElseThrow(
                         () -> new BusinessException(
                                 ShiftErrorCode.MEMBER_NOT_IN_WORKPLACE

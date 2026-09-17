@@ -24,7 +24,8 @@ public class RegularShiftPatternController {
     public ApiResponse<List<RegularShiftPatternListResponse>> list(
             @PathVariable Long workplaceId
     ) {
-        List<RegularShiftPatternListResponse> regularShiftPatternList = regularShiftPatternService.findAll(workplaceId);
+        List<RegularShiftPatternListResponse> regularShiftPatternList
+                = regularShiftPatternService.findAll(workplaceId);
 
         return ApiResponse.success(
                 "200",
@@ -37,7 +38,7 @@ public class RegularShiftPatternController {
     public ApiResponse<RegularShiftPatternResponse> register(
             @PathVariable Long workplaceId,
             @Valid @RequestBody RegularShiftPatternReqBody reqBody
-            ) {
+    ) {
 
         RegularShiftPatternResponse newRegularShiftPattern = regularShiftPatternService.register(
                 workplaceId,
@@ -58,7 +59,8 @@ public class RegularShiftPatternController {
             @PathVariable Long patternId,
             @Valid @RequestBody RegularShiftPatternReqBody reqBody
     ) {
-        RegularShiftPatternResponse updatedRegularShiftPattern = regularShiftPatternService.update(workplaceId, patternId, reqBody);
+        RegularShiftPatternResponse updatedRegularShiftPattern
+                = regularShiftPatternService.update(workplaceId, patternId, reqBody);
 
         return ApiResponse.success(
                 "200",
