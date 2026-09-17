@@ -8,7 +8,7 @@ public record ShiftRequest (
     @NotNull Long memberId,
     @NotNull LocalDateTime startAt,
     @NotNull LocalDateTime endAt,
-    @NotNull boolean confirmUnavailableConflict
+    @NotNull Boolean confirmUnavailableConflict
 ){
 
 }
