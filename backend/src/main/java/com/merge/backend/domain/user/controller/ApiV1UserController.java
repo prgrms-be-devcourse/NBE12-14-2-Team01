@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -60,6 +61,14 @@ public class ApiV1UserController {
         return ResponseEntity.ok(
             ApiResponse.success("200", "Access Token이 재발급되었습니다", new RefreshResponse(accessToken))
         );
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<UserResponse>> me() {
+        User user = userService.getById(rq.getActorId());
+        UserResponse response = UserResponse.from(user);
+
+        return ResponseEntity.ok(ApiResponse.success("200", "현재 사용자 정보를 조회했습니다", response));
     }
 
 }
