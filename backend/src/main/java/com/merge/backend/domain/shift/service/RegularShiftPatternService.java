@@ -12,10 +12,12 @@ import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
 import com.merge.backend.global.exception.BusinessException;
 import com.merge.backend.global.rq.Rq;
+import com.merge.backend.global.util.TimeRangeUtils;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.sql.Time;
 import java.util.List;
 
 @Service
@@ -195,7 +197,10 @@ public class RegularShiftPatternService {
     }
 
     private void validateTime(RegularShiftPatternReqBody reqBody) {
-        if (!reqBody.startTime().isBefore(reqBody.endTime())) {
+        if (!TimeRangeUtils.isValidRange(
+                reqBody.startTime(),
+                reqBody.endTime()
+        )) {
             throw new BusinessException(
                     RegularShiftErrorCode.INVALID_PATTERN_TIME
             );
@@ -216,9 +221,12 @@ public class RegularShiftPatternService {
                                 || !pattern.getId().equals(excludePatternId)
                 )
                 .anyMatch(pattern ->
-                        reqBody.startTime().isBefore(pattern.getEndTime())
-                                && pattern.getStartTime()
-                                .isBefore(reqBody.endTime())
+                        TimeRangeUtils.overlaps(
+                                reqBody.startTime(),
+                                reqBody.endTime(),
+                                pattern.getStartTime(),
+                                pattern.getEndTime()
+                        )
                 );
 
         if (overlap) {
