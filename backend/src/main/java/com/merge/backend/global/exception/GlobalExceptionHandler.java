@@ -65,7 +65,7 @@ public class GlobalExceptionHandler {
             getFieldErrors().
             stream()
             .map(error -> new FieldErrorDetail(
-                error.getField(),
+                    error.getField(),
                     error.getDefaultMessage()
                 )
             )

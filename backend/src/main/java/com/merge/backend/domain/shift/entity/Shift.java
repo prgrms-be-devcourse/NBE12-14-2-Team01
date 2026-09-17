@@ -2,8 +2,15 @@ package com.merge.backend.domain.shift.entity;
 
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.global.entity.BaseEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import java.time.LocalDateTime;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -29,4 +36,30 @@ public class Shift extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ShiftStatus status;
+
+    public Shift (
+        Schedule schedule,
+        WorkplaceMember member,
+        LocalDateTime startAt,
+        LocalDateTime endAt,
+        ShiftStatus status
+    ) {
+        this.schedule = schedule;
+        this.member = member;
+        this.startAt = startAt;
+        this.endAt = endAt;
+        this.status = status;
+    }
+
+    public Shift update(
+        WorkplaceMember member,
+        LocalDateTime startAt,
+        LocalDateTime endAt
+    ) {
+        this.member = member;
+        this.startAt = startAt;
+        this.endAt = endAt;
+
+        return this;
+    }
 }
