@@ -81,7 +81,7 @@ public class ShiftService {
         Long userId = member.getUser().getId();
         validateShiftOverlap(
             scheduleId, member.getId(), userId,
-            reqBody.startAt(), reqBody.endAt(), null, SCHEDULED
+            reqBody.startAt(), reqBody.endAt(), null
         );
 
         // confirmUnavailableConflict가 false일 때만 체크)
@@ -130,19 +130,18 @@ public class ShiftService {
         Long userId,
         java.time.LocalDateTime startAt,
         java.time.LocalDateTime endAt,
-        Long currentShiftId,
-        ShiftStatus status
+        Long currentShiftId
     ) {
         // 1) 동일 Schedule 내 동일 Member 중복 체크
         if (shiftRepository.existsOverlappingInSchedule(
-            scheduleId, memberId, startAt, endAt, currentShiftId, status)
+            scheduleId, memberId, startAt, endAt, currentShiftId)
         ) {
             throw new BusinessException(ShiftErrorCode.DUPLICATE_LOCAL_SCHEDULE_TIME);
         }
 
         // 2) 해당 User의 모든 Workplace 확정 Shift 중복 체크
         if (shiftRepository.existsOverlappingOfficialShift(
-            userId, ScheduleStatus.PUBLISHED, startAt, endAt, currentShiftId, status)
+            userId, ScheduleStatus.PUBLISHED, startAt, endAt, currentShiftId)
         ) {
             throw new BusinessException(ShiftErrorCode.DUPLICATE_GLOBAL_SCHEDULE_TIME);
         }
@@ -216,7 +215,7 @@ public class ShiftService {
         //자기 자신은 overlap 검사에서 제외
         validateShiftOverlap(
             scheduleId, member.getId(), userId,
-            reqBody.startAt(), reqBody.endAt(), shiftId, shift.getStatus()
+            reqBody.startAt(), reqBody.endAt(), shiftId
         );
 
         // confirmUnavailableConflict가 false일 때만 체크)
