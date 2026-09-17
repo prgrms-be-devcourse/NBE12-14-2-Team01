@@ -24,6 +24,17 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.POST, "/auth/signup", "/auth/login", "/auth/refresh")
+                .permitAll()
+                .anyRequest().authenticated()
+            )
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(session ->
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
+            .addFilterBefore(customAuthenticationFilter,
+                UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 HttpMethod.POST
@@ -51,17 +62,17 @@ public class SecurityConfig {
                         UsernamePasswordAuthenticationFilter.class
                 )
 
-                //토큰 없는 요청은 Spring Security가 기본처리 하는데 대신 ApiResponse 형식으로 통일
-                .exceptionHandling(exceptionHandling -> exceptionHandling
-                        .authenticationEntryPoint((request, response, authException) -> {
-                            UserErrorCode errorCode = UserErrorCode.AUTHENTICATION_REQUIRED;
-                            response.setStatus(errorCode.getHttpStatus().value());
-                            response.setContentType("application/json; charset=UTF-8");
-                            String body = objectMapper.writeValueAsString(
-                                    ApiResponse.error(errorCode.getCode(), errorCode.getMessage())
-                            );
-                            response.getWriter().write(body);
-                        })
+            //토큰 없는 요청은 Spring Security가 기본처리 하는데 대신 ApiResponse 형식으로 통일
+            .exceptionHandling(exceptionHandling -> exceptionHandling
+                .authenticationEntryPoint((request, response, authException) -> {
+                    UserErrorCode errorCode = UserErrorCode.AUTHENTICATION_REQUIRED;
+                    response.setStatus(errorCode.getHttpStatus().value());
+                    response.setContentType("application/json; charset=UTF-8");
+                    String body = objectMapper.writeValueAsString(
+                        ApiResponse.error(errorCode.getCode(), errorCode.getMessage())
+                    );
+                    response.getWriter().write(body);
+                })
             );
 
         return http.build();

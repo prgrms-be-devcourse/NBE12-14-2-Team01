@@ -33,4 +33,18 @@ public class WorkplaceMember extends BaseEntity {
     private LocalDateTime joinedAt;
 
     private LocalDateTime leftAt;
+
+    public WorkplaceMember(
+        Workplace workplace,
+        User user,
+        WorkplaceRole workplaceRole,
+        LocalDateTime joinedAt,
+        LocalDateTime leftAt
+    ){
+        this.workplace = workplace;
+        this.user = user;
+        this.role = workplaceRole;
+        this.joinedAt = joinedAt;
+        this.leftAt = leftAt;
+    }
 }

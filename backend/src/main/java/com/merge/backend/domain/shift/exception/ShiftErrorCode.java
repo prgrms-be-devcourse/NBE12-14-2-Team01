@@ -1,5 +1,6 @@
 package com.merge.backend.domain.shift.exception;
 
+
 import com.merge.backend.global.exception.ErrorCode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -8,58 +9,91 @@ import org.springframework.http.HttpStatus;
 @Getter
 @RequiredArgsConstructor
 public enum ShiftErrorCode implements ErrorCode {
-    WORKPLACE_NOT_FOUND(
+
+    INVALID_INPUT_VALUE(
+            HttpStatus.BAD_REQUEST,
+            "SFT-001",
+            "입력값이 올바르지 않습니다."
+    ),
+
+    INVALID_WORKPLACE_VALUE(
+            HttpStatus.BAD_REQUEST,
+            "SFT-002",
+            "스케줄이 해당 workplace 소속이 아닙니다."
+    ),
+    INVALID_SHIFT_VALUE(
+            HttpStatus.BAD_REQUEST,
+            "SFT-003",
+            "업무가 해당 스케줄 소속이 아닙니다."
+    ),
+
+    INVALID_WORKPLACE_MEMBER_VALUE(
+            HttpStatus.BAD_REQUEST,
+            "SFT-004",
+            "멤버가 해당 workplace 소속이 아닙니다."
+    ),
+
+    INVALID_STATUS_VALUE(
+            HttpStatus.BAD_REQUEST,
+            "SFT-005",
+            "잘못된 상태입니다."
+    ),
+
+    INVALID_TIME_VALUE(
+            HttpStatus.BAD_REQUEST,
+            "SFT-006",
+            "시간 형식이나 값이 올바르지 않습니다."
+    ),
+
+    INVALID_BEFORE_AFTER_VALUE(
+            HttpStatus.BAD_REQUEST,
+            "SFT-007",
+            "근무 시작 시간은 종료 시간보다 이전이어야 합니다."
+    ),
+
+    INVALID_SHIFT_INSCHEDULE(
+            HttpStatus.BAD_REQUEST,
+            "SFT-008",
+            "설정한 근무시간이 스케줄 주간에서 벗어나있습니다."
+    ),
+    DUPLICATE_LOCAL_SCHEDULE_TIME(
+            HttpStatus.BAD_REQUEST,
+            "SFT-009",
+            "동일인물의 근무는 중복될 수 없습니다."
+    ),
+
+    DUPLICATE_GLOBAL_SCHEDULE_TIME(
+            HttpStatus.BAD_REQUEST,
+            "SFT-010",
+            "다른 근무지에서 중복되는 근무가 있습니다."
+    ),
+
+    INVALID_SHIFT_SAME_DAY(
+            HttpStatus.BAD_REQUEST,
+            "SFT-011",
+            "근무 시작일과 종료일은 같아야 합니다."
+    ),
+    UNAVAILABLE_TIME_CONFLICT(
+            HttpStatus.BAD_REQUEST,
+            "UNAVAILABLE_TIME_CONFLICT",
+            "해당 구성원이 이 시간에 근무 불가능 일정을 등록했습니다."
+    ),
+
+    NOT_FOUND_ERROR(
             HttpStatus.NOT_FOUND,
-            "SHIFT-001",
-            "존재하지 않는 근무지입니다."
+            "SFT-404",
+            "대상을 찾을 수 없습니다."
     ),
 
-    MEMBER_NOT_FOUND(
+    NOT_FOUND_SCHEDULE_ERROR(
             HttpStatus.NOT_FOUND,
-            "SHIFT-002",
-            "존재하지 않는 근로자입니다."
+            "SFT-404",
+            "스케줄이 없거나 잘못된 스케줄 ID입니다."
     ),
-
-    PATTERN_NOT_FOUND(
+    NOT_FOUND_SHIFT_ERROR(
             HttpStatus.NOT_FOUND,
-            "SHIFT-003",
-            "존재하지 않는 정기 근무입니다."
-    ),
-
-    MEMBER_NOT_IN_WORKPLACE(
-            HttpStatus.BAD_REQUEST,
-            "SHIFT-004",
-            "해당 근무지의 구성원이 아닙니다."
-    ),
-
-    MEMBER_NOT_ACTIVE(
-            HttpStatus.BAD_REQUEST,
-            "SHIFT-005",
-            "현재 근무 중인 구성원이 아닙니다."
-    ),
-
-    INVALID_PATTERN_TIME(
-            HttpStatus.BAD_REQUEST,
-            "SHIFT-006",
-            "시작 시간은 종료 시간보다 빨라야 합니다."
-    ),
-
-    PATTERN_TIME_OVERLAP(
-            HttpStatus.CONFLICT,
-            "SHIFT-007",
-            "기존 정기 근무 시간과 겹칩니다."
-    ),
-
-    PATTERN_NOT_IN_WORKPLACE(
-            HttpStatus.BAD_REQUEST,
-            "SHIFT-008",
-            "해당 근무지의 정기 근무가 아닙니다."
-    ),
-
-    MANAGER_REQUIRED(
-            HttpStatus.FORBIDDEN,
-        "SHIFT-009",
-                "관리자 권한이 필요합니다."
+            "SFT-404",
+            "해당 근무를 찾을 수 없습니다."
     );
 
     private final HttpStatus httpStatus;

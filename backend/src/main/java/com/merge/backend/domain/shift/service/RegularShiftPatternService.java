@@ -4,7 +4,7 @@ import com.merge.backend.domain.shift.dto.RegularShiftPatternListResponse;
 import com.merge.backend.domain.shift.dto.RegularShiftPatternReqBody;
 import com.merge.backend.domain.shift.dto.RegularShiftPatternResponse;
 import com.merge.backend.domain.shift.entity.RegularShiftPattern;
-import com.merge.backend.domain.shift.exception.ShiftErrorCode;
+import com.merge.backend.domain.shift.exception.RegularShiftErrorCode;
 import com.merge.backend.domain.shift.repository.RegularShiftPatternRepository;
 import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
@@ -140,7 +140,7 @@ public class RegularShiftPatternService {
     private void validateWorkplaceExists(Long workplaceId) {
         if (!workplaceRepository.existsById(workplaceId)) {
             throw new BusinessException(
-                    ShiftErrorCode.WORKPLACE_NOT_FOUND
+                    RegularShiftErrorCode.WORKPLACE_NOT_FOUND
             );
         }
     }
@@ -150,19 +150,19 @@ public class RegularShiftPatternService {
                 workplaceMemberRepository.findById(memberId)
                         .orElseThrow(() ->
                                 new BusinessException(
-                                        ShiftErrorCode.MEMBER_NOT_FOUND
+                                        RegularShiftErrorCode.MEMBER_NOT_FOUND
                                 )
                         );
 
         if (!member.getWorkplace().getId().equals(workplaceId)) {
             throw new BusinessException(
-                    ShiftErrorCode.MEMBER_NOT_IN_WORKPLACE
+                    RegularShiftErrorCode.MEMBER_NOT_IN_WORKPLACE
             );
         }
 
         if (member.getLeftAt() != null) {
             throw new BusinessException(
-                    ShiftErrorCode.MEMBER_NOT_ACTIVE
+                    RegularShiftErrorCode.MEMBER_NOT_ACTIVE
             );
         }
 
@@ -177,7 +177,7 @@ public class RegularShiftPatternService {
                 regularShiftPatternRepository.findById(patternId)
                         .orElseThrow(() ->
                                 new BusinessException(
-                                        ShiftErrorCode.PATTERN_NOT_FOUND
+                                        RegularShiftErrorCode.PATTERN_NOT_FOUND
                                 )
                         );
 
@@ -187,7 +187,7 @@ public class RegularShiftPatternService {
                 .equals(workplaceId)) {
 
             throw new BusinessException(
-                    ShiftErrorCode.PATTERN_NOT_IN_WORKPLACE
+                    RegularShiftErrorCode.PATTERN_NOT_IN_WORKPLACE
             );
         }
 
@@ -197,7 +197,7 @@ public class RegularShiftPatternService {
     private void validateTime(RegularShiftPatternReqBody reqBody) {
         if (!reqBody.startTime().isBefore(reqBody.endTime())) {
             throw new BusinessException(
-                    ShiftErrorCode.INVALID_PATTERN_TIME
+                    RegularShiftErrorCode.INVALID_PATTERN_TIME
             );
         }
     }
@@ -223,7 +223,7 @@ public class RegularShiftPatternService {
 
         if (overlap) {
             throw new BusinessException(
-                    ShiftErrorCode.PATTERN_TIME_OVERLAP
+                    RegularShiftErrorCode.PATTERN_TIME_OVERLAP
             );
         }
     }
@@ -236,19 +236,19 @@ public class RegularShiftPatternService {
                         .findByWorkplaceIdAndUserId(workplaceId, actorId)
                 .orElseThrow(
                         () -> new BusinessException(
-                                ShiftErrorCode.MEMBER_NOT_IN_WORKPLACE
+                                RegularShiftErrorCode.MEMBER_NOT_IN_WORKPLACE
                         )
                 );
 
         if (actorMember.getLeftAt() != null) {
             throw new BusinessException(
-                    ShiftErrorCode.MEMBER_NOT_ACTIVE
+                    RegularShiftErrorCode.MEMBER_NOT_ACTIVE
             );
         }
 
         if (actorMember.getRole() != WorkplaceRole.MANAGER) {
             throw new BusinessException(
-                    ShiftErrorCode.MANAGER_REQUIRED
+                    RegularShiftErrorCode.MANAGER_REQUIRED
             );
         }
     }

@@ -10,4 +10,5 @@ public interface WorkplaceMemberRepository extends JpaRepository<WorkplaceMember
             Long workplaceId,
             Long userId
     );
+
 }
