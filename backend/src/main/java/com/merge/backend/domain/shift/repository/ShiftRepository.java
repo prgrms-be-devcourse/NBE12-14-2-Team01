@@ -53,6 +53,7 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
         SELECT s
         FROM Shift s 
         WHERE s.member.user.id = :currentUserId 
+          AND s.member.leftAt IS NULL
           AND s.schedule.status = ScheduleStatus.PUBLISHED
           AND s.status = ShiftStatus.SCHEDULED
           AND s.schedule.weekStartDate = :weekStartDate
