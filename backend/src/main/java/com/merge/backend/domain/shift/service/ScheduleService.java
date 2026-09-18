@@ -1,11 +1,17 @@
 package com.merge.backend.domain.shift.service;
 
+import com.merge.backend.domain.shift.dto.ManagerScheduleResponse;
 import com.merge.backend.domain.shift.entity.Schedule;
+import com.merge.backend.domain.shift.entity.Shift;
 import com.merge.backend.domain.shift.exception.ScheduleErrorCode;
+import com.merge.backend.domain.shift.repository.RegularShiftPatternRepository;
 import com.merge.backend.domain.shift.repository.ScheduleRepository;
+import com.merge.backend.domain.shift.repository.ShiftRepository;
 import com.merge.backend.global.exception.BusinessException;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +22,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class ScheduleService {
 
     private final ScheduleRepository scheduleRepository;
+    private final RegularShiftPatternRepository
+        regularShiftPatternRepository;
+    private final ShiftRepository shiftRepository;
+    private final ShiftService shiftService;
+    // private final WorkplaceAccessService workplaceAccessService;
 
     @Transactional
     public Schedule createDraftSchedule(
@@ -45,57 +56,51 @@ public class ScheduleService {
         /*
         // 4. DRAFT Schedule 생성
        Schedule schedule =
-            Schedule.createDraft(
+            new Schedule(
                 manager.getWorkplace(),
                 weekStartDate
             );
 
         // 5. Schedule 저장
-         scheduleRepository.save(schedule);
+         Schedule savedSchedule =
+            scheduleRepository.save(schedule);
          */
 
-
         /*
-        ⑤ Pattern
-        해당 Workplace에 적용할 Pattern 목록 조회
+        // 6. 해당 Workplace에 적용할 Pattern 목록 조회
         List<RegularShiftPattern> patterns =
-            regularShiftPatternService
-                .findCurrentPatterns(workplaceId);
+            regularShiftPatternRepository
+                .findByMemberWorkplaceIdAndMemberLeftAtIsNull(
+                    workplaceId
+                );
 
         // 7. Pattern → 실제 Shift
         for (RegularShiftPattern pattern : patterns) {
-            pattern.getMember();
-            pattern.getDayOfWeek();
-            pattern.getStartTime();
-            pattern.getEndTime();
 
-            ⑥ Schedule orchestration
-            Pattern마다:
-            dayOfWeek → 실제 LocalDate 계산
+//            LocalDate shiftDate =
+//                schedule.resolveDate(
+//                    pattern.getDayOfWeek()
+//                );
+//            LocalDateTime startAt =
+//                shiftDate.atTime(
+//                    pattern.getStartTime()
+//                );
+//
+//            LocalDateTime endAt =
+//                shiftDate.atTime(
+//                    pattern.getEndTime()
+//                );
 
-            LocalDate + startTime
-            → startAt
+//            shiftService.createFromValidatedPattern(
+//              savedSchedule,
+//              pattern.getMember(),
+//              startAt,
+//              endAt
+//            );
 
-            LocalDate + endTime
-            → endAt
+//        }
 
-            }
-
-
-
-        ⑦ Shift
-        각 Pattern에 대해
-        Schedule + member + startAt + endAt
-        로 유효한 Shift 생성
-        Shift shift =
-            shiftService.createScheduledShift(
-                schedule,
-                pattern.getMember(),
-                startAt,
-                endAt
-            );
-
-        ⑧ Persistence
+        ⑧Persistence
         Schedule + Shift N개 저장
 
         ⑨ 하나라도 실패
@@ -103,9 +108,54 @@ public class ScheduleService {
 
         ⑩ 성공
         → 생성된 DRAFT Schedule 반환
+        return schedule;
          */
 
-        return null; // schedule;
+        return null; // savedSchedule;
+    }
+
+    @Transactional(readOnly = true)
+    public ManagerScheduleResponse getWeeklySchedule(
+        Long actorUserId,
+        Long workplaceId,
+        LocalDate weekStartDate
+    ) {
+
+        /*
+        workplaceAccessService.requireManager(
+            actorUserId,
+            workplaceId
+        );
+        */
+
+        validateWeekStartDate(
+            weekStartDate
+        );
+
+        Optional<Schedule> optionalSchedule =
+            scheduleRepository
+                .findByWorkplace_IdAndWeekStartDate(
+                    workplaceId,
+                    weekStartDate
+                );
+
+        if (optionalSchedule.isEmpty()) {
+            return null;
+        }
+
+        Schedule schedule =
+            optionalSchedule.get();
+
+        List<Shift> shifts =
+            shiftRepository
+                .findBySchedule_IdOrderByStartAtAscIdAsc(
+                    schedule.getId()
+                );
+
+        return ManagerScheduleResponse.from(
+            schedule,
+            shifts
+        );
     }
 
     private void validateWeekStartDate(
