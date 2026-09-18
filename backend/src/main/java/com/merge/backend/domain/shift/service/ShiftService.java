@@ -20,6 +20,7 @@ import com.merge.backend.global.exception.BusinessException;
 import com.merge.backend.global.util.TimeRangeUtils;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,15 @@ public class ShiftService {
     private final WorkplaceMemberRepository workplaceMemberRepository;
     private final WorkplaceRepository workplaceRepository;
     private final UnavailableTimeRepository unavailableTimeRepository;
+
+    @Transactional(readOnly = true)
+    public List<Shift> list(LocalDate weekStartDate, Long currentUserId) {
+
+        List<Shift> shifts = shiftRepository.findAllByWeekStartDateAndCurrentUserId(
+            weekStartDate, currentUserId
+        );
+        return shifts;
+    }
 
     @Transactional(readOnly = true)
     public Shift detail(Long shiftId, Long currentUserId) {
