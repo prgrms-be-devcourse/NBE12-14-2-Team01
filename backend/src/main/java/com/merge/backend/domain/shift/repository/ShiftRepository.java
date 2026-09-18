@@ -57,6 +57,7 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
           AND s.schedule.status = ScheduleStatus.PUBLISHED
           AND s.status = ShiftStatus.SCHEDULED
           AND s.schedule.weekStartDate = :weekStartDate
+        ORDER BY s.startAt ASC
         """)
     List<Shift> findAllByWeekStartDateAndCurrentUserId(
         @Param("weekStartDate") LocalDate weekStartDate,
