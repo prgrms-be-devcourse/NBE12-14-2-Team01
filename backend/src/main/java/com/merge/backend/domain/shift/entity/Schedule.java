@@ -50,6 +50,13 @@ public class Schedule extends BaseEntity {
         this.publishedAt = null;
     }
 
+    public void publish(
+        LocalDateTime publishedAt
+    ) {
+        this.status = ScheduleStatus.PUBLISHED;
+        this.publishedAt = publishedAt;
+    }
+
     public LocalDate resolveDate(
         DayOfWeek dayOfWeek
     ) {
@@ -59,4 +66,5 @@ public class Schedule extends BaseEntity {
 
         return weekStartDate.plusDays(daysToAdd);
     }
+
 }
