@@ -29,7 +29,7 @@ public enum ScheduleErrorCode implements ErrorCode {
 
     SCHEDULE_NOT_DRAFT(
         HttpStatus.CONFLICT,
-    "SCH-004",
+        "SCH-004",
         "DRAFT 상태의 근무표만 공개할 수 있습니다."
     ),
 
