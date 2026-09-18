@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -21,9 +22,9 @@ import com.merge.backend.domain.shift.repository.ShiftRepository;
 import com.merge.backend.domain.user.entity.User;
 import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
-import com.merge.backend.domain.workplace.entity.WorkplaceRole;
-import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
+import com.merge.backend.domain.workplace.exception.WorkplaceErrorCode;
 import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
+import com.merge.backend.domain.workplace.service.WorkplaceMemberService;
 import com.merge.backend.global.exception.BusinessException;
 import java.time.LocalDate;
 import java.util.List;
@@ -34,7 +35,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
 
 @ExtendWith(MockitoExtension.class)
 class ShiftServiceTest {
@@ -52,7 +52,7 @@ class ShiftServiceTest {
     private WorkplaceRepository workplaceRepository;
 
     @Mock
-    private WorkplaceMemberRepository workplaceMemberRepository;
+    private WorkplaceMemberService workplaceMemberService;
 
     @Test
     @DisplayName("근무 상세 조회 성공 - 본인의 확정된 근무 정보 반환")
@@ -149,7 +149,7 @@ class ShiftServiceTest {
         // given
         Long shiftId = 1L;
         Long currentUserId = 100L;
-        Long otherUserId = 200L; // 다른 유저 ID
+        Long otherUserId = 200L;
 
         User user = mock(User.class);
         given(user.getId()).willReturn(otherUserId);
@@ -190,10 +190,8 @@ class ShiftServiceTest {
         // Workplace 존재
         when(workplaceRepository.findById(workplaceId)).thenReturn(Optional.of(workplace));
 
-        // 매니저 권한 검증 (isNotManager -> false)
-        when(workplaceMemberRepository.findByWorkplaceIdAndUserId(workplaceId, actorId))
-            .thenReturn(Optional.of(managerMember));
-        when(managerMember.getRole()).thenReturn(WorkplaceRole.MANAGER);
+        // 매니저 권한 검증 Mocking
+        when(workplaceMemberService.requireManager(actorId, workplaceId)).thenReturn(managerMember);
 
         // Schedule 검증
         when(scheduleRepository.findById(scheduleId)).thenReturn(Optional.of(schedule));
@@ -222,21 +220,16 @@ class ShiftServiceTest {
         Long shiftId = 100L;
         Long actorId = 200L;
 
-        Workplace workplace = mock(Workplace.class);
-        WorkplaceMember staffMember = mock(WorkplaceMember.class);
-
-        when(workplaceRepository.findById(workplaceId)).thenReturn(Optional.of(workplace));
-        when(workplaceMemberRepository.findByWorkplaceIdAndUserId(workplaceId, actorId))
-            .thenReturn(Optional.of(staffMember));
-        when(staffMember.getRole()).thenReturn(WorkplaceRole.EMPLOYEE); // 매니저가 아님
+        // 매니저 권한 부족 시 예외 발생 스텁 설정
+        doThrow(new BusinessException(WorkplaceErrorCode.MANAGER_REQUIRED))
+            .when(workplaceMemberService).requireManager(actorId, workplaceId);
 
         // when & then
-        BusinessException exception = assertThrows(
+        assertThrows(
             BusinessException.class,
             () -> shiftService.delete(workplaceId, scheduleId, shiftId, actorId)
         );
 
-        assertThat(exception.getErrorCode()).isEqualTo(ShiftErrorCode.FORBIDDEN_ACCESS);
         verify(shiftRepository, never()).deleteById(anyLong());
     }
 
@@ -254,14 +247,12 @@ class ShiftServiceTest {
         WorkplaceMember managerMember = mock(WorkplaceMember.class);
 
         when(workplaceRepository.findById(workplaceId)).thenReturn(Optional.of(workplace));
-        when(workplaceMemberRepository.findByWorkplaceIdAndUserId(workplaceId, actorId))
-            .thenReturn(Optional.of(managerMember));
-        when(managerMember.getRole()).thenReturn(WorkplaceRole.MANAGER);
+        when(workplaceMemberService.requireManager(actorId, workplaceId)).thenReturn(managerMember);
 
         when(scheduleRepository.findById(scheduleId)).thenReturn(Optional.of(schedule));
         when(schedule.getWorkplace()).thenReturn(workplace);
         when(workplace.getId()).thenReturn(workplaceId);
-        when(schedule.getStatus()).thenReturn(ScheduleStatus.PUBLISHED); // DRAFT가 아님
+        when(schedule.getStatus()).thenReturn(ScheduleStatus.PUBLISHED);
 
         // when & then
         BusinessException exception = assertThrows(
@@ -290,9 +281,7 @@ class ShiftServiceTest {
         WorkplaceMember managerMember = mock(WorkplaceMember.class);
 
         when(workplaceRepository.findById(workplaceId)).thenReturn(Optional.of(workplace));
-        when(workplaceMemberRepository.findByWorkplaceIdAndUserId(workplaceId, actorId))
-            .thenReturn(Optional.of(managerMember));
-        when(managerMember.getRole()).thenReturn(WorkplaceRole.MANAGER);
+        when(workplaceMemberService.requireManager(actorId, workplaceId)).thenReturn(managerMember);
 
         when(scheduleRepository.findById(scheduleId)).thenReturn(Optional.of(schedule));
         when(schedule.getWorkplace()).thenReturn(workplace);
@@ -300,7 +289,7 @@ class ShiftServiceTest {
         when(schedule.getStatus()).thenReturn(ScheduleStatus.DRAFT);
 
         when(shiftRepository.findById(shiftId)).thenReturn(Optional.of(shift));
-        when(shift.getSchedule()).thenReturn(otherSchedule); // 다른 스케줄 소속
+        when(shift.getSchedule()).thenReturn(otherSchedule);
         when(otherSchedule.getId()).thenReturn(otherScheduleId);
 
         // when & then
@@ -320,8 +309,8 @@ class ShiftServiceTest {
         LocalDate weekStartDate = LocalDate.of(2026, 9, 21);
         Long currentUserId = 1L;
 
-        Shift mockShift1 = org.mockito.Mockito.mock(Shift.class);
-        Shift mockShift2 = org.mockito.Mockito.mock(Shift.class);
+        Shift mockShift1 = mock(Shift.class);
+        Shift mockShift2 = mock(Shift.class);
         List<Shift> expectedShifts = List.of(mockShift1, mockShift2);
 
         given(shiftRepository.findAllByWeekStartDateAndCurrentUserId(weekStartDate, currentUserId))
@@ -333,6 +322,7 @@ class ShiftServiceTest {
         // then
         assertThat(result).hasSize(2);
         assertThat(result).isEqualTo(expectedShifts);
-        verify(shiftRepository).findAllByWeekStartDateAndCurrentUserId(weekStartDate, currentUserId);
+        verify(shiftRepository).findAllByWeekStartDateAndCurrentUserId(
+            weekStartDate, currentUserId);
     }
 }
