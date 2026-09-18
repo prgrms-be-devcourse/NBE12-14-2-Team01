@@ -13,9 +13,9 @@ import com.merge.backend.domain.shift.repository.ShiftRepository;
 import com.merge.backend.domain.shift.repository.UnavailableTimeRepository;
 import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
-import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
 import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
+import com.merge.backend.domain.workplace.service.WorkplaceMemberService;
 import com.merge.backend.global.exception.BusinessException;
 import com.merge.backend.global.util.TimeRangeUtils;
 import java.time.LocalDate;
@@ -31,6 +31,7 @@ public class ShiftService {
 
     private final ScheduleRepository scheduleRepository;
     private final ShiftRepository shiftRepository;
+    private final WorkplaceMemberService workplaceMemberService;
     private final WorkplaceMemberRepository workplaceMemberRepository;
     private final WorkplaceRepository workplaceRepository;
     private final UnavailableTimeRepository unavailableTimeRepository;
@@ -70,9 +71,7 @@ public class ShiftService {
     public Shift create(ShiftRequest reqBody, Long workplaceId, Long scheduleId, Long actorId) {
 
         //요청 사용자 해당 매장의 MANAGER 권한을 가지고 있는지
-        if(isNotManager(workplaceId, actorId)) {
-            throw new BusinessException(ShiftErrorCode.FORBIDDEN_ACCESS);
-        }
+        workplaceMemberService.requireManager(actorId, workplaceId);
 
         //스케줄 존재 확인
         Schedule schedule = scheduleRepository.findById(scheduleId)
@@ -186,20 +185,6 @@ public class ShiftService {
         }
     }
 
-    //요청자가 해당 workplaceId의 MANAGER 권한을 보유하고 있는지
-    private boolean isNotManager(Long workplaceId, Long actorId) {
-
-        WorkplaceMember requester = workplaceMemberRepository
-            .findByWorkplaceIdAndUserId(workplaceId, actorId)
-            .orElseThrow(() ->
-                new BusinessException(ShiftErrorCode.INVALID_WORKPLACE_MEMBER_VALUE));
-
-        if (requester.getRole().equals(WorkplaceRole.MANAGER)) {
-            return false;
-        }
-        return true;
-    }
-
     @Transactional
     public Shift modify(
         Long workplaceId,
@@ -208,11 +193,8 @@ public class ShiftService {
         ShiftRequest reqBody,
         Long actorId
     ) {
-
         //요청 사용자(actorId)가 해당 매장의 MANAGER 권한을 가지고 있는지 검증
-        if(isNotManager(workplaceId, actorId)){
-            throw new BusinessException(ShiftErrorCode.FORBIDDEN_ACCESS);
-        };
+        workplaceMemberService.requireManager(actorId, workplaceId);
 
         //스케줄 존재 확인
         Schedule schedule = scheduleRepository.findById(scheduleId)
@@ -293,14 +275,13 @@ public class ShiftService {
 
     public void delete(Long workplaceId, Long scheduleId, Long shiftId, Long actorId) {
 
+        //요청 사용자(actorId)가 해당 매장의 MANAGER 권한을 가지고 있는지 검증
+        workplaceMemberService.requireManager(actorId, workplaceId);
+
         Workplace workplace = workplaceRepository.findById(workplaceId)
             .orElseThrow(() ->
                 new BusinessException(ShiftErrorCode.NOT_FOUND_WORKPLACE_ERROR)
             );
-        //나중에 workplace의 매니저 인가 로직으로 변환
-        if(isNotManager(workplaceId, actorId)){
-            throw new BusinessException(ShiftErrorCode.FORBIDDEN_ACCESS);
-        }
         //스케줄 존재 확인
         Schedule schedule = scheduleRepository.findById(scheduleId)
             .orElseThrow(() ->
