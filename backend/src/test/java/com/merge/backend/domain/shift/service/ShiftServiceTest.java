@@ -25,6 +25,8 @@ import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
 import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import com.merge.backend.global.exception.BusinessException;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -309,5 +311,28 @@ class ShiftServiceTest {
 
         assertThat(exception.getErrorCode()).isEqualTo(ShiftErrorCode.INVALID_SHIFT_VALUE);
         verify(shiftRepository, never()).deleteById(anyLong());
+    }
+
+    @Test
+    @DisplayName("주 시작 일자와 사용자 ID로 주간 근무 목록을 성공적으로 조회한다")
+    void list_Success() {
+        // given
+        LocalDate weekStartDate = LocalDate.of(2026, 9, 21);
+        Long currentUserId = 1L;
+
+        Shift mockShift1 = org.mockito.Mockito.mock(Shift.class);
+        Shift mockShift2 = org.mockito.Mockito.mock(Shift.class);
+        List<Shift> expectedShifts = List.of(mockShift1, mockShift2);
+
+        given(shiftRepository.findAllByWeekStartDateAndCurrentUserId(weekStartDate, currentUserId))
+            .willReturn(expectedShifts);
+
+        // when
+        List<Shift> result = shiftService.list(weekStartDate, currentUserId);
+
+        // then
+        assertThat(result).hasSize(2);
+        assertThat(result).isEqualTo(expectedShifts);
+        verify(shiftRepository).findAllByWeekStartDateAndCurrentUserId(weekStartDate, currentUserId);
     }
 }
