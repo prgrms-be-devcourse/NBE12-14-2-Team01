@@ -1,11 +1,30 @@
 package com.merge.backend.domain.workplace.repository;
 
+import com.merge.backend.domain.user.entity.User;
+import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
+import java.util.List;
 import java.util.Optional;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.util.Optional;
-
 public interface WorkplaceMemberRepository extends JpaRepository<WorkplaceMember, Long> {
-    Optional<WorkplaceMember> findByWorkplaceIdAndUserId(Long workplaceId, Long actorId);
+
+    boolean existsByWorkplaceAndUser(Workplace workplace, User user);
+
+    Optional<WorkplaceMember> findByWorkplace_IdAndUser_IdAndLeftAtIsNull(
+        Long workplaceId,
+        Long userId
+    );
+
+    @EntityGraph(attributePaths = "workplace")
+    List<WorkplaceMember> findAllByUser_IdAndLeftAtIsNull(Long userId);
+
+    @EntityGraph(attributePaths = "user")
+    List<WorkplaceMember> findAllByWorkplace_IdAndLeftAtIsNull(Long workplaceId);
+
+    Optional<WorkplaceMember> findByWorkplaceIdAndUserId(
+        Long workplaceId,
+        Long userId
+    );
 }
