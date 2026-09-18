@@ -17,7 +17,7 @@ public class Workplace extends BaseEntity {
     @Column(nullable = false, unique = true)
     private String inviteCode;
 
-    public Workplace(String name, String inviteCode){
+    public Workplace(String name, String inviteCode) {
         this.name = name;
         this.inviteCode = inviteCode;
     }
