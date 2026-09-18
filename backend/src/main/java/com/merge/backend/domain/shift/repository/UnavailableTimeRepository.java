@@ -2,6 +2,8 @@ package com.merge.backend.domain.shift.repository;
 
 import com.merge.backend.domain.shift.entity.UnavailableTime;
 import java.time.LocalDateTime;
+import java.util.List;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -20,4 +22,6 @@ public interface UnavailableTimeRepository extends JpaRepository<UnavailableTime
         @Param("startAt") LocalDateTime startAt,
         @Param("endAt") LocalDateTime endAt
     );
+
+    List<UnavailableTime> findByUserId(Long userId);
 }
