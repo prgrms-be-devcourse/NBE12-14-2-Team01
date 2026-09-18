@@ -10,7 +10,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
 
 import com.merge.backend.domain.shift.entity.Schedule;
 import com.merge.backend.domain.shift.entity.ScheduleStatus;
@@ -27,11 +29,13 @@ import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import com.merge.backend.domain.workplace.service.WorkplaceMemberService;
 import com.merge.backend.global.exception.BusinessException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -53,6 +57,51 @@ class ShiftServiceTest {
 
     @Mock
     private WorkplaceMemberService workplaceMemberService;
+
+    @Test
+    @DisplayName("SCH-01 - Pattern에서 전달된 정보로 SCHEDULED Shift를 저장한다")
+    void createFromValidatedPattern_SavesScheduledShift() {
+        // given
+        Schedule schedule = mock(Schedule.class);
+        WorkplaceMember member = mock(WorkplaceMember.class);
+
+        LocalDateTime startAt = LocalDateTime.of(
+            2026, 9, 23, 9, 0
+        );
+        LocalDateTime endAt = LocalDateTime.of(
+            2026, 9, 23, 14, 0
+        );
+
+        Shift savedShift = mock(Shift.class);
+
+        when(shiftRepository.save(any(Shift.class)))
+            .thenReturn(savedShift);
+
+        // when
+        Shift result = shiftService.createFromValidatedPattern(
+            schedule,
+            member,
+            startAt,
+            endAt
+        );
+
+        // then
+        ArgumentCaptor<Shift> shiftCaptor =
+            ArgumentCaptor.forClass(Shift.class);
+
+        verify(shiftRepository).save(shiftCaptor.capture());
+
+        Shift shiftToSave = shiftCaptor.getValue();
+
+        assertThat(shiftToSave.getSchedule()).isSameAs(schedule);
+        assertThat(shiftToSave.getMember()).isSameAs(member);
+        assertThat(shiftToSave.getStartAt()).isEqualTo(startAt);
+        assertThat(shiftToSave.getEndAt()).isEqualTo(endAt);
+        assertThat(shiftToSave.getStatus())
+            .isEqualTo(ShiftStatus.SCHEDULED);
+
+        assertThat(result).isSameAs(savedShift);
+    }
 
     @Test
     @DisplayName("근무 상세 조회 성공 - 본인의 확정된 근무 정보 반환")
@@ -325,4 +374,25 @@ class ShiftServiceTest {
         verify(shiftRepository).findAllByWeekStartDateAndCurrentUserId(
             weekStartDate, currentUserId);
     }
+
+    @Test
+    @DisplayName("월요일이 아닌 날짜로 주간 근무를 조회하면 실패한다")
+    void list_Fail_WhenWeekStartDateIsNotMonday() {
+        // given
+        LocalDate weekStartDate = LocalDate.of(2026, 9, 22);
+        Long currentUserId = 1L;
+
+        // when
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> shiftService.list(weekStartDate, currentUserId)
+        );
+
+        // then
+        assertThat(exception.getErrorCode())
+            .isEqualTo(ShiftErrorCode.INVALID_INPUT_VALUE);
+
+        verifyNoInteractions(shiftRepository);
+    }
+
 }

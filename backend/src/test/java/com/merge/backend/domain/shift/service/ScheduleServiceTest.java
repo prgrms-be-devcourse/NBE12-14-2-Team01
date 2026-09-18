@@ -3,6 +3,7 @@ package com.merge.backend.domain.shift.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -2086,6 +2087,137 @@ class ScheduleServiceTest {
 
         verify(schedule)
             .publish(publishedAt);
+    }
+
+    @Test
+    @DisplayName("SCH-06 - confirm=true여도 공식 Shift 충돌이 있으면 공개할 수 없다")
+    void publishScheduleThrowsExceptionWhenOfficialConflictExistsEvenIfConfirmed() {
+
+        // given
+        Long actorUserId = 1L;
+        Long workplaceId = 10L;
+        Long scheduleId = 20L;
+        Long userId = 30L;
+
+        LocalDate weekStartDate =
+            LocalDate.of(
+                2026, 9, 21
+            );
+
+        LocalDateTime startAt =
+            LocalDateTime.of(
+                2026, 9, 21,
+                10, 0
+            );
+
+        LocalDateTime endAt =
+            LocalDateTime.of(
+                2026, 9, 21,
+                14, 0
+            );
+
+        Schedule schedule =
+            mock(Schedule.class);
+
+        Shift shift =
+            mock(Shift.class);
+
+        Workplace workplace =
+            mock(Workplace.class);
+
+        WorkplaceMember member =
+            mock(WorkplaceMember.class);
+
+        User user =
+            mock(User.class);
+
+        when(scheduleRepository.findById(scheduleId))
+            .thenReturn(
+                Optional.of(schedule)
+            );
+
+        when(schedule.getWorkplace())
+            .thenReturn(workplace);
+
+        when(workplace.getId())
+            .thenReturn(workplaceId);
+
+        when(schedule.getStatus())
+            .thenReturn(
+                ScheduleStatus.DRAFT
+            );
+
+        when(schedule.getId())
+            .thenReturn(scheduleId);
+
+        when(schedule.getWeekStartDate())
+            .thenReturn(weekStartDate);
+
+        when(
+            shiftRepository
+                .findBySchedule_IdOrderByStartAtAscIdAsc(
+                    scheduleId
+                )
+        ).thenReturn(
+            List.of(shift)
+        );
+
+        when(shift.getMember())
+            .thenReturn(member);
+
+        when(member.getWorkplace())
+            .thenReturn(workplace);
+
+        when(member.getLeftAt())
+            .thenReturn(null);
+
+        when(shift.getStartAt())
+            .thenReturn(startAt);
+
+        when(shift.getEndAt())
+            .thenReturn(endAt);
+
+        when(member.getUser())
+            .thenReturn(user);
+
+        when(user.getId())
+            .thenReturn(userId);
+
+        when(
+            shiftRepository.existsOverlappingOfficialShift(
+                userId,
+                ScheduleStatus.PUBLISHED,
+                startAt,
+                endAt,
+                null
+            )
+        ).thenReturn(true);
+
+        // when
+        BusinessException exception =
+            assertThrows(
+                BusinessException.class,
+                () -> scheduleService.publishSchedule(
+                    actorUserId,
+                    workplaceId,
+                    scheduleId,
+                    true
+                )
+            );
+
+        // then
+        assertThat(exception.getErrorCode())
+            .isEqualTo(
+                ScheduleErrorCode.OFFICIAL_SHIFT_CONFLICT
+            );
+
+        verify(schedule, never())
+            .publish(any());
+
+        verifyNoInteractions(
+            unavailableTimeRepository,
+            clock
+        );
     }
 
 }

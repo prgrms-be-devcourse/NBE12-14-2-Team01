@@ -18,6 +18,7 @@ import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import com.merge.backend.domain.workplace.service.WorkplaceMemberService;
 import com.merge.backend.global.exception.BusinessException;
 import com.merge.backend.global.util.TimeRangeUtils;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -37,12 +38,16 @@ public class ShiftService {
     private final UnavailableTimeRepository unavailableTimeRepository;
 
     @Transactional(readOnly = true)
-    public List<Shift> list(LocalDate weekStartDate, Long currentUserId) {
+    public List<Shift> list(
+        LocalDate weekStartDate,
+        Long currentUserId
+    ) {
+        validWeekStartDate(weekStartDate);
 
-        List<Shift> shifts = shiftRepository.findAllByWeekStartDateAndCurrentUserId(
-            weekStartDate, currentUserId
+        return shiftRepository.findAllByWeekStartDateAndCurrentUserId(
+            weekStartDate,
+            currentUserId
         );
-        return shifts;
     }
 
     @Transactional(readOnly = true)
@@ -313,4 +318,13 @@ public class ShiftService {
             throw new BusinessException(ShiftErrorCode.DUPLICATE_GLOBAL_SCHEDULE_TIME);
         }
     }
+
+    private void validWeekStartDate(LocalDate weekStartDate) {
+        if (weekStartDate.getDayOfWeek() != DayOfWeek.MONDAY) {
+            throw new BusinessException(
+                ShiftErrorCode.INVALID_INPUT_VALUE
+            );
+        }
+    }
+
 }
