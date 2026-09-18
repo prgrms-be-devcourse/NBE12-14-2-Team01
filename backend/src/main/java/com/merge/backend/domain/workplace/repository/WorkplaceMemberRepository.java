@@ -5,6 +5,7 @@ import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface WorkplaceMemberRepository extends JpaRepository<WorkplaceMember, Long> {
@@ -16,8 +17,10 @@ public interface WorkplaceMemberRepository extends JpaRepository<WorkplaceMember
         Long userId
     );
 
+    @EntityGraph(attributePaths = "workplace")
     List<WorkplaceMember> findAllByUser_IdAndLeftAtIsNull(Long userId);
 
+    @EntityGraph(attributePaths = "user")
     List<WorkplaceMember> findAllByWorkplace_IdAndLeftAtIsNull(Long workplaceId);
 
     Optional<WorkplaceMember> findByWorkplaceIdAndUserId(
