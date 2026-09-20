@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 export default function SignupPage() {
@@ -5,13 +6,14 @@ export default function SignupPage() {
       <main className="flex min-h-screen items-center justify-center bg-[#f5faf7] px-4 py-10">
         <div className="w-full max-w-md rounded-3xl border border-[#dce8e2] bg-white p-8 shadow-sm">
           <div className="text-center">
-            <h1 className="text-3xl font-black text-[#005642]">
-              SWITCH
-            </h1>
-
-            <p className="mt-2 text-sm text-[#78847f]">
-              근무가 필요한 순간, 더 유연한 하루
-            </p>
+            <Image
+                src="/switch-logo.png"
+                alt="SWITCH"
+                width={220}
+                height={165}
+                priority
+                className="mx-auto h-auto w-[220px]"
+            />
           </div>
 
           <div className="mt-8">

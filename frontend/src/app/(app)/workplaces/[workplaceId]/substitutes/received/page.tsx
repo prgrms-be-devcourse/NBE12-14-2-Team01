@@ -16,7 +16,6 @@ type SubstituteRequest = {
   day: string;
   startTime: string;
   endTime: string;
-  message: string;
   status: RequestStatus;
 };
 
@@ -29,8 +28,6 @@ const initialRequests: SubstituteRequest[] = [
     day: "월",
     startTime: "09:00",
     endTime: "18:00",
-    message:
-        "개인 일정으로 인해 대체 근무가 필요합니다.",
     status: "PENDING",
   },
   {
@@ -41,8 +38,6 @@ const initialRequests: SubstituteRequest[] = [
     day: "수",
     startTime: "09:00",
     endTime: "15:00",
-    message:
-        "급한 일정이 생겨서 요청드립니다.",
     status: "PENDING",
   },
 ];
@@ -229,17 +224,6 @@ export default function ReceivedRequestsPage() {
                           request.workplaceName
                         }
                       </p>
-                    </div>
-
-                    {/* 요청 메시지 */}
-                    <div className="mt-4">
-                      <p className="mb-2 text-sm font-bold">
-                        요청 메시지
-                      </p>
-
-                      <div className="rounded-xl border border-[#dce8e2] px-4 py-3 text-sm text-[#66736d]">
-                        {request.message}
-                      </div>
                     </div>
 
                     {/* 대기 중일 때만 버튼 표시 */}
