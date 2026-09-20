@@ -1,12 +1,13 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import {
   useEffect,
   useState,
 } from "react";
 import { usePathname } from "next/navigation";
-
+import switchIcon from "@/app/icon.png";
 import {
   getNavItems,
   WorkplaceRole,
@@ -107,8 +108,16 @@ export default function AppSidebar({
                 onClick={() =>
                     setIsOpen(false)
                 }
-                className="text-2xl font-black tracking-tight text-[#005642]"
+                className="flex items-center gap-2 text-2xl font-black tracking-tight text-[#005642]"
             >
+              <Image
+                  src={switchIcon}
+                  alt=""
+                  width={32}
+                  height={32}
+                  className="h-8 w-8 object-contain"
+              />
+
               SWITCH
             </Link>
 
@@ -175,8 +184,16 @@ export default function AppSidebar({
           <div className="flex h-20 items-center px-6">
             <Link
                 href={dashboardHref}
-                className="text-2xl font-black tracking-tight text-[#005642]"
+                className="flex items-center gap-2 text-2xl font-black tracking-tight text-[#005642]"
             >
+              <Image
+                  src={switchIcon}
+                  alt=""
+                  width={32}
+                  height={32}
+                  className="h-8 w-8 object-contain"
+              />
+
               SWITCH
             </Link>
           </div>
