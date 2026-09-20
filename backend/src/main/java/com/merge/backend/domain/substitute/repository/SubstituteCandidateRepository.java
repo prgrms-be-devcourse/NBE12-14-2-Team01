@@ -14,7 +14,7 @@ public interface SubstituteCandidateRepository extends JpaRepository<SubstituteC
               AND c.status = 'ACCEPTED'
               AND c.request.status = 'ACCEPTED'
               AND c.request.shift.startAt < :endAt
-              AND c.request.shift.endAt > :startAt          
+              AND c.request.shift.endAt > :startAt
           """)
     boolean existsOverlappingAcceptedSubstitute(
         @Param("userId") Long userId,
