@@ -18,13 +18,13 @@ public enum SubstituteErrorCode implements ErrorCode {
     SHIFT_NOT_PUBLISHED(
         HttpStatus.BAD_REQUEST,
         "SUB-002",
-        "아직 공개되지 않은 근무 입니다."
+        "아직 공개되지 않은 근무입니다."
     ),
 
     NOT_OWN_SHIFT(
         HttpStatus.FORBIDDEN,
         "SUB-003",
-        "본인 근무의 대해서만 대체근무 요청을 할 수 있습니다"
+        "본인 근무에 대해서만 대체근무 요청을 할 수 있습니다"
     ),
 
     SHIFT_ALREADY_STARTED(
@@ -37,6 +37,12 @@ public enum SubstituteErrorCode implements ErrorCode {
         HttpStatus.CONFLICT,
         "SUB-005",
         "이미 진행중인 대체근무 요청이 있습니다"
+    ),
+
+    SHIFT_CANCELLED(
+        HttpStatus.BAD_REQUEST,
+        "SUB-006",
+        "취소된 근무에는 대체근무를 요청할 수 없습니다"
     );
 
 

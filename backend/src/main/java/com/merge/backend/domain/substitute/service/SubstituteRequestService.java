@@ -2,6 +2,7 @@ package com.merge.backend.domain.substitute.service;
 
 import com.merge.backend.domain.shift.entity.ScheduleStatus;
 import com.merge.backend.domain.shift.entity.Shift;
+import com.merge.backend.domain.shift.entity.ShiftStatus;
 import com.merge.backend.domain.shift.repository.ShiftRepository;
 import com.merge.backend.domain.substitute.entity.RequestStatus;
 import com.merge.backend.domain.substitute.exception.SubstituteErrorCode;
@@ -28,6 +29,10 @@ public class SubstituteRequestService {
             throw new BusinessException(SubstituteErrorCode.SHIFT_NOT_PUBLISHED);
         }
 
+        if (shift.getStatus() != ShiftStatus.SCHEDULED) {
+            throw new BusinessException(SubstituteErrorCode.SHIFT_CANCELLED);
+        }
+
         if (!shift.getMember().getUser().getId().equals(actorUserId)) {
             throw new BusinessException(SubstituteErrorCode.NOT_OWN_SHIFT);
         }
@@ -40,7 +45,6 @@ public class SubstituteRequestService {
             shiftId, List.of(RequestStatus.OPEN, RequestStatus.ACCEPTED))) {
             throw new BusinessException(SubstituteErrorCode.ACTIVE_REQUEST_EXISTS);
         }
-
         return shift;
     }
 
