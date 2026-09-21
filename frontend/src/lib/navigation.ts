@@ -49,10 +49,7 @@ export const navItems: NavItem[] = [
   },
 ];
 
-export function getNavItems(
-    workplaceId: string,
-    role: WorkplaceRole
-) {
+export function getNavItems(workplaceId: string, role: WorkplaceRole) {
   return navItems
   .filter((item) => !item.managerOnly || role === "MANAGER")
   .map((item) => ({

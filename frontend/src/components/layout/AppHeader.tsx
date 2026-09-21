@@ -1,10 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  useParams,
-  useRouter,
-} from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 type Notification = {
   id: number;
@@ -17,24 +14,21 @@ type Notification = {
 const initialNotifications: Notification[] = [
   {
     id: 1,
-    message:
-        "이서연님이 대체 근무 요청을 수락했습니다.",
+    message: "이서연님이 대체 근무 요청을 수락했습니다.",
     time: "방금 전",
     read: false,
     path: "substitutes/admin",
   },
   {
     id: 2,
-    message:
-        "대체 근무 후보의 응답을 확인해주세요.",
+    message: "대체 근무 후보의 응답을 확인해주세요.",
     time: "10분 전",
     read: false,
     path: "substitutes/admin",
   },
   {
     id: 3,
-    message:
-        "이번 주 근무표가 공개되었습니다.",
+    message: "이번 주 근무표가 공개되었습니다.",
     time: "1시간 전",
     read: true,
     path: "schedule",
@@ -45,31 +39,16 @@ export default function AppHeader() {
   const router = useRouter();
   const params = useParams();
 
-  const workplaceId =
-      params.workplaceId as string;
+  const workplaceId = params.workplaceId as string;
 
-  const [
-    showProfileMenu,
-    setShowProfileMenu,
-  ] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showNotificationMenu, setShowNotificationMenu] = useState(false);
+  const [notifications, setNotifications] =
+      useState<Notification[]>(initialNotifications);
 
-  const [
-    showNotificationMenu,
-    setShowNotificationMenu,
-  ] = useState(false);
-
-  const [
-    notifications,
-    setNotifications,
-  ] = useState<Notification[]>(
-      initialNotifications
-  );
-
-  const unreadCount =
-      notifications.filter(
-          (notification) =>
-              !notification.read
-      ).length;
+  const unreadCount = notifications.filter(
+      (notification) => !notification.read
+  ).length;
 
   const handleLogout = () => {
     /*
@@ -79,9 +58,7 @@ export default function AppHeader() {
     router.push("/login");
   };
 
-  const handleNotificationClick = (
-      notification: Notification
-  ) => {
+  const handleNotificationClick = (notification: Notification) => {
     setNotifications((prev) =>
         prev.map((item) =>
             item.id === notification.id
@@ -129,10 +106,7 @@ export default function AppHeader() {
             <button
                 type="button"
                 onClick={() => {
-                  setShowNotificationMenu(
-                      (prev) => !prev
-                  );
-
+                  setShowNotificationMenu((prev) => !prev);
                   setShowProfileMenu(false);
                 }}
                 className="relative grid h-10 w-10 place-items-center rounded-xl text-lg transition hover:bg-[#f3fbf7]"
@@ -175,58 +149,47 @@ export default function AppHeader() {
                   </div>
 
                   <div className="max-h-[360px] overflow-y-auto">
-                    {notifications.length >
-                    0 ? (
-                        notifications.map(
-                            (notification) => (
-                                <button
-                                    key={
-                                      notification.id
-                                    }
-                                    type="button"
-                                    onClick={() =>
-                                        handleNotificationClick(
-                                            notification
-                                        )
-                                    }
-                                    className={`flex w-full gap-3 border-b border-[#edf2ef] px-4 py-4 text-left transition last:border-b-0 hover:bg-[#f3fbf7] ${
+                    {notifications.length > 0 ? (
+                        notifications.map((notification) => (
+                            <button
+                                key={notification.id}
+                                type="button"
+                                onClick={() =>
+                                    handleNotificationClick(notification)
+                                }
+                                className={`flex w-full gap-3 border-b border-[#edf2ef] px-4 py-4 text-left transition last:border-b-0 hover:bg-[#f3fbf7] ${
+                                    notification.read
+                                        ? "bg-white"
+                                        : "bg-[#f7fcf9]"
+                                }`}
+                            >
+                              <div className="pt-2">
+                        <span
+                            className={`block h-2 w-2 rounded-full ${
+                                notification.read
+                                    ? "bg-transparent"
+                                    : "bg-[#14956c]"
+                            }`}
+                        />
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                <p
+                                    className={`text-sm leading-6 ${
                                         notification.read
-                                            ? "bg-white"
-                                            : "bg-[#f7fcf9]"
+                                            ? "font-medium text-[#66736d]"
+                                            : "font-bold text-[#1f2925]"
                                     }`}
                                 >
-                                  <div className="pt-2">
-                          <span
-                              className={`block h-2 w-2 rounded-full ${
-                                  notification.read
-                                      ? "bg-transparent"
-                                      : "bg-[#14956c]"
-                              }`}
-                          />
-                                  </div>
+                                  {notification.message}
+                                </p>
 
-                                  <div className="min-w-0 flex-1">
-                                    <p
-                                        className={`text-sm leading-6 ${
-                                            notification.read
-                                                ? "font-medium text-[#66736d]"
-                                                : "font-bold text-[#1f2925]"
-                                        }`}
-                                    >
-                                      {
-                                        notification.message
-                                      }
-                                    </p>
-
-                                    <p className="mt-1 text-xs text-[#9aa5a0]">
-                                      {
-                                        notification.time
-                                      }
-                                    </p>
-                                  </div>
-                                </button>
-                            )
-                        )
+                                <p className="mt-1 text-xs text-[#9aa5a0]">
+                                  {notification.time}
+                                </p>
+                              </div>
+                            </button>
+                        ))
                     ) : (
                         <div className="px-4 py-10 text-center">
                           <p className="text-sm font-bold text-[#66736d]">
@@ -252,13 +215,8 @@ export default function AppHeader() {
             <button
                 type="button"
                 onClick={() => {
-                  setShowProfileMenu(
-                      (prev) => !prev
-                  );
-
-                  setShowNotificationMenu(
-                      false
-                  );
+                  setShowProfileMenu((prev) => !prev);
+                  setShowNotificationMenu(false);
                 }}
                 className="flex items-center gap-3 rounded-xl px-2 py-1.5 text-left transition hover:bg-[#f3fbf7]"
             >
@@ -278,9 +236,7 @@ export default function AppHeader() {
 
               <span
                   className={`hidden text-xs text-[#78847f] transition-transform sm:block ${
-                      showProfileMenu
-                          ? "rotate-180"
-                          : ""
+                      showProfileMenu ? "rotate-180" : ""
                   }`}
               >
               ▾

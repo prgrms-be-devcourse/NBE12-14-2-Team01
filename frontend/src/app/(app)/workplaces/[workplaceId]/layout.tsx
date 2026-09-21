@@ -10,10 +10,7 @@ type Props = {
   }>;
 };
 
-export default async function WorkplaceLayout({
-                                                children,
-                                                params,
-                                              }: Props) {
+export default async function WorkplaceLayout({ children, params }: Props) {
   const { workplaceId } = await params;
 
   // TODO: API 연결 후 실제 사용자 역할로 변경

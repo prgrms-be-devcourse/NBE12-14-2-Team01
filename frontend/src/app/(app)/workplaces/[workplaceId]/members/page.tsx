@@ -4,9 +4,7 @@ import { useState } from "react";
 import Card from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 
-type MemberRole =
-    | "MANAGER"
-    | "EMPLOYEE";
+type MemberRole = "MANAGER" | "EMPLOYEE";
 
 type Member = {
   id: number;
@@ -51,39 +49,17 @@ const initialMembers: Member[] = [
 ];
 
 export default function MembersPage() {
-  const [members, setMembers] =
-      useState<Member[]>(
-          initialMembers
-      );
+  const [members, setMembers] = useState<Member[]>(initialMembers);
 
   const [filter, setFilter] = useState<
       "ALL" | "MANAGER" | "EMPLOYEE"
   >("ALL");
 
-  const [
-    showInviteModal,
-    setShowInviteModal,
-  ] = useState(false);
-
-  const [
-    showCopyToast,
-    setShowCopyToast,
-  ] = useState(false);
-
-  const [
-    openMenuId,
-    setOpenMenuId,
-  ] = useState<number | null>(null);
-
-  const [
-    memberToEnd,
-    setMemberToEnd,
-  ] = useState<Member | null>(null);
-
-  const [
-    successMessage,
-    setSuccessMessage,
-  ] = useState("");
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showCopyToast, setShowCopyToast] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [memberToEnd, setMemberToEnd] = useState<Member | null>(null);
+  const [successMessage, setSuccessMessage] = useState("");
 
   /*
    * TODO: API 연동 후
@@ -91,47 +67,38 @@ export default function MembersPage() {
    */
   const inviteCode = "SW-9284";
 
-  const filteredMembers =
-      members.filter((member) => {
-        if (filter === "ALL") {
-          return true;
-        }
+  const filteredMembers = members.filter((member) => {
+    if (filter === "ALL") {
+      return true;
+    }
 
-        return member.role === filter;
-      });
+    return member.role === filter;
+  });
 
-  const managerCount =
-      members.filter(
-          (member) =>
-              member.role === "MANAGER"
-      ).length;
+  const managerCount = members.filter(
+      (member) => member.role === "MANAGER"
+  ).length;
 
-  const employeeCount =
-      members.filter(
-          (member) =>
-              member.role === "EMPLOYEE"
-      ).length;
+  const employeeCount = members.filter(
+      (member) => member.role === "EMPLOYEE"
+  ).length;
 
-  const handleCopyInviteCode =
-      async () => {
-        await navigator.clipboard.writeText(
-            inviteCode
-        );
+  const handleCopyInviteCode = async () => {
+    await navigator.clipboard.writeText(inviteCode);
 
-        setShowCopyToast(true);
+    setShowCopyToast(true);
 
-        setTimeout(() => {
-          setShowCopyToast(false);
-        }, 2000);
-      };
+    setTimeout(() => {
+      setShowCopyToast(false);
+    }, 2000);
+  };
 
   const handleEndMembership = () => {
     if (!memberToEnd) {
       return;
     }
 
-    const endedMemberName =
-        memberToEnd.name;
+    const endedMemberName = memberToEnd.name;
 
     /*
      * TODO: P1 소속 종료 API 연동
@@ -151,8 +118,7 @@ export default function MembersPage() {
             member.id === memberToEnd.id
                 ? {
                   ...member,
-                  leftAt:
-                      new Date().toISOString(),
+                  leftAt: new Date().toISOString(),
                 }
                 : member
         )
@@ -178,9 +144,7 @@ export default function MembersPage() {
         >
           <button
               type="button"
-              onClick={() =>
-                  setShowInviteModal(true)
-              }
+              onClick={() => setShowInviteModal(true)}
               className="rounded-xl bg-[#005642] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#0b6b52]"
           >
             + 직원 초대
@@ -192,9 +156,7 @@ export default function MembersPage() {
           <div className="flex gap-2">
             <button
                 type="button"
-                onClick={() =>
-                    setFilter("ALL")
-                }
+                onClick={() => setFilter("ALL")}
                 className={`rounded-full px-4 py-2 text-sm font-bold transition ${
                     filter === "ALL"
                         ? "bg-[#005642] text-white"
@@ -206,9 +168,7 @@ export default function MembersPage() {
 
             <button
                 type="button"
-                onClick={() =>
-                    setFilter("MANAGER")
-                }
+                onClick={() => setFilter("MANAGER")}
                 className={`rounded-full px-4 py-2 text-sm font-bold transition ${
                     filter === "MANAGER"
                         ? "bg-[#005642] text-white"
@@ -220,9 +180,7 @@ export default function MembersPage() {
 
             <button
                 type="button"
-                onClick={() =>
-                    setFilter("EMPLOYEE")
-                }
+                onClick={() => setFilter("EMPLOYEE")}
                 className={`rounded-full px-4 py-2 text-sm font-bold transition ${
                     filter === "EMPLOYEE"
                         ? "bg-[#005642] text-white"
@@ -238,167 +196,132 @@ export default function MembersPage() {
             <table className="w-full min-w-[760px] border-collapse">
               <thead>
               <tr className="border-b border-[#dce8e2] text-left text-sm text-[#78847f]">
-                <th className="px-3 py-3">
-                  이름
-                </th>
-
-                <th className="px-3 py-3">
-                  이메일
-                </th>
-
-                <th className="px-3 py-3">
-                  역할
-                </th>
-
-                <th className="px-3 py-3">
-                  상태
-                </th>
-
-                <th className="px-3 py-3 text-right">
-                  관리
-                </th>
+                <th className="px-3 py-3">이름</th>
+                <th className="px-3 py-3">이메일</th>
+                <th className="px-3 py-3">역할</th>
+                <th className="px-3 py-3">상태</th>
+                <th className="px-3 py-3 text-right">관리</th>
               </tr>
               </thead>
 
               <tbody>
-              {filteredMembers.map(
-                  (member) => {
-                    const isActive =
-                        member.leftAt === null;
+              {filteredMembers.map((member) => {
+                const isActive = member.leftAt === null;
 
-                    return (
-                        <tr
-                            key={member.id}
-                            className={`border-b border-[#edf2ef] last:border-none ${
-                                !isActive
-                                    ? "bg-[#fafbfa]"
-                                    : ""
-                            }`}
-                        >
-                          {/* 이름 */}
-                          <td className="px-3 py-4">
-                            <div className="flex items-center gap-3">
-                              <div
-                                  className={`grid h-10 w-10 place-items-center rounded-full font-bold ${
-                                      isActive
-                                          ? "bg-[#dff7ec] text-[#005642]"
-                                          : "bg-[#f0f2f1] text-[#9aa5a0]"
-                                  }`}
-                              >
-                                {member.name.slice(
-                                    0,
-                                    1
-                                )}
-                              </div>
-
-                              <span
-                                  className={`font-bold ${
-                                      !isActive
-                                          ? "text-[#9aa5a0]"
-                                          : ""
-                                  }`}
-                              >
-                            {member.name}
-                          </span>
-                            </div>
-                          </td>
-
-                          {/* 이메일 */}
-                          <td
-                              className={`px-3 py-4 text-sm ${
+                return (
+                    <tr
+                        key={member.id}
+                        className={`border-b border-[#edf2ef] last:border-none ${
+                            !isActive ? "bg-[#fafbfa]" : ""
+                        }`}
+                    >
+                      {/* 이름 */}
+                      <td className="px-3 py-4">
+                        <div className="flex items-center gap-3">
+                          <div
+                              className={`grid h-10 w-10 place-items-center rounded-full font-bold ${
                                   isActive
-                                      ? "text-[#66736d]"
-                                      : "text-[#a6afab]"
+                                      ? "bg-[#dff7ec] text-[#005642]"
+                                      : "bg-[#f0f2f1] text-[#9aa5a0]"
                               }`}
                           >
-                            {member.email}
-                          </td>
+                            {member.name.slice(0, 1)}
+                          </div>
 
-                          {/* 역할 */}
-                          <td className="px-3 py-4">
-                        <span
-                            className={
-                              member.role ===
-                              "MANAGER"
-                                  ? "rounded-full bg-[#ece8ff] px-3 py-1 text-xs font-bold text-[#6758c7]"
-                                  : "rounded-full bg-[#f3f5f4] px-3 py-1 text-xs font-bold text-[#66736d]"
-                            }
-                        >
-                          {member.role ===
-                          "MANAGER"
-                              ? "관리자"
-                              : "직원"}
+                          <span
+                              className={`font-bold ${
+                                  !isActive ? "text-[#9aa5a0]" : ""
+                              }`}
+                          >
+                          {member.name}
                         </span>
-                          </td>
+                        </div>
+                      </td>
 
-                          {/* 상태 */}
-                          <td className="px-3 py-4">
-                            {isActive ? (
-                                <span className="rounded-full bg-[#dff7ec] px-3 py-1 text-xs font-bold text-[#14956c]">
-                            활성
+                      {/* 이메일 */}
+                      <td
+                          className={`px-3 py-4 text-sm ${
+                              isActive
+                                  ? "text-[#66736d]"
+                                  : "text-[#a6afab]"
+                          }`}
+                      >
+                        {member.email}
+                      </td>
+
+                      {/* 역할 */}
+                      <td className="px-3 py-4">
+                      <span
+                          className={
+                            member.role === "MANAGER"
+                                ? "rounded-full bg-[#ece8ff] px-3 py-1 text-xs font-bold text-[#6758c7]"
+                                : "rounded-full bg-[#f3f5f4] px-3 py-1 text-xs font-bold text-[#66736d]"
+                          }
+                      >
+                        {member.role === "MANAGER"
+                            ? "관리자"
+                            : "직원"}
+                      </span>
+                      </td>
+
+                      {/* 상태 */}
+                      <td className="px-3 py-4">
+                        {isActive ? (
+                            <span className="rounded-full bg-[#dff7ec] px-3 py-1 text-xs font-bold text-[#14956c]">
+                          활성
+                        </span>
+                        ) : (
+                            <span className="rounded-full bg-[#f1f3f2] px-3 py-1 text-xs font-bold text-[#78847f]">
+                          소속 종료
+                        </span>
+                        )}
+                      </td>
+
+                      {/* 관리 */}
+                      <td className="px-3 py-4">
+                        <div className="relative flex justify-end">
+                          {member.role === "EMPLOYEE" && isActive ? (
+                              <>
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setOpenMenuId(
+                                            openMenuId === member.id
+                                                ? null
+                                                : member.id
+                                        )
+                                    }
+                                    className="rounded-lg px-3 py-2 text-xl leading-none text-[#78847f] transition hover:bg-[#f3fbf7] hover:text-[#005642]"
+                                    aria-label={`${member.name} 관리 메뉴`}
+                                >
+                                  ⋮
+                                </button>
+
+                                {openMenuId === member.id && (
+                                    <div className="absolute right-0 top-10 z-20 w-36 overflow-hidden rounded-xl border border-[#dce8e2] bg-white shadow-lg">
+                                      <button
+                                          type="button"
+                                          onClick={() => {
+                                            setMemberToEnd(member);
+                                            setOpenMenuId(null);
+                                          }}
+                                          className="w-full px-4 py-3 text-left text-sm font-bold text-[#d95555] transition hover:bg-[#fff5f5]"
+                                      >
+                                        소속 종료
+                                      </button>
+                                    </div>
+                                )}
+                              </>
+                          ) : (
+                              <span className="px-3 text-sm text-[#b0b8b4]">
+                            -
                           </span>
-                            ) : (
-                                <span className="rounded-full bg-[#f1f3f2] px-3 py-1 text-xs font-bold text-[#78847f]">
-                            소속 종료
-                          </span>
-                            )}
-                          </td>
-
-                          {/* 관리 */}
-                          <td className="px-3 py-4">
-                            <div className="relative flex justify-end">
-                              {member.role ===
-                              "EMPLOYEE" &&
-                              isActive ? (
-                                  <>
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setOpenMenuId(
-                                                openMenuId ===
-                                                member.id
-                                                    ? null
-                                                    : member.id
-                                            )
-                                        }
-                                        className="rounded-lg px-3 py-2 text-xl leading-none text-[#78847f] transition hover:bg-[#f3fbf7] hover:text-[#005642]"
-                                        aria-label={`${member.name} 관리 메뉴`}
-                                    >
-                                      ⋮
-                                    </button>
-
-                                    {openMenuId ===
-                                        member.id && (
-                                            <div className="absolute right-0 top-10 z-20 w-36 overflow-hidden rounded-xl border border-[#dce8e2] bg-white shadow-lg">
-                                              <button
-                                                  type="button"
-                                                  onClick={() => {
-                                                    setMemberToEnd(
-                                                        member
-                                                    );
-
-                                                    setOpenMenuId(
-                                                        null
-                                                    );
-                                                  }}
-                                                  className="w-full px-4 py-3 text-left text-sm font-bold text-[#d95555] transition hover:bg-[#fff5f5]"
-                                              >
-                                                소속 종료
-                                              </button>
-                                            </div>
-                                        )}
-                                  </>
-                              ) : (
-                                  <span className="px-3 text-sm text-[#b0b8b4]">
-                              -
-                            </span>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                    );
-                  }
-              )}
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                );
+              })}
               </tbody>
             </table>
           </div>
@@ -416,28 +339,23 @@ export default function MembersPage() {
                   <strong className="text-[#1f2925]">
                     {memberToEnd.name}
                   </strong>
-                  님의 카페 스위치 소속을
-                  종료합니다.
+                  님의 카페 스위치 소속을 종료합니다.
                 </p>
 
                 <div className="mt-5 rounded-xl bg-[#fff7f7] p-4">
                   <p className="text-sm font-bold text-[#d95555]">
-                    계정 자체가 삭제되는 것은
-                    아니에요.
+                    계정 자체가 삭제되는 것은 아니에요.
                   </p>
 
                   <p className="mt-1 text-sm leading-6 text-[#78847f]">
-                    해당 근무지와의 소속 관계만
-                    종료됩니다.
+                    해당 근무지와의 소속 관계만 종료됩니다.
                   </p>
                 </div>
 
                 <div className="mt-6 flex gap-3">
                   <button
                       type="button"
-                      onClick={() =>
-                          setMemberToEnd(null)
-                      }
+                      onClick={() => setMemberToEnd(null)}
                       className="flex-1 rounded-xl border border-[#dce8e2] px-4 py-3 text-sm font-bold text-[#66736d] transition hover:bg-[#f3fbf7]"
                   >
                     취소
@@ -445,9 +363,7 @@ export default function MembersPage() {
 
                   <button
                       type="button"
-                      onClick={
-                        handleEndMembership
-                      }
+                      onClick={handleEndMembership}
                       className="flex-1 rounded-xl bg-[#d95555] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#c54848]"
                   >
                     소속 종료
@@ -468,16 +384,13 @@ export default function MembersPage() {
                     </h2>
 
                     <p className="mt-1 text-sm text-[#78847f]">
-                      아래 초대 코드를 직원에게
-                      공유해주세요.
+                      아래 초대 코드를 직원에게 공유해주세요.
                     </p>
                   </div>
 
                   <button
                       type="button"
-                      onClick={() =>
-                          setShowInviteModal(false)
-                      }
+                      onClick={() => setShowInviteModal(false)}
                       className="text-xl text-[#78847f] hover:text-black"
                   >
                     ×
@@ -495,17 +408,14 @@ export default function MembersPage() {
                 </div>
 
                 <p className="mt-4 text-sm leading-6 text-[#78847f]">
-                  직원은 로그인 후 근무지 참여
-                  화면에서 이 코드를 입력하면
-                  근무지에 참여할 수 있어요.
+                  직원은 로그인 후 근무지 참여 화면에서 이 코드를
+                  입력하면 근무지에 참여할 수 있어요.
                 </p>
 
                 <div className="mt-6 flex gap-3">
                   <button
                       type="button"
-                      onClick={() =>
-                          setShowInviteModal(false)
-                      }
+                      onClick={() => setShowInviteModal(false)}
                       className="flex-1 rounded-xl border border-[#dce8e2] px-4 py-3 text-sm font-bold text-[#66736d] hover:bg-[#f3fbf7]"
                   >
                     닫기
@@ -513,9 +423,7 @@ export default function MembersPage() {
 
                   <button
                       type="button"
-                      onClick={
-                        handleCopyInviteCode
-                      }
+                      onClick={handleCopyInviteCode}
                       className="flex-1 rounded-xl bg-[#005642] px-4 py-3 text-sm font-bold text-white hover:bg-[#0b6b52]"
                   >
                     초대 코드 복사

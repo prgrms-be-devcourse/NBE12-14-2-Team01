@@ -36,40 +36,23 @@ const shifts: MyShift[] = [
   },
 ];
 
-function getWorkHours(
-    startTime: string,
-    endTime: string
-) {
-  const [startHour, startMinute] = startTime
-  .split(":")
-  .map(Number);
+function getWorkHours(startTime: string, endTime: string) {
+  const [startHour, startMinute] = startTime.split(":").map(Number);
+  const [endHour, endMinute] = endTime.split(":").map(Number);
 
-  const [endHour, endMinute] = endTime
-  .split(":")
-  .map(Number);
-
-  const start =
-      startHour * 60 + startMinute;
-
-  const end =
-      endHour * 60 + endMinute;
+  const start = startHour * 60 + startMinute;
+  const end = endHour * 60 + endMinute;
 
   return (end - start) / 60;
 }
 
 export default function MyShiftsPage() {
   const params = useParams();
-
-  const workplaceId =
-      params.workplaceId as string;
+  const workplaceId = params.workplaceId as string;
 
   const totalHours = shifts.reduce(
       (total, shift) =>
-          total +
-          getWorkHours(
-              shift.startTime,
-              shift.endTime
-          ),
+          total + getWorkHours(shift.startTime, shift.endTime),
       0
   );
 
@@ -130,8 +113,7 @@ export default function MyShiftsPage() {
                       </p>
 
                       <p className="mt-1 text-sm text-[#78847f]">
-                        {shift.startTime} ~{" "}
-                        {shift.endTime}
+                        {shift.startTime} ~ {shift.endTime}
                       </p>
                     </div>
                   </div>
@@ -189,8 +171,8 @@ export default function MyShiftsPage() {
             </p>
 
             <p className="mt-1 text-sm text-[#78847f]">
-              예정된 근무 중 참여하기 어려운 일정이
-              있다면 대체 근무를 요청할 수 있어요.
+              예정된 근무 중 참여하기 어려운 일정이 있다면 대체 근무를
+              요청할 수 있어요.
             </p>
 
             <Link

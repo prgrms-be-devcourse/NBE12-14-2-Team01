@@ -33,14 +33,11 @@ const myShifts: MyShift[] = [
 ];
 
 export default function SubstituteRequestPage() {
-  const [selectedShiftId, setSelectedShiftId] =
-      useState(myShifts[0]?.id ?? 0);
-
-  const [error, setError] =
-      useState("");
-
-  const [successMessage, setSuccessMessage] =
-      useState("");
+  const [selectedShiftId, setSelectedShiftId] = useState(
+      myShifts[0]?.id ?? 0
+  );
+  const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   const selectedShift = myShifts.find(
       (shift) => shift.id === selectedShiftId
@@ -48,9 +45,7 @@ export default function SubstituteRequestPage() {
 
   const handleSubmit = () => {
     if (!selectedShift) {
-      setError(
-          "대체 근무를 요청할 근무를 선택해주세요."
-      );
+      setError("대체 근무를 요청할 근무를 선택해주세요.");
       return;
     }
 
@@ -66,9 +61,7 @@ export default function SubstituteRequestPage() {
      * 현재는 프론트 화면 확인을 위해
      * 성공 상태만 임시로 표시한다.
      */
-    setSuccessMessage(
-        "대체 근무 요청이 전송되었습니다."
-    );
+    setSuccessMessage("대체 근무 요청이 전송되었습니다.");
   };
 
   return (
@@ -97,10 +90,7 @@ export default function SubstituteRequestPage() {
             <select
                 value={selectedShiftId}
                 onChange={(e) => {
-                  setSelectedShiftId(
-                      Number(e.target.value)
-                  );
-
+                  setSelectedShiftId(Number(e.target.value));
                   setError("");
                   setSuccessMessage("");
                 }}
@@ -111,10 +101,8 @@ export default function SubstituteRequestPage() {
                       key={shift.id}
                       value={shift.id}
                   >
-                    {shift.date} ({shift.day}){" "}
-                    {shift.startTime} -{" "}
-                    {shift.endTime} /{" "}
-                    {shift.workplaceName}
+                    {shift.date} ({shift.day}) {shift.startTime} -{" "}
+                    {shift.endTime} / {shift.workplaceName}
                   </option>
               ))}
             </select>
@@ -127,13 +115,11 @@ export default function SubstituteRequestPage() {
                 </p>
 
                 <p className="mt-2 font-black">
-                  {selectedShift.date} (
-                  {selectedShift.day})
+                  {selectedShift.date} ({selectedShift.day})
                 </p>
 
                 <p className="mt-1 font-bold text-[#005642]">
-                  {selectedShift.startTime} ~{" "}
-                  {selectedShift.endTime}
+                  {selectedShift.startTime} ~ {selectedShift.endTime}
                 </p>
 
                 <p className="mt-1 text-sm text-[#78847f]">
@@ -149,18 +135,15 @@ export default function SubstituteRequestPage() {
 
             <div className="mt-2 space-y-1 text-sm leading-6 text-[#66736d]">
               <p>
-                대체 근무가 가능한 후보는 시스템이
-                자동으로 확인합니다.
+                대체 근무가 가능한 후보는 시스템이 자동으로 확인합니다.
               </p>
 
               <p>
-                요청자는 후보 직원을 직접 선택하거나
-                개별적으로 연락할 필요가 없습니다.
+                요청자는 후보 직원을 직접 선택하거나 개별적으로 연락할 필요가 없습니다.
               </p>
 
               <p>
-                후보 직원이 요청을 수락한 뒤 관리자
-                최종 승인이 완료되어야 실제 근무자가
+                후보 직원이 요청을 수락한 뒤 관리자 최종 승인이 완료되어야 실제 근무자가
                 변경됩니다.
               </p>
             </div>
@@ -194,8 +177,7 @@ export default function SubstituteRequestPage() {
             </h2>
 
             <p className="mt-1 text-sm text-[#78847f]">
-              별도의 연락 없이 시스템 안에서 대체 근무
-              요청을 진행할 수 있어요.
+              별도의 연락 없이 시스템 안에서 대체 근무 요청을 진행할 수 있어요.
             </p>
           </div>
 
@@ -210,8 +192,7 @@ export default function SubstituteRequestPage() {
               </p>
 
               <p className="mt-1 text-sm leading-6 text-[#78847f]">
-                참여하기 어려운 내 공식 근무를
-                선택합니다.
+                참여하기 어려운 내 공식 근무를 선택합니다.
               </p>
             </div>
 
@@ -225,8 +206,7 @@ export default function SubstituteRequestPage() {
               </p>
 
               <p className="mt-1 text-sm leading-6 text-[#78847f]">
-                시스템이 일정이 겹치지 않는 직원을
-                찾아 요청을 전달합니다.
+                시스템이 일정이 겹치지 않는 직원을 찾아 요청을 전달합니다.
               </p>
             </div>
 
@@ -240,8 +220,7 @@ export default function SubstituteRequestPage() {
               </p>
 
               <p className="mt-1 text-sm leading-6 text-[#78847f]">
-                후보가 수락하면 관리자 승인 후
-                최종 근무자가 변경됩니다.
+                후보가 수락하면 관리자 승인 후 최종 근무자가 변경됩니다.
               </p>
             </div>
           </div>

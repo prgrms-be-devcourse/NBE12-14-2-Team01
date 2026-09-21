@@ -2,16 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import {
-  useEffect,
-  useState,
-} from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import switchIcon from "@/app/icon.png";
-import {
-  getNavItems,
-  WorkplaceRole,
-} from "@/lib/navigation";
+import { getNavItems, WorkplaceRole } from "@/lib/navigation";
 
 type Props = {
   workplaceId: string;
@@ -24,16 +18,11 @@ export default function AppSidebar({
                                    }: Props) {
   const pathname = usePathname();
 
-  const [isOpen, setIsOpen] =
-      useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
-  const items = getNavItems(
-      workplaceId,
-      role
-  );
+  const items = getNavItems(workplaceId, role);
 
-  const dashboardHref =
-      `/workplaces/${workplaceId}`;
+  const dashboardHref = `/workplaces/${workplaceId}`;
 
   /*
    * 페이지가 이동되면
@@ -52,15 +41,12 @@ export default function AppSidebar({
       return;
     }
 
-    const originalOverflow =
-        document.body.style.overflow;
+    const originalOverflow = document.body.style.overflow;
 
-    document.body.style.overflow =
-        "hidden";
+    document.body.style.overflow = "hidden";
 
     return () => {
-      document.body.style.overflow =
-          originalOverflow;
+      document.body.style.overflow = originalOverflow;
     };
   }, [isOpen]);
 
@@ -70,9 +56,7 @@ export default function AppSidebar({
         {!isOpen && (
             <button
                 type="button"
-                onClick={() =>
-                    setIsOpen(true)
-                }
+                onClick={() => setIsOpen(true)}
                 className="fixed left-4 top-4 z-[70] grid h-10 w-10 place-items-center rounded-xl border border-[#dce8e2] bg-white text-xl font-bold text-[#005642] shadow-sm transition hover:bg-[#f3fbf7] lg:hidden"
                 aria-label="메뉴 열기"
                 aria-expanded={isOpen}
@@ -83,9 +67,7 @@ export default function AppSidebar({
 
         {/* 모바일 배경 */}
         <div
-            onClick={() =>
-                setIsOpen(false)
-            }
+            onClick={() => setIsOpen(false)}
             className={`fixed inset-0 z-50 bg-black/30 transition-opacity duration-200 lg:hidden ${
                 isOpen
                     ? "pointer-events-auto opacity-100"
@@ -105,9 +87,7 @@ export default function AppSidebar({
           <div className="flex h-20 items-center justify-between px-6">
             <Link
                 href={dashboardHref}
-                onClick={() =>
-                    setIsOpen(false)
-                }
+                onClick={() => setIsOpen(false)}
                 className="flex items-center gap-2 text-2xl font-black tracking-tight text-[#005642]"
             >
               <Image
@@ -123,9 +103,7 @@ export default function AppSidebar({
 
             <button
                 type="button"
-                onClick={() =>
-                    setIsOpen(false)
-                }
+                onClick={() => setIsOpen(false)}
                 className="grid h-9 w-9 place-items-center rounded-lg text-2xl text-[#78847f] transition hover:bg-[#f3fbf7] hover:text-[#005642]"
                 aria-label="메뉴 닫기"
             >
@@ -137,20 +115,15 @@ export default function AppSidebar({
           <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
             {items.map((item) => {
               const active =
-                  item.href ===
-                  dashboardHref
+                  item.href === dashboardHref
                       ? pathname === item.href
-                      : pathname.startsWith(
-                          item.href
-                      );
+                      : pathname.startsWith(item.href);
 
               return (
                   <Link
                       key={item.href}
                       href={item.href}
-                      onClick={() =>
-                          setIsOpen(false)
-                      }
+                      onClick={() => setIsOpen(false)}
                       className={`block rounded-xl px-4 py-3 text-sm font-semibold transition ${
                           active
                               ? "bg-[#dff7ec] text-[#005642]"
@@ -201,12 +174,9 @@ export default function AppSidebar({
           <nav className="flex-1 space-y-1 px-3">
             {items.map((item) => {
               const active =
-                  item.href ===
-                  dashboardHref
+                  item.href === dashboardHref
                       ? pathname === item.href
-                      : pathname.startsWith(
-                          item.href
-                      );
+                      : pathname.startsWith(item.href);
 
               return (
                   <Link

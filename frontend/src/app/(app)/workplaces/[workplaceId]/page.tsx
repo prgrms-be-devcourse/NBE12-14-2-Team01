@@ -6,9 +6,7 @@ import Card from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 import InviteCodeBox from "@/components/ui/InviteCodeBox";
 
-type MemberRole =
-    | "MANAGER"
-    | "EMPLOYEE";
+type MemberRole = "MANAGER" | "EMPLOYEE";
 
 type Member = {
   id: number;
@@ -29,24 +27,17 @@ const members: Member[] = [
 
 export default function WorkplacePage() {
   const params = useParams();
+  const workplaceId = params.workplaceId as string;
 
-  const workplaceId =
-      params.workplaceId as string;
+  const managerCount = members.filter(
+      (member) => member.role === "MANAGER"
+  ).length;
 
-  const managerCount =
-      members.filter(
-          (member) =>
-              member.role === "MANAGER"
-      ).length;
+  const employeeCount = members.filter(
+      (member) => member.role === "EMPLOYEE"
+  ).length;
 
-  const employeeCount =
-      members.filter(
-          (member) =>
-              member.role === "EMPLOYEE"
-      ).length;
-
-  const hasEmployees =
-      employeeCount > 0;
+  const hasEmployees = employeeCount > 0;
 
   return (
       <>
@@ -72,8 +63,7 @@ export default function WorkplacePage() {
 
               <p className="mt-1 text-sm text-[#78847f]">
                 관리자 {managerCount}명
-                {employeeCount > 0 &&
-                    ` · 직원 ${employeeCount}명`}
+                {employeeCount > 0 && ` · 직원 ${employeeCount}명`}
               </p>
             </Card>
           </Link>
@@ -125,8 +115,7 @@ export default function WorkplacePage() {
             </h2>
 
             <p className="mt-1 text-sm text-[#78847f]">
-              근무표를 만들기 위한 기본
-              설정을 진행해보세요.
+              근무표를 만들기 위한 기본 설정을 진행해보세요.
             </p>
           </div>
 
@@ -146,8 +135,7 @@ export default function WorkplacePage() {
                   </p>
 
                   <p className="mt-0.5 text-sm text-[#78847f]">
-                    초대 코드를 공유하고
-                    구성원을 추가하세요.
+                    초대 코드를 공유하고 구성원을 추가하세요.
                   </p>
                 </div>
               </div>
@@ -172,8 +160,7 @@ export default function WorkplacePage() {
                   </p>
 
                   <p className="mt-0.5 text-sm text-[#78847f]">
-                    직원별 반복 근무 요일과
-                    시간을 등록하세요.
+                    직원별 반복 근무 요일과 시간을 등록하세요.
                   </p>
                 </div>
               </div>
@@ -198,8 +185,7 @@ export default function WorkplacePage() {
                   </p>
 
                   <p className="mt-0.5 text-sm text-[#78847f]">
-                    정기 근무를 기준으로 이번 주
-                    근무표를 만드세요.
+                    정기 근무를 기준으로 이번 주 근무표를 만드세요.
                   </p>
                 </div>
               </div>
@@ -251,10 +237,7 @@ export default function WorkplacePage() {
                 >
                   <div className="flex items-center gap-3">
                     <div className="grid h-10 w-10 place-items-center rounded-full bg-[#dff7ec] font-black text-[#005642]">
-                      {member.name.slice(
-                          0,
-                          1
-                      )}
+                      {member.name.slice(0, 1)}
                     </div>
 
                     <div>
@@ -270,16 +253,12 @@ export default function WorkplacePage() {
 
                   <span
                       className={`rounded-full px-3 py-1 text-xs font-bold ${
-                          member.role ===
-                          "MANAGER"
+                          member.role === "MANAGER"
                               ? "bg-[#ece7ff] text-[#7861c9]"
                               : "bg-[#dff7ec] text-[#14956c]"
                       }`}
                   >
-                {member.role ===
-                "MANAGER"
-                    ? "관리자"
-                    : "직원"}
+                {member.role === "MANAGER" ? "관리자" : "직원"}
               </span>
                 </div>
             ))}
@@ -297,20 +276,19 @@ export default function WorkplacePage() {
                 </p>
 
                 <p className="mt-1 text-sm text-[#78847f]">
-                  초대 코드를 직원에게
-                  전달해보세요.
+                  초대 코드를 직원에게 전달해보세요.
                 </p>
 
                 <div className="mt-4">
-                {/*
-                  TODO:
-                  Workplace 초대 코드 조회 API 연동 후
-                  inviteCode 값을 전달한다.
+                  {/*
+                TODO:
+                Workplace 초대 코드 조회 API 연동 후
+                inviteCode 값을 전달한다.
 
-                  예:
-                  <InviteCodeBox inviteCode={workplace.inviteCode}/>
-                */}
-                  <InviteCodeBox inviteCode={"SW-1234"}/>
+                예:
+                <InviteCodeBox inviteCode={workplace.inviteCode}/>
+              */}
+                  <InviteCodeBox inviteCode={"SW-1234"} />
                 </div>
               </div>
           )}

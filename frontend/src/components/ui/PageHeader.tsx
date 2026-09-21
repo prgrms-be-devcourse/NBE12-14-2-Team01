@@ -6,11 +6,7 @@ type Props = {
   children?: ReactNode;
 };
 
-export default function PageHeader({
-    title,
-    description,
-    children,
-    }: Props) {
+export default function PageHeader({ title, description, children }: Props) {
   return (
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>

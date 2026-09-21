@@ -3,9 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
-type WorkplaceRole =
-    | "MANAGER"
-    | "EMPLOYEE";
+type WorkplaceRole = "MANAGER" | "EMPLOYEE";
 
 type Workplace = {
   id: number;
@@ -30,32 +28,16 @@ const initialWorkplaces: Workplace[] = [
 ];
 
 export default function WorkplacesPage() {
-  const [
-    workplaces,
-    setWorkplaces,
-  ] = useState<Workplace[]>(
-      initialWorkplaces
-  );
-
-  const [
-    workplaceName,
-    setWorkplaceName,
-  ] = useState("");
-
-  const [
-    inviteCode,
-    setInviteCode,
-  ] = useState("");
+  const [workplaces, setWorkplaces] =
+      useState<Workplace[]>(initialWorkplaces);
+  const [workplaceName, setWorkplaceName] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
 
   const handleCreateWorkplace = () => {
-    const name =
-        workplaceName.trim();
+    const name = workplaceName.trim();
 
     if (!name) {
-      alert(
-          "근무지 이름을 입력해주세요."
-      );
-
+      alert("근무지 이름을 입력해주세요.");
       return;
     }
 
@@ -75,14 +57,10 @@ export default function WorkplacesPage() {
   };
 
   const handleJoinWorkplace = () => {
-    const code =
-        inviteCode.trim();
+    const code = inviteCode.trim();
 
     if (!code) {
-      alert(
-          "초대 코드를 입력해주세요."
-      );
-
+      alert("초대 코드를 입력해주세요.");
       return;
     }
 
@@ -93,9 +71,7 @@ export default function WorkplacesPage() {
      * 현재는 화면 동작 확인용으로
      * 입력 여부만 확인한다.
      */
-    alert(
-        "초대 코드 확인 기능은 API 연동 후 연결할 예정입니다."
-    );
+    alert("초대 코드 확인 기능은 API 연동 후 연결할 예정입니다.");
   };
 
   return (
@@ -109,8 +85,7 @@ export default function WorkplacesPage() {
               </h1>
 
               <p className="mt-2 text-[#78847f]">
-                참여할 근무지를 선택하거나
-                새로운 근무지를 시작해보세요.
+                참여할 근무지를 선택하거나 새로운 근무지를 시작해보세요.
               </p>
             </div>
 
@@ -149,8 +124,7 @@ export default function WorkplacesPage() {
                   </h2>
 
                   <p className="mt-1 text-sm text-[#78847f]">
-                    현재 참여 중인
-                    근무지입니다.
+                    현재 참여 중인 근무지입니다.
                   </p>
                 </div>
 
@@ -160,62 +134,49 @@ export default function WorkplacesPage() {
               </div>
 
               <div className="space-y-3">
-                {workplaces.map(
-                    (workplace) => (
-                        <Link
-                            key={workplace.id}
-                            href={`/workplaces/${workplace.id}`}
-                            className="block rounded-2xl border border-[#dce8e2] bg-white p-5 transition hover:border-[#14956c] hover:shadow-sm"
-                        >
-                          <div className="flex items-center justify-between gap-4">
-                            <div className="flex min-w-0 items-center gap-4">
-                              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#dff7ec] text-xl font-black text-[#005642]">
-                                {workplace.name.slice(
-                                    0,
-                                    1
-                                )}
-                              </div>
-
-                              <div className="min-w-0">
-                                <p className="truncate font-black">
-                                  {
-                                    workplace.name
-                                  }
-                                </p>
-
-                                <p className="mt-1 text-sm text-[#78847f]">
-                                  구성원{" "}
-                                  {
-                                    workplace.members
-                                  }
-                                  명
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="flex shrink-0 items-center gap-3">
-                        <span
-                            className={
-                              workplace.role ===
-                              "MANAGER"
-                                  ? "rounded-full bg-[#ece8ff] px-3 py-1 text-xs font-bold text-[#6758c7]"
-                                  : "rounded-full bg-[#f3f5f4] px-3 py-1 text-xs font-bold text-[#66736d]"
-                            }
-                        >
-                          {workplace.role ===
-                          "MANAGER"
-                              ? "관리자"
-                              : "직원"}
-                        </span>
-
-                              <span className="text-xl text-[#9eaaa5]">
-                          ›
-                        </span>
-                            </div>
+                {workplaces.map((workplace) => (
+                    <Link
+                        key={workplace.id}
+                        href={`/workplaces/${workplace.id}`}
+                        className="block rounded-2xl border border-[#dce8e2] bg-white p-5 transition hover:border-[#14956c] hover:shadow-sm"
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex min-w-0 items-center gap-4">
+                          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#dff7ec] text-xl font-black text-[#005642]">
+                            {workplace.name.slice(0, 1)}
                           </div>
-                        </Link>
-                    )
-                )}
+
+                          <div className="min-w-0">
+                            <p className="truncate font-black">
+                              {workplace.name}
+                            </p>
+
+                            <p className="mt-1 text-sm text-[#78847f]">
+                              구성원 {workplace.members}명
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex shrink-0 items-center gap-3">
+                      <span
+                          className={
+                            workplace.role === "MANAGER"
+                                ? "rounded-full bg-[#ece8ff] px-3 py-1 text-xs font-bold text-[#6758c7]"
+                                : "rounded-full bg-[#f3f5f4] px-3 py-1 text-xs font-bold text-[#66736d]"
+                          }
+                      >
+                        {workplace.role === "MANAGER"
+                            ? "관리자"
+                            : "직원"}
+                      </span>
+
+                          <span className="text-xl text-[#9eaaa5]">
+                        ›
+                      </span>
+                        </div>
+                      </div>
+                    </Link>
+                ))}
               </div>
             </section>
 
@@ -228,8 +189,7 @@ export default function WorkplacesPage() {
                 </h2>
 
                 <p className="mt-1 text-sm leading-6 text-[#78847f]">
-                  새로운 근무지를 만들면
-                  관리자로 시작합니다.
+                  새로운 근무지를 만들면 관리자로 시작합니다.
                 </p>
 
                 <div className="mt-5">
@@ -240,15 +200,9 @@ export default function WorkplacesPage() {
                   <input
                       type="text"
                       value={workplaceName}
-                      onChange={(e) =>
-                          setWorkplaceName(
-                              e.target.value
-                          )
-                      }
+                      onChange={(e) => setWorkplaceName(e.target.value)}
                       onKeyDown={(e) => {
-                        if (
-                            e.key === "Enter"
-                        ) {
+                        if (e.key === "Enter") {
                           handleCreateWorkplace();
                         }
                       }}
@@ -259,9 +213,7 @@ export default function WorkplacesPage() {
 
                 <button
                     type="button"
-                    onClick={
-                      handleCreateWorkplace
-                    }
+                    onClick={handleCreateWorkplace}
                     className="mt-4 w-full rounded-xl bg-[#005642] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#0b6b52]"
                 >
                   근무지 만들기
@@ -275,8 +227,7 @@ export default function WorkplacesPage() {
                 </h2>
 
                 <p className="mt-1 text-sm leading-6 text-[#78847f]">
-                  관리자에게 받은 초대
-                  코드를 입력해주세요.
+                  관리자에게 받은 초대 코드를 입력해주세요.
                 </p>
 
                 <div className="mt-5">
@@ -288,14 +239,10 @@ export default function WorkplacesPage() {
                       type="text"
                       value={inviteCode}
                       onChange={(e) =>
-                          setInviteCode(
-                              e.target.value.toUpperCase()
-                          )
+                          setInviteCode(e.target.value.toUpperCase())
                       }
                       onKeyDown={(e) => {
-                        if (
-                            e.key === "Enter"
-                        ) {
+                        if (e.key === "Enter") {
                           handleJoinWorkplace();
                         }
                       }}
@@ -306,9 +253,7 @@ export default function WorkplacesPage() {
 
                 <button
                     type="button"
-                    onClick={
-                      handleJoinWorkplace
-                    }
+                    onClick={handleJoinWorkplace}
                     className="mt-4 w-full rounded-xl border border-[#005642] bg-white px-4 py-3 text-sm font-bold text-[#005642] transition hover:bg-[#f3fbf7]"
                 >
                   근무지 참여하기
