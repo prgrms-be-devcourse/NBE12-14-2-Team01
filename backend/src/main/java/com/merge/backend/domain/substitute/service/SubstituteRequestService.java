@@ -99,12 +99,14 @@ public class SubstituteRequestService {
         )){
             throw new BusinessException(SubstituteRequestErrorCode.CONFLICT_UNAVAILABLE_TIME);
         }
+        //이전에 다른 대체 근무를 수락했다면, 그것과 중복되는지
         if(substituteCandidateRepository.existsConflictingActiveSubstitute(
             candidate.getMember().getId(), requestId,
             request.getShift().getStartAt(), request.getShift().getEndAt())
         ){
             throw new BusinessException(SubstituteRequestErrorCode.CONFLICT_ACTIVE_SUBSTITUTE);
         }
+        //최종 승인 시작
         request.approveRequest(candidate.getMember(), LocalDateTime.now());
 
         ///todo: 요청자와 수락자에게 알림 주기
