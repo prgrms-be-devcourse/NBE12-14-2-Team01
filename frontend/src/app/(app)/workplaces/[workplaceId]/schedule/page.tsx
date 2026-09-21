@@ -342,7 +342,7 @@ export default function SchedulePage() {
                   type="button"
                   className="grid h-9 w-9 place-items-center rounded-lg border border-[#dce8e2] text-[#66736d] transition hover:bg-[#f3fbf7]"
               >
-                ‹
+                <span className="block -translate-y-px text-xl leading-none">‹</span>
               </button>
 
               <p className="font-bold">2026년 9월 3주차</p>
@@ -351,7 +351,7 @@ export default function SchedulePage() {
                   type="button"
                   className="grid h-9 w-9 place-items-center rounded-lg border border-[#dce8e2] text-[#66736d] transition hover:bg-[#f3fbf7]"
               >
-                ›
+                <span className="block -translate-y-px text-xl leading-none">›</span>
               </button>
 
               {status === "DRAFT" && (

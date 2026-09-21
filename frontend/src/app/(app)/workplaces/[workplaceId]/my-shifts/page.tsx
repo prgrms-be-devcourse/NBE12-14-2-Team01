@@ -70,7 +70,7 @@ export default function MyShiftsPage() {
                   type="button"
                   className="grid h-9 w-9 place-items-center rounded-lg border border-[#dce8e2] text-[#66736d] transition hover:bg-[#f3fbf7]"
               >
-                ‹
+                <span className="block -translate-y-px text-xl leading-none">‹</span>
               </button>
 
               <p className="font-bold">
@@ -81,7 +81,7 @@ export default function MyShiftsPage() {
                   type="button"
                   className="grid h-9 w-9 place-items-center rounded-lg border border-[#dce8e2] text-[#66736d] transition hover:bg-[#f3fbf7]"
               >
-                ›
+                <span className="block -translate-y-px text-xl leading-none">›</span>
               </button>
             </div>
 

@@ -164,7 +164,7 @@ export default function UnavailablePage() {
                 onClick={handlePrevMonth}
                 className="grid h-9 w-9 place-items-center rounded-lg border border-[#dce8e2] text-[#66736d] transition hover:bg-[#f3fbf7]"
             >
-              ‹
+              <span className="block -translate-y-px text-xl leading-none">‹</span>
             </button>
 
             <h2 className="text-lg font-black">
@@ -176,7 +176,7 @@ export default function UnavailablePage() {
                 onClick={handleNextMonth}
                 className="grid h-9 w-9 place-items-center rounded-lg border border-[#dce8e2] text-[#66736d] transition hover:bg-[#f3fbf7]"
             >
-              ›
+              <span className="block -translate-y-px text-xl leading-none">›</span>
             </button>
           </div>
 

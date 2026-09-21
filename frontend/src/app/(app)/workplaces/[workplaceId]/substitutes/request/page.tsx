@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import {useState} from "react";
 import Card from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 
@@ -87,25 +87,38 @@ export default function SubstituteRequestPage() {
               대체가 필요한 근무
             </label>
 
-            <select
-                value={selectedShiftId}
-                onChange={(e) => {
-                  setSelectedShiftId(Number(e.target.value));
-                  setError("");
-                  setSuccessMessage("");
-                }}
-                className="w-full rounded-xl border border-[#dce8e2] bg-white px-4 py-3 outline-none focus:border-[#14956c]"
-            >
-              {myShifts.map((shift) => (
-                  <option
-                      key={shift.id}
-                      value={shift.id}
-                  >
-                    {shift.date} ({shift.day}) {shift.startTime} -{" "}
-                    {shift.endTime} / {shift.workplaceName}
-                  </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                  value={selectedShiftId}
+                  onChange={(e) => {
+                    setSelectedShiftId(Number(e.target.value));
+                    setError("");
+                    setSuccessMessage("");
+                  }}
+                  className="w-full appearance-none rounded-xl border border-[#dce8e2] bg-white px-4 py-3 pr-12 outline-none focus:border-[#14956c]"
+              >
+                {myShifts.map((shift) => (
+                    <option key={shift.id} value={shift.id}>
+                      {shift.date} ({shift.day}) {shift.startTime} - {shift.endTime} /{" "}
+                      {shift.workplaceName}
+                    </option>
+                ))}
+              </select>
+
+              <svg
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#66736d]"
+              >
+                <path
+                    d="M6 8L10 12L14 8"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                />
+              </svg>
+            </div>
           </div>
 
           {selectedShift && (
@@ -156,7 +169,8 @@ export default function SubstituteRequestPage() {
           )}
 
           {successMessage && (
-              <div className="mt-4 rounded-xl bg-[#dff7ec] px-4 py-3 text-sm font-bold text-[#14956c]">
+              <div
+                  className="mt-4 rounded-xl bg-[#dff7ec] px-4 py-3 text-sm font-bold text-[#14956c]">
                 {successMessage}
               </div>
           )}
