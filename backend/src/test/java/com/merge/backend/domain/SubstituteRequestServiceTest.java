@@ -117,14 +117,19 @@ class SubstituteRequestServiceTest {
 
         given(substituteRequestRepository.findById(requestId)).willReturn(Optional.of(request));
         WorkplaceMember managerMember = mock(WorkplaceMember.class);
-        given(workplaceMemberService.requireManager(actorId, workplaceId)).willReturn(managerMember);
+        given(workplaceMemberService.requireManager(
+            actorId, workplaceId)).willReturn(managerMember);
         given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
-        given(substituteCandidateRepository.findByRequestIdAndStatus(requestId, CandidateStatus.ACCEPTED))
+        given(substituteCandidateRepository.findByRequestIdAndStatus(
+            requestId, CandidateStatus.ACCEPTED))
             .willReturn(candidate);
 
-        given(shiftRepository.existsConflictingShift(eq(candidateMemberId), any(), any())).willReturn(false);
-        given(unavailableTimeRepository.existsOverlappingUnavailableTime(eq(actorId), any(), any())).willReturn(false);
-        given(substituteCandidateRepository.existsConflictingActiveSubstitute(eq(candidateMemberId), eq(requestId), any(), any()))
+        given(shiftRepository.existsConflictingShift(
+            eq(candidateMemberId), any(), any())).willReturn(false);
+        given(unavailableTimeRepository.existsOverlappingUnavailableTime(
+            eq(actorId), any(), any())).willReturn(false);
+        given(substituteCandidateRepository.existsConflictingActiveSubstitute(
+            eq(candidateMemberId), eq(requestId), any(), any()))
             .willReturn(false);
 
         // when
@@ -193,7 +198,8 @@ class SubstituteRequestServiceTest {
 
         given(substituteRequestRepository.findById(requestId)).willReturn(Optional.of(request));
         given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
-        given(substituteCandidateRepository.findByRequestIdAndStatus(requestId, CandidateStatus.ACCEPTED))
+        given(substituteCandidateRepository.findByRequestIdAndStatus(
+            requestId, CandidateStatus.ACCEPTED))
             .willReturn(candidate);
 
         // when & then
@@ -225,10 +231,12 @@ class SubstituteRequestServiceTest {
 
         given(substituteRequestRepository.findById(requestId)).willReturn(Optional.of(request));
         given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
-        given(substituteCandidateRepository.findByRequestIdAndStatus(requestId, CandidateStatus.ACCEPTED))
+        given(substituteCandidateRepository.findByRequestIdAndStatus(
+            requestId, CandidateStatus.ACCEPTED))
             .willReturn(candidate);
 
-        given(shiftRepository.existsConflictingShift(eq(candidateMemberId), any(), any())).willReturn(true);
+        given(shiftRepository.existsConflictingShift(
+            eq(candidateMemberId), any(), any())).willReturn(true);
 
         // when & then
         assertThatThrownBy(() -> substituteRequestService.approve(requestId, actorId))
@@ -259,12 +267,16 @@ class SubstituteRequestServiceTest {
 
         given(substituteRequestRepository.findById(requestId)).willReturn(Optional.of(request));
         given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
-        given(substituteCandidateRepository.findByRequestIdAndStatus(requestId, CandidateStatus.ACCEPTED))
+        given(substituteCandidateRepository.findByRequestIdAndStatus(
+            requestId, CandidateStatus.ACCEPTED))
             .willReturn(candidate);
 
-        given(shiftRepository.existsConflictingShift(eq(candidateMemberId), any(), any())).willReturn(false);
-        given(unavailableTimeRepository.existsOverlappingUnavailableTime(eq(actorId), any(), any())).willReturn(false);
-        given(substituteCandidateRepository.existsConflictingActiveSubstitute(eq(candidateMemberId), eq(requestId), any(), any()))
+        given(shiftRepository.existsConflictingShift(
+            eq(candidateMemberId), any(), any())).willReturn(false);
+        given(unavailableTimeRepository.existsOverlappingUnavailableTime(
+            eq(actorId), any(), any())).willReturn(false);
+        given(substituteCandidateRepository.existsConflictingActiveSubstitute(
+            eq(candidateMemberId), eq(requestId), any(), any()))
             .willReturn(true);
 
         // when & then
