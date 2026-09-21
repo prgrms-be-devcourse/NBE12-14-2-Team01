@@ -75,7 +75,7 @@ public class SubstituteRequestService {
             requestId, CandidateStatus.ACCEPTED
         );
         //수락자가 해당 근무지 소속인지
-        if(candidate.getMember().getWorkplace() != workplace ||
+        if(!candidate.getMember().getWorkplace().equals(workplace) ||
             candidate.getMember().getLeftAt() != null){
             throw new BusinessException(ShiftErrorCode.INVALID_WORKPLACE_MEMBER_VALUE);
         }
