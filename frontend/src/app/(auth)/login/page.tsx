@@ -77,12 +77,12 @@ export default function LoginPage() {
           <div className="mt-6 text-center text-sm text-[#78847f]">
             아직 계정이 없으신가요?
 
-            <a
+            <Link
                 href="/signup"
                 className="ml-2 font-bold text-[#005642] hover:underline"
             >
               회원가입
-            </a>
+            </Link>
           </div>
         </div>
       </main>
