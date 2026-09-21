@@ -73,27 +73,47 @@ public enum ShiftErrorCode implements ErrorCode {
             "SFT-011",
             "근무 시작일과 종료일은 같아야 합니다."
     ),
+    NOT_PUBLISHED_SHIFT(
+        HttpStatus.NOT_FOUND,
+        "SFT-012",
+        "해당 근무는 확정되지 않았습니다."
+    ),
+    IS_CANCELED_SHIFT(
+        HttpStatus.NOT_FOUND,
+        "SFT-013",
+        "해당 근무는 취소되었습니다."
+    ),
+    FORBIDDEN_ACCESS(
+        HttpStatus.FORBIDDEN,
+        "SFT-014",
+        "잘못된 권한입니다."
+    ),
     UNAVAILABLE_TIME_CONFLICT(
             HttpStatus.BAD_REQUEST,
-            "UNAVAILABLE_TIME_CONFLICT",
+            "SFT-015",
             "해당 구성원이 이 시간에 근무 불가능 일정을 등록했습니다."
     ),
 
     NOT_FOUND_ERROR(
             HttpStatus.NOT_FOUND,
-            "SFT-404",
+            "SFT-016",
             "대상을 찾을 수 없습니다."
     ),
 
     NOT_FOUND_SCHEDULE_ERROR(
             HttpStatus.NOT_FOUND,
-            "SFT-404",
+            "SFT-017",
             "스케줄이 없거나 잘못된 스케줄 ID입니다."
     ),
     NOT_FOUND_SHIFT_ERROR(
-            HttpStatus.NOT_FOUND,
-            "SFT-404",
-            "해당 근무를 찾을 수 없습니다."
+        HttpStatus.NOT_FOUND,
+        "SFT-018",
+        "해당 근무를 찾을 수 없습니다."
+    ),
+    NOT_FOUND_WORKPLACE_ERROR(
+        HttpStatus.NOT_FOUND,
+        "SFT-019",
+        "해당 근무지를 찾을 수 없습니다."
     );
 
     private final HttpStatus httpStatus;
