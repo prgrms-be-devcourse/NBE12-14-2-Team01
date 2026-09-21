@@ -52,7 +52,7 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
         @Param("endAt") LocalDateTime endAt,
         @Param("currentShiftId") Long currentShiftId
     );
-
+    //해당 주차의 모든 스케줄에서 본인 근무 조회
     @Query("""
         SELECT s
         FROM Shift s 
@@ -66,5 +66,21 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
     List<Shift> findAllByWeekStartDateAndCurrentUserId(
         @Param("weekStartDate") LocalDate weekStartDate,
         @Param("currentUserId") Long currentUserId
+    );
+
+    //수락 이후 승인 이전 사이 혹시나 새로운 근무가 겹치지 않는지
+    @Query("""
+        select count(s) > 0 
+        from Shift s 
+        where s.member.id = :memberId
+        and s.schedule.status = ScheduleStatus.PUBLISHED
+        and s.status = ShiftStatus.SCHEDULED
+        and s.startAt < :endAt 
+        and s.endAt > :startAt
+        """)
+    boolean existsConflictingShift(
+        @Param("memberId") Long memberId,
+        @Param("startAt") LocalDateTime startAt,
+        @Param("endAt") LocalDateTime endAt
     );
 }

@@ -1,0 +1,114 @@
+package com.merge.backend.domain.substitute.service;
+
+import com.merge.backend.domain.shift.entity.ScheduleStatus;
+import com.merge.backend.domain.shift.entity.ShiftStatus;
+import com.merge.backend.domain.shift.exception.ScheduleErrorCode;
+import com.merge.backend.domain.shift.exception.ShiftErrorCode;
+import com.merge.backend.domain.shift.repository.ShiftRepository;
+import com.merge.backend.domain.shift.repository.UnavailableTimeRepository;
+import com.merge.backend.domain.substitute.entity.CandidateStatus;
+import com.merge.backend.domain.substitute.entity.RequestStatus;
+import com.merge.backend.domain.substitute.entity.SubstituteCandidate;
+import com.merge.backend.domain.substitute.entity.SubstituteRequest;
+import com.merge.backend.domain.substitute.exception.SubstituteRequestErrorCode;
+import com.merge.backend.domain.substitute.repository.SubstituteCandidateRepository;
+import com.merge.backend.domain.substitute.repository.SubstituteRequestRepository;
+import com.merge.backend.domain.workplace.entity.Workplace;
+import com.merge.backend.domain.workplace.exception.WorkplaceErrorCode;
+import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
+import com.merge.backend.domain.workplace.service.WorkplaceMemberService;
+import com.merge.backend.global.exception.BusinessException;
+import java.time.LocalDateTime;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+public class SubstituteRequestService {
+
+    private final SubstituteRequestRepository substituteRequestRepository;
+    private final SubstituteCandidateRepository substituteCandidateRepository;
+    private final ShiftRepository shiftRepository;
+    private final WorkplaceRepository workplaceRepository;
+    private final UnavailableTimeRepository unavailableTimeRepository;
+    private final WorkplaceMemberService workplaceMemberService;
+
+    @Transactional
+    public SubstituteRequest approve(Long requestId, Long actorId) {
+
+        //대체 근무 요청이 존재하는지
+        SubstituteRequest request = substituteRequestRepository.findById(requestId)
+            .orElseThrow(() ->
+                new BusinessException(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND));
+
+        //request == ACCEPTED 여부 검사
+        if(request.getStatus() != RequestStatus.ACCEPTED) {
+            throw new BusinessException(SubstituteRequestErrorCode.INVALID_REQUEST);
+        }
+        //근무지 ID 뽑아오기(어차피 get요청자로 뽑아도 매니저랑 같은 근무지라 괜찮)
+        Long workplaceId = request.getRequesterMember().getWorkplace().getId();
+        //매니저 인가 확인
+        workplaceMemberService.requireManager(actorId, workplaceId);
+
+        //요청의 스케줄이 공개되지 않았을 때
+        if(request.getShift().getSchedule().getStatus() != ScheduleStatus.PUBLISHED) {
+            throw new BusinessException(ScheduleErrorCode.NOT_PUBLISHED);
+        }
+        //요청의 근무가 취소되었다면
+        if(request.getShift().getStatus() != ShiftStatus.SCHEDULED) {
+            throw new BusinessException(ShiftErrorCode.IS_CANCELED_SHIFT);
+        }
+        //근무 시작일이 이미 지났을 시
+        if(request.getShift().getStartAt().isBefore(LocalDateTime.now())) {
+            throw new BusinessException(ShiftErrorCode.INVALID_TIME_VALUE);
+        }
+        //현재 Shift.member != Request.requesterMember
+        if(!request.getRequesterMember().equals(request.getShift().getMember())) {
+            throw new BusinessException(SubstituteRequestErrorCode.INVALID_MEMBER);
+        }
+        Workplace workplace = workplaceRepository.findById(workplaceId)
+            .orElseThrow(() ->
+                new BusinessException(WorkplaceErrorCode.WORKPLACE_NOT_FOUND));
+
+        SubstituteCandidate candidate = substituteCandidateRepository.findByRequestIdAndStatus(
+            requestId, CandidateStatus.ACCEPTED
+        );
+        //수락자가 해당 근무지 소속인지
+        if(candidate.getMember().getWorkplace() != workplace ||
+            candidate.getMember().getLeftAt() != null){
+            throw new BusinessException(ShiftErrorCode.INVALID_WORKPLACE_MEMBER_VALUE);
+        }
+        //혹여나 수락 후 승인 전 사이에 근무를 배정받았는지
+        boolean hasConflictingShift = shiftRepository.existsConflictingShift(
+            candidate.getMember().getId(),
+            request.getShift().getStartAt(), // 시작 시간
+            request.getShift().getEndAt()// 종료 시간
+        );
+        if(hasConflictingShift){
+            throw new BusinessException(SubstituteRequestErrorCode.CONFLICT_SHIFT);
+        }
+        //현재를 기준으로 대체 근무 시작 시간이 지났다면
+        if(LocalDateTime.now().isAfter(request.getShift().getStartAt())){
+            //요청은 만료시킨다.
+            request.expiredRequest();
+        }
+        //불가능 시간과 중복되는지
+        if(unavailableTimeRepository.existsOverlappingUnavailableTime(
+            actorId, request.getShift().getStartAt(), request.getShift().getEndAt()
+        )){
+            throw new BusinessException(SubstituteRequestErrorCode.CONFLICT_UNAVAILABLE_TIME);
+        }
+        if(substituteCandidateRepository.existsConflictingActiveSubstitute(
+            candidate.getMember().getId(), requestId,
+            request.getShift().getStartAt(), request.getShift().getEndAt())
+        ){
+            throw new BusinessException(SubstituteRequestErrorCode.CONFLICT_ACTIVE_SUBSTITUTE);
+        }
+        request.approveRequest(candidate.getMember(), LocalDateTime.now());
+
+        ///todo: 요청자와 수락자에게 알림 주기
+
+        return request;
+    }
+}
