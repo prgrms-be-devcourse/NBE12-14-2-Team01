@@ -72,8 +72,9 @@ public class SubstituteRequestService {
                 new BusinessException(WorkplaceErrorCode.WORKPLACE_NOT_FOUND));
 
         SubstituteCandidate candidate = substituteCandidateRepository.findByRequestIdAndStatus(
-            requestId, CandidateStatus.ACCEPTED
-        );
+            requestId, CandidateStatus.ACCEPTED)
+            .orElseThrow(() ->
+                new BusinessException(SubstituteRequestErrorCode.NOT_FOUND_CANDIDATE));
         //수락자가 해당 근무지 소속인지
         if(!candidate.getMember().getWorkplace().equals(workplace) ||
             candidate.getMember().getLeftAt() != null){
@@ -95,7 +96,7 @@ public class SubstituteRequestService {
         }
         //불가능 시간과 중복되는지
         if(unavailableTimeRepository.existsOverlappingUnavailableTime(
-            candidate.getMember().getId(),
+            candidate.getMember().getUser().getId(),
             request.getShift().getStartAt(),
             request.getShift().getEndAt()
         )){
