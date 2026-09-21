@@ -282,6 +282,7 @@ class SubstituteRequestServiceTest {
         // when & then
         assertThatThrownBy(() -> substituteRequestService.approve(requestId, actorId))
             .isInstanceOf(BusinessException.class)
-            .hasMessageContaining(SubstituteRequestErrorCode.CONFLICT_ACTIVE_SUBSTITUTE.getMessage());
+            .hasMessageContaining(
+                SubstituteRequestErrorCode.CONFLICT_ACTIVE_SUBSTITUTE.getMessage());
     }
 }
