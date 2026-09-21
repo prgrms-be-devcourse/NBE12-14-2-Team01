@@ -1,17 +1,17 @@
 package com.merge.backend.domain.shift.controller;
 
-import com.merge.backend.domain.shift.dto.UnavailableTimeRegisterReqBody;
-import com.merge.backend.domain.shift.dto.UnavailableTimeRegisterResponse;
-import com.merge.backend.domain.shift.dto.UnavailableTimeUpdateReqBody;
-import com.merge.backend.domain.shift.dto.UnavailableTimeUpdateResponse;
+import com.merge.backend.domain.shift.dto.*;
 import com.merge.backend.domain.shift.entity.UnavailableTime;
 import com.merge.backend.domain.shift.service.UnavailableTimeService;
 import com.merge.backend.global.dto.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.apache.coyote.Response;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -19,6 +19,29 @@ import org.springframework.web.bind.annotation.*;
 public class UnavailableTimeController {
 
     private final UnavailableTimeService unavailableTimeService;
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<UnavailableTimeListResponse>>> list() {
+        List<UnavailableTimeService.UnavailableTimeResult> results =
+                unavailableTimeService.findAll();
+
+        List<UnavailableTimeListResponse> responses = results.stream()
+                .map(result -> new UnavailableTimeListResponse(
+                        result.unavailableTimeId(),
+                        result.startAt(),
+                        result.endAt(),
+                        result.officialShiftConflict()
+                ))
+                .toList();
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "200",
+                        "근무 불가능 일정을 조회했습니다.",
+                        responses
+                )
+        );
+    }
 
     @PostMapping
     public ResponseEntity<ApiResponse<UnavailableTimeRegisterResponse>> register(
@@ -67,5 +90,20 @@ public class UnavailableTimeController {
                                 )
                         )
                 );
+    }
+
+    @DeleteMapping("/{unavailableTimeId}")
+    public ResponseEntity<ApiResponse<Void>> delete(
+            @PathVariable Long unavailableTimeId
+    ) {
+
+        unavailableTimeService.delete(unavailableTimeId);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "200",
+                        "근무 불가능 일정이 삭제되었습니다."
+                )
+        );
     }
 }

@@ -1,5 +1,6 @@
 package com.merge.backend.domain.shift.service;
 
+import com.merge.backend.domain.shift.dto.UnavailableTimeListResponse;
 import com.merge.backend.domain.shift.dto.UnavailableTimeRegisterReqBody;
 import com.merge.backend.domain.shift.dto.UnavailableTimeRegisterResponse;
 import com.merge.backend.domain.shift.dto.UnavailableTimeUpdateReqBody;
@@ -13,14 +14,11 @@ import com.merge.backend.domain.user.service.UserService;
 import com.merge.backend.global.exception.BusinessException;
 import com.merge.backend.global.rq.Rq;
 import com.merge.backend.global.util.TimeRangeUtils;
-import jakarta.transaction.Transactional;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cglib.core.Local;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -34,6 +32,47 @@ public class UnavailableTimeService {
     private final Rq rq;
     private final Clock clock;
     private final UserService userService;
+
+    public record UnavailableTimeResult(
+            Long unavailableTimeId,
+            LocalDateTime startAt,
+            LocalDateTime endAt,
+            boolean officialShiftConflict
+    ){}
+
+    @Transactional(readOnly = true)
+    public List<UnavailableTimeResult> findAll() {
+
+        Long userId = rq.getActorId();
+
+        List<UnavailableTime> unavailableTimes =
+                unavailableTimeRepository
+                        .findByUserIdAndEndAtAfterOrderByStartAtAsc(
+                                userId,
+                                LocalDateTime.now(clock)
+                        );
+
+        return unavailableTimes.stream()
+                .map(unavailableTime ->{
+                            boolean officialShiftConflict =
+                                    shiftRepository.existsOverlappingOfficialShift(
+                                            userId,
+                                            ScheduleStatus.PUBLISHED,
+                                            unavailableTime.getStartAt(),
+                                            unavailableTime.getEndAt(),
+                                            null
+                            );
+
+                            return new UnavailableTimeResult(
+                                    unavailableTime.getId(),
+                                    unavailableTime.getStartAt(),
+                                    unavailableTime.getEndAt(),
+                                    officialShiftConflict
+                            );
+                })
+                .toList();
+
+    }
 
     public UnavailableTime register(LocalDateTime startAt,
                                     LocalDateTime endAt,
@@ -103,6 +142,22 @@ public class UnavailableTimeService {
 
         return unavailableTime;
         
+    }
+
+    public void delete(Long unavailableTimeId) {
+
+        Long userId = rq.getActorId();
+
+        UnavailableTime unavailableTime =
+                unavailableTimeRepository.findById(unavailableTimeId).orElseThrow(
+                        () -> new BusinessException(
+                                UnavailableTimeErrorCode.NOT_FOUND
+                        )
+                );
+
+        validateOwner(userId, unavailableTime);
+
+        unavailableTimeRepository.delete(unavailableTime);
     }
 
 

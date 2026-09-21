@@ -24,4 +24,8 @@ public interface UnavailableTimeRepository extends JpaRepository<UnavailableTime
     );
 
     List<UnavailableTime> findByUserId(Long userId);
+    List<UnavailableTime> findByUserIdAndEndAtAfterOrderByStartAtAsc(
+            Long userId,
+            LocalDateTime now
+    );
 }
