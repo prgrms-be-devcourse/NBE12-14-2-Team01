@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface UnavailableTimeRepository extends JpaRepository<UnavailableTime, Long> {
 
+    //등록한 불가능 시간과 중복되는가?
     @Query("""
         SELECT COUNT(u) > 0 
         FROM UnavailableTime u 
