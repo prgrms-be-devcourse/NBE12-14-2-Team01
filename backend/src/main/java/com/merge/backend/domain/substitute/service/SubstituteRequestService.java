@@ -95,7 +95,9 @@ public class SubstituteRequestService {
         }
         //불가능 시간과 중복되는지
         if(unavailableTimeRepository.existsOverlappingUnavailableTime(
-            candidate.getMember().getId(), request.getShift().getStartAt(), request.getShift().getEndAt()
+            candidate.getMember().getId(),
+            request.getShift().getStartAt(),
+            request.getShift().getEndAt()
         )){
             throw new BusinessException(SubstituteRequestErrorCode.CONFLICT_UNAVAILABLE_TIME);
         }
