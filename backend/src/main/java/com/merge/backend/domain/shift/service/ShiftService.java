@@ -18,6 +18,7 @@ import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import com.merge.backend.domain.workplace.service.WorkplaceMemberService;
 import com.merge.backend.global.exception.BusinessException;
 import com.merge.backend.global.util.TimeRangeUtils;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -37,12 +38,16 @@ public class ShiftService {
     private final UnavailableTimeRepository unavailableTimeRepository;
 
     @Transactional(readOnly = true)
-    public List<Shift> list(LocalDate weekStartDate, Long currentUserId) {
+    public List<Shift> list(
+        LocalDate weekStartDate,
+        Long currentUserId
+    ) {
+        validWeekStartDate(weekStartDate);
 
-        List<Shift> shifts = shiftRepository.findAllByWeekStartDateAndCurrentUserId(
-            weekStartDate, currentUserId
+        return shiftRepository.findAllByWeekStartDateAndCurrentUserId(
+            weekStartDate,
+            currentUserId
         );
-        return shifts;
     }
 
     @Transactional(readOnly = true)
@@ -87,15 +92,53 @@ public class ShiftService {
         //불가능 시간 관련 예외 처리
         validconfirmUnavailableConflict(reqBody, userId);
 
-        Shift newShift = new Shift(
+        return saveShift(
             schedule,
             member,
             reqBody.startAt(),
-            reqBody.endAt(),
+            reqBody.endAt()
+        );
+    }
+
+    /**
+     * SCH-01 전용 Pattern 기반 초기 Shift 생성.
+     *
+     * ScheduleService에서 관리자 권한과 주차를 검증하고,
+     * 현재 구성원의 Pattern을 해당 주차의 날짜·시간으로 변환한 뒤 호출한다.
+     * 편집용 충돌 검증은 적용하지 않으며, 공개 시 SCH-06에서 최종 검증한다.
+     */
+    @Transactional
+    public Shift createFromValidatedPattern(
+        Schedule schedule,
+        WorkplaceMember member,
+        LocalDateTime startAt,
+        LocalDateTime endAt
+    ) {
+        return saveShift(
+            schedule,
+            member,
+            startAt,
+            endAt
+        );
+    }
+
+    private Shift saveShift(
+        Schedule schedule,
+        WorkplaceMember member,
+        LocalDateTime startAt,
+        LocalDateTime endAt
+    ) {
+        Shift shift = new Shift(
+            schedule,
+            member,
+            startAt,
+            endAt,
             SCHEDULED
         );
-        return shiftRepository.save(newShift);
+
+        return shiftRepository.save(shift);
     }
+
     @Transactional
     public Shift modify(
         Long workplaceId,
@@ -275,4 +318,13 @@ public class ShiftService {
             throw new BusinessException(ShiftErrorCode.DUPLICATE_GLOBAL_SCHEDULE_TIME);
         }
     }
+
+    private void validWeekStartDate(LocalDate weekStartDate) {
+        if (weekStartDate.getDayOfWeek() != DayOfWeek.MONDAY) {
+            throw new BusinessException(
+                ShiftErrorCode.INVALID_INPUT_VALUE
+            );
+        }
+    }
+
 }

@@ -11,6 +11,10 @@ import org.springframework.data.repository.query.Param;
 
 public interface ShiftRepository extends JpaRepository<Shift, Long> {
 
+    List<Shift> findBySchedule_IdOrderByStartAtAscIdAsc(
+        Long scheduleId
+    );
+
     //동일 Schedule 내 동일 WorkplaceMember의 다른 Shift 중복 검증
     @Query("""
         SELECT COUNT(s) > 0 
