@@ -43,6 +43,11 @@ public enum SubstituteRequestErrorCode implements ErrorCode {
         HttpStatus.CONFLICT,
         "SUB-007",
         "이미 수락한 대체 근무 시간과 중복됩니다."
+    ),
+    NOT_FOUND_CANDIDATE(
+        HttpStatus.CONFLICT,
+        "SUB-008",
+        "수락한 후보자를 찾을 수 없습니다."
     );
     private final HttpStatus httpStatus;
     private final String code;
