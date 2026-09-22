@@ -16,7 +16,7 @@ public interface SubstituteCandidateRepository extends JpaRepository<SubstituteC
     @Query("""
         select count(c) > 0 
         from SubstituteCandidate c 
-        where c.member.id = :memberId 
+        where c.member.user.id = :userId 
             and c.request.id <> :requestId
             and c.status = CandidateStatus.ACCEPTED
             and c.request.status = RequestStatus.ACCEPTED 
@@ -25,7 +25,7 @@ public interface SubstituteCandidateRepository extends JpaRepository<SubstituteC
             and c.request.shift.startAt > :now
         """)
     boolean existsConflictingActiveSubstitute(
-        @Param("memberId") Long memberId,
+        @Param("userId") Long userId,
         @Param("requestId") Long requestId,
         @Param("startAt") LocalDateTime startAt,
         @Param("endAt") LocalDateTime endAt,

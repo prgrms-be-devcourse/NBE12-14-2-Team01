@@ -43,6 +43,48 @@ public class SubstituteRequestService {
     private final Clock clock;
 
     @Transactional
+    public SubstituteRequestCreateResponse create(Long shiftId, Long actorUserId) {
+        Shift shift = validateSubstituteRequest(shiftId, actorUserId);
+
+        SubstituteRequest request = substituteRequestRepository.save(
+            new SubstituteRequest(shift, shift.getMember(), RequestStatus.OPEN)
+        );
+
+        // TODO: 후보 계산 연결
+
+        return new SubstituteRequestCreateResponse(true, request.getId(), shiftId,
+            request.getStatus(), 0);
+    }
+
+    private Shift validateSubstituteRequest(Long shiftId, Long actorUserId) {
+        Shift shift = shiftRepository.findById(shiftId)
+            .orElseThrow(() -> new
+                BusinessException(SubstituteErrorCode.SHIFT_NOT_FOUND));
+
+        if (shift.getSchedule().getStatus() != ScheduleStatus.PUBLISHED) {
+            throw new BusinessException(SubstituteErrorCode.SHIFT_NOT_PUBLISHED);
+        }
+
+        if (shift.getStatus() != ShiftStatus.SCHEDULED) {
+            throw new BusinessException(SubstituteErrorCode.SHIFT_CANCELLED);
+        }
+
+        if (!shift.getMember().getUser().getId().equals(actorUserId)) {
+            throw new BusinessException(SubstituteErrorCode.NOT_OWN_SHIFT);
+        }
+
+        if (!shift.getStartAt().isAfter(LocalDateTime.now(clock))) {
+            throw new BusinessException(SubstituteErrorCode.SHIFT_ALREADY_STARTED);
+        }
+
+        if (substituteRequestRepository.existsByShift_IdAndStatusIn(
+            shiftId, List.of(RequestStatus.OPEN, RequestStatus.ACCEPTED))) {
+            throw new BusinessException(SubstituteErrorCode.ACTIVE_REQUEST_EXISTS);
+        }
+        return shift;
+    }
+
+    @Transactional
     public SubstituteRequest approve(Long requestId, Long actorId) {
 
         //대체 근무 요청이 존재하는지
@@ -123,7 +165,7 @@ public class SubstituteRequestService {
         validateNotStarted(request.getShift(), approvedAt);
 
         //최종 승인 시작
-        request.approveRequest(candidate.getMember(), LocalDateTime.now(clock));
+        request.approveRequest(candidate.getMember(),approvedAt);
 
         ///todo: 요청자와 수락자에게 알림 주기
 
@@ -134,47 +176,4 @@ public class SubstituteRequestService {
             throw new BusinessException(ShiftErrorCode.INVALID_TIME_VALUE);
         }
     }
-    
-    @Transactional
-    public SubstituteRequestCreateResponse create(Long shiftId, Long actorUserId) {
-        Shift shift = validateSubstituteRequest(shiftId, actorUserId);
-
-        SubstituteRequest request = substituteRequestRepository.save(
-            new SubstituteRequest(shift, shift.getMember(), RequestStatus.OPEN)
-        );
-
-        // TODO: 후보 계산 연결
-
-        return new SubstituteRequestCreateResponse(true, request.getId(), shiftId,
-            request.getStatus(), 0);
-    }
-
-    private Shift validateSubstituteRequest(Long shiftId, Long actorUserId) {
-        Shift shift = shiftRepository.findById(shiftId)
-            .orElseThrow(() -> new
-                BusinessException(SubstituteErrorCode.SHIFT_NOT_FOUND));
-
-        if (shift.getSchedule().getStatus() != ScheduleStatus.PUBLISHED) {
-            throw new BusinessException(SubstituteErrorCode.SHIFT_NOT_PUBLISHED);
-        }
-
-        if (shift.getStatus() != ShiftStatus.SCHEDULED) {
-            throw new BusinessException(SubstituteErrorCode.SHIFT_CANCELLED);
-        }
-
-        if (!shift.getMember().getUser().getId().equals(actorUserId)) {
-            throw new BusinessException(SubstituteErrorCode.NOT_OWN_SHIFT);
-        }
-
-        if (!shift.getStartAt().isAfter(LocalDateTime.now(clock))) {
-            throw new BusinessException(SubstituteErrorCode.SHIFT_ALREADY_STARTED);
-        }
-
-        if (substituteRequestRepository.existsByShift_IdAndStatusIn(
-            shiftId, List.of(RequestStatus.OPEN, RequestStatus.ACCEPTED))) {
-            throw new BusinessException(SubstituteErrorCode.ACTIVE_REQUEST_EXISTS);
-        }
-        return shift;
-    }
-
 }
