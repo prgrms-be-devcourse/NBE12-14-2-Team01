@@ -72,14 +72,14 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
     @Query("""
         select count(s) > 0 
         from Shift s 
-        where s.member.id = :memberId
+        where s.member.user.id = :userId
         and s.schedule.status = ScheduleStatus.PUBLISHED
         and s.status = ShiftStatus.SCHEDULED
         and s.startAt < :endAt 
         and s.endAt > :startAt
         """)
     boolean existsConflictingShift(
-        @Param("memberId") Long memberId,
+        @Param("userId") Long userId,
         @Param("startAt") LocalDateTime startAt,
         @Param("endAt") LocalDateTime endAt
     );
