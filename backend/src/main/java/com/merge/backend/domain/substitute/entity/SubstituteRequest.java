@@ -31,4 +31,14 @@ public class SubstituteRequest extends BaseEntity {
     private LocalDateTime approvedAt;
 
     private LocalDateTime closedAt;
+
+    public SubstituteRequest(
+        Shift shift,
+        WorkplaceMember requesterMember,
+        RequestStatus status
+    ) {
+        this.shift = shift;
+        this.requesterMember = requesterMember;
+        this.status = status;
+    }
 }

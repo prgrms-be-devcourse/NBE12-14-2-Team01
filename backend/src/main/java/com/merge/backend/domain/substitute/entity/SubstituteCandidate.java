@@ -30,4 +30,14 @@ public class SubstituteCandidate extends BaseEntity {
     private CandidateStatus status;
 
     private LocalDateTime respondedAt;
+
+    public SubstituteCandidate(
+        SubstituteRequest request,
+        WorkplaceMember member,
+        CandidateStatus status
+    ) {
+        this.request = request;
+        this.member = member;
+        this.status = status;
+    }
 }
