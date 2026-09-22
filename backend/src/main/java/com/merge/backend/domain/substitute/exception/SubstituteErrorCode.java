@@ -11,37 +11,37 @@ public enum SubstituteErrorCode implements ErrorCode {
 
     SHIFT_NOT_FOUND(
         HttpStatus.NOT_FOUND,
-        "SUB-001",
+        "SUB-009",
         "해당 shift를 찾을 수 없습니다."
     ),
 
     SHIFT_NOT_PUBLISHED(
         HttpStatus.BAD_REQUEST,
-        "SUB-002",
+        "SUB-010",
         "아직 공개되지 않은 근무입니다."
     ),
 
     NOT_OWN_SHIFT(
         HttpStatus.FORBIDDEN,
-        "SUB-003",
+        "SUB-011",
         "본인 근무에 대해서만 대체근무 요청을 할 수 있습니다"
     ),
 
     SHIFT_ALREADY_STARTED(
         HttpStatus.BAD_REQUEST,
-        "SUB-004",
+        "SUB-012",
         "이미 시작된 근무는 대체근무를 요청할 수 없습니다"
     ),
 
     ACTIVE_REQUEST_EXISTS(
         HttpStatus.CONFLICT,
-        "SUB-005",
+        "SUB-013",
         "이미 진행중인 대체근무 요청이 있습니다"
     ),
 
     SHIFT_CANCELLED(
         HttpStatus.BAD_REQUEST,
-        "SUB-006",
+        "SUB-014",
         "취소된 근무에는 대체근무를 요청할 수 없습니다"
     );
 
