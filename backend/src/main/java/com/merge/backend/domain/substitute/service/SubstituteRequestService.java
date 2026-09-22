@@ -24,8 +24,11 @@ import com.merge.backend.domain.workplace.service.WorkplaceMemberService;
 import com.merge.backend.global.exception.BusinessException;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -82,6 +85,29 @@ public class SubstituteRequestService {
             throw new BusinessException(SubstituteErrorCode.ACTIVE_REQUEST_EXISTS);
         }
         return shift;
+    }
+    @Transactional(readOnly = true)
+    public List<SubstituteRequest> list(Long workplaceId, Long actorId) {
+
+        Workplace workplace = workplaceRepository.findById(workplaceId)
+            .orElseThrow(() -> new BusinessException(WorkplaceErrorCode.WORKPLACE_NOT_FOUND));
+
+        workplaceMemberService.requireManager(actorId, workplaceId);
+
+        return substituteRequestRepository
+            .findAllByWorkplaceId(workplaceId, LocalDateTime.now(clock));
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Long, SubstituteCandidate> getAcceptedCandidates(List<Long> requestIds) {
+        if (requestIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        return substituteCandidateRepository
+            .findByRequestIdInAndStatus(requestIds, CandidateStatus.ACCEPTED)
+            .stream()
+            .collect(Collectors.toMap(c -> c.getRequest().getId(), c -> c));
     }
 
     @Transactional
