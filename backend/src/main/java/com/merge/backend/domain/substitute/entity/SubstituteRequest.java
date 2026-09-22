@@ -63,5 +63,14 @@ public class SubstituteRequest extends BaseEntity {
         this.approvedAt = now;
         this.closedAt = now;
         this.closeReason = null;
+      
+    public SubstituteRequest(
+        Shift shift,
+        WorkplaceMember requesterMember,
+        RequestStatus status
+    ) {
+        this.shift = shift;
+        this.requesterMember = requesterMember;
+        this.status = status;
     }
 }
