@@ -22,11 +22,13 @@ public interface SubstituteCandidateRepository extends JpaRepository<SubstituteC
             and c.request.status = RequestStatus.ACCEPTED 
             and c.request.shift.startAt < :endAt 
             and c.request.shift.endAt > :startAt
+            and c.request.shift.startAt > :now
         """)
     boolean existsConflictingActiveSubstitute(
         @Param("memberId") Long memberId,
         @Param("requestId") Long requestId,
         @Param("startAt") LocalDateTime startAt,
-        @Param("endAt") LocalDateTime endAt
+        @Param("endAt") LocalDateTime endAt,
+        @Param("now") LocalDateTime now
     );
 }
