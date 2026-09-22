@@ -10,6 +10,7 @@ import com.merge.backend.domain.substitute.entity.SubstituteRequest;
 import com.merge.backend.domain.substitute.exception.SubstituteErrorCode;
 import com.merge.backend.domain.substitute.repository.SubstituteRequestRepository;
 import com.merge.backend.global.exception.BusinessException;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class SubstituteRequestService {
 
     private final ShiftRepository shiftRepository;
     private final SubstituteRequestRepository substituteRequestRepository;
+    private final Clock clock;
 
     @Transactional
     public SubstituteRequestCreateResponse create(Long shiftId, Long actorUserId) {
@@ -54,7 +56,7 @@ public class SubstituteRequestService {
             throw new BusinessException(SubstituteErrorCode.NOT_OWN_SHIFT);
         }
 
-        if (!shift.getStartAt().isAfter(LocalDateTime.now())) {
+        if (!shift.getStartAt().isAfter(LocalDateTime.now(clock))) {
             throw new BusinessException(SubstituteErrorCode.SHIFT_ALREADY_STARTED);
         }
 
