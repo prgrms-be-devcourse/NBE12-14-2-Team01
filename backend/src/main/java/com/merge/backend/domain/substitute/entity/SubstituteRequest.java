@@ -34,6 +34,16 @@ public class SubstituteRequest extends BaseEntity {
 
     private LocalDateTime closedAt;
 
+    public SubstituteRequest(
+        Shift shift,
+        WorkplaceMember requesterMember,
+        RequestStatus status
+    ) {
+        this.shift = shift;
+        this.requesterMember = requesterMember;
+        this.status = status;
+    }
+
     //3. 요청이 이미 수락, 승인 상태라면 예외 던짐
     public void validateOpening() {
         if (this.status != RequestStatus.OPEN) {
@@ -47,11 +57,6 @@ public class SubstituteRequest extends BaseEntity {
         // ACCEPTED Candidate가 정확히 1명 존재해야 한다는 조건 만족, 추후 동시성 문제 보완 필요)
         this.status = RequestStatus.ACCEPTED;
     }
-    public void expiredRequest(){
-        this.status = RequestStatus.CLOSED;
-        this.closeReason = RequestCloseReason.EXPIRED;
-        this.closedAt = LocalDateTime.now();
-    }
 
     //실제로 근무를 바꿈
     public void approveRequest(WorkplaceMember acceptedMember, LocalDateTime now) {
@@ -63,14 +68,5 @@ public class SubstituteRequest extends BaseEntity {
         this.approvedAt = now;
         this.closedAt = now;
         this.closeReason = null;
-      
-    public SubstituteRequest(
-        Shift shift,
-        WorkplaceMember requesterMember,
-        RequestStatus status
-    ) {
-        this.shift = shift;
-        this.requesterMember = requesterMember;
-        this.status = status;
     }
 }
