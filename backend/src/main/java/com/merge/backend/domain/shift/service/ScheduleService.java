@@ -13,6 +13,7 @@ import com.merge.backend.domain.shift.repository.RegularShiftPatternRepository;
 import com.merge.backend.domain.shift.repository.ScheduleRepository;
 import com.merge.backend.domain.shift.repository.ShiftRepository;
 import com.merge.backend.domain.shift.repository.UnavailableTimeRepository;
+import com.merge.backend.domain.user.repository.UserRepository;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.service.WorkplaceMemberService;
 import com.merge.backend.global.exception.BusinessException;
@@ -35,6 +36,7 @@ public class ScheduleService {
     private final RegularShiftPatternRepository
         regularShiftPatternRepository;
     private final ShiftRepository shiftRepository;
+    private final UserRepository userRepository;
     private final ShiftService shiftService;
     private final WorkplaceMemberService workplaceMemberService;
     private final UnavailableTimeRepository unavailableTimeRepository;
@@ -190,10 +192,18 @@ public class ScheduleService {
                 schedule
             );
 
-        validatePublishSchedule(
+        validatePublishScheduleBeforeUserLock(
             schedule,
             shifts,
-            workplaceId,
+            workplaceId
+        );
+
+        lockShiftUsers(
+            shifts
+        );
+
+        validatePublishScheduleAfterUserLock(
+            shifts,
             confirmUnavailableConflict
         );
 
@@ -234,16 +244,14 @@ public class ScheduleService {
         }
     }
 
-    private Schedule getScheduleOrThrow(
+    private Schedule getScheduleForUpdateOrThrow(
         Long scheduleId
     ) {
         return scheduleRepository
-            .findById(scheduleId)
-            .orElseThrow(
-                () -> new BusinessException(
-                    ScheduleErrorCode.SCHEDULE_NOT_FOUND
-                )
-            );
+            .findByIdForUpdate(scheduleId)
+            .orElseThrow(() -> new BusinessException(
+                ScheduleErrorCode.SCHEDULE_NOT_FOUND
+            ));
     }
 
     private void validateScheduleWorkplace(
@@ -271,9 +279,7 @@ public class ScheduleService {
         );
 
         Schedule schedule =
-            getScheduleOrThrow(
-                scheduleId
-            );
+            getScheduleForUpdateOrThrow(scheduleId);
 
         validateScheduleWorkplace(
             schedule,
@@ -490,11 +496,10 @@ public class ScheduleService {
         }
     }
 
-    private void validatePublishSchedule(
+    private void validatePublishScheduleBeforeUserLock(
         Schedule schedule,
         List<Shift> shifts,
-        Long workplaceId,
-        boolean confirmUnavailableConflict
+        Long workplaceId
     ) {
         validateCurrentShiftMembers(
             shifts,
@@ -513,7 +518,12 @@ public class ScheduleService {
         validateInternalShiftOverlap(
             shifts
         );
+    }
 
+    private void validatePublishScheduleAfterUserLock(
+        List<Shift> shifts,
+        boolean confirmUnavailableConflict
+    ) {
         validateOfficialShiftConflicts(
             shifts
         );
@@ -533,6 +543,32 @@ public class ScheduleService {
         schedule.publish(
             publishedAt
         );
+    }
+
+    private void lockShiftUsers(
+        List<Shift> shifts
+    ) {
+        List<Long> userIds =
+            shifts.stream()
+                .map(
+                    shift ->
+                        shift.getMember()
+                            .getUser()
+                            .getId()
+                )
+                .distinct()
+                .sorted()
+                .toList();
+
+        for (Long userId : userIds) {
+            userRepository
+                .findByIdForUpdate(userId)
+                .orElseThrow(
+                    () -> new IllegalStateException(
+                        "Shift 담당 User를 찾을 수 없습니다."
+                    )
+                );
+        }
     }
 
 }

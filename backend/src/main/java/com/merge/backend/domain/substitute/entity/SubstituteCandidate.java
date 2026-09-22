@@ -30,4 +30,24 @@ public class SubstituteCandidate extends BaseEntity {
     private CandidateStatus status;
 
     private LocalDateTime respondedAt;
+
+    public SubstituteCandidate(
+        SubstituteRequest request,
+        WorkplaceMember member,
+        CandidateStatus status
+    ) {
+        this.request = request;
+        this.member = member;
+        this.status = status;
+    }
+    //1. 후보자 중 1명이 수락을 눌렀을 때
+    public void acceptRequest(LocalDateTime now) {
+
+        //본인 상태 업데이트
+        this.status = CandidateStatus.ACCEPTED;
+        this.respondedAt = now;
+
+        //연관된 대체근무 요청 상태 승인으로 변경
+        this.request.accept();
+    }
 }

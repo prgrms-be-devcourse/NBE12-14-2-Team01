@@ -73,6 +73,11 @@ public enum ScheduleErrorCode implements ErrorCode {
         HttpStatus.CONFLICT,
         "SCH-011",
         "다른 공식 근무와 시간이 겹쳐 근무표를 공개할 수 없습니다."
+    ),
+    NOT_PUBLISHED(
+        HttpStatus.BAD_REQUEST,
+        "SCH-012",
+        "해당 요청의 스케줄은 공개되지 않았습니다."
     );
 
     private final HttpStatus httpStatus;
