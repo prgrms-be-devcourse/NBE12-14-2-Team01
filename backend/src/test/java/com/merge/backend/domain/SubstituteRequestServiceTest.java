@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -26,10 +27,14 @@ import com.merge.backend.domain.substitute.service.SubstituteRequestService;
 import com.merge.backend.domain.user.entity.User;
 import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
+import com.merge.backend.domain.workplace.exception.WorkplaceErrorCode;
 import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import com.merge.backend.domain.workplace.service.WorkplaceMemberService;
 import com.merge.backend.global.exception.BusinessException;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -37,6 +42,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -63,9 +69,16 @@ class SubstituteRequestServiceTest {
     @Mock
     private WorkplaceMemberService workplaceMemberService;
 
+    @Spy
+    private Clock clock = Clock.fixed(
+        Instant.parse("2026-09-22T12:00:00Z"),
+        ZoneId.of("Asia/Seoul")
+    );
+
     private Long requestId;
     private Long actorId;
     private Long workplaceId;
+    private Long requesterMemberId;
     private Long candidateMemberId;
     private Long candidateUserId;
 
@@ -77,16 +90,18 @@ class SubstituteRequestServiceTest {
     private Shift shift;
     private SubstituteRequest request;
     private SubstituteCandidate candidate;
+    private LocalDateTime now;
 
     @BeforeEach
     void setUp() {
         requestId = 1L;
         actorId = 10L;
         workplaceId = 100L;
+        requesterMemberId = 15L;
         candidateMemberId = 20L;
         candidateUserId = 200L;
+        now = LocalDateTime.now(clock);
 
-        // Mock 객체 생성
         workplace = mock(Workplace.class);
         requesterMember = mock(WorkplaceMember.class);
         candidateMember = mock(WorkplaceMember.class);
@@ -97,42 +112,53 @@ class SubstituteRequestServiceTest {
         candidate = mock(SubstituteCandidate.class);
     }
 
+    private void setupValidRequestBasicInfo() {
+        given(workplace.getId()).willReturn(workplaceId);
+        given(schedule.getWorkplace()).willReturn(workplace);
+        given(shift.getSchedule()).willReturn(schedule);
+        given(request.getShift()).willReturn(shift);
+        given(request.getStatus()).willReturn(RequestStatus.ACCEPTED);
+    }
+
+    private void setupValidRequestFullInfo() {
+        setupValidRequestBasicInfo();
+        given(schedule.getStatus()).willReturn(ScheduleStatus.PUBLISHED);
+        given(shift.getStatus()).willReturn(ShiftStatus.SCHEDULED);
+        given(requesterMember.getId()).willReturn(requesterMemberId);
+        given(shift.getMember()).willReturn(requesterMember);
+        given(request.getRequesterMember()).willReturn(requesterMember);
+    }
+
+    private void setupValidCandidateInfo() {
+        given(candidateMember.getWorkplace()).willReturn(workplace);
+        given(candidateMember.getLeftAt()).willReturn(null);
+        given(candidateUser.getId()).willReturn(candidateUserId);
+        given(candidateMember.getUser()).willReturn(candidateUser);
+        given(candidate.getMember()).willReturn(candidateMember);
+    }
+
     @Test
     @DisplayName("대체 근무 승인 성공")
     void approve_success() {
         // given
-        given(workplace.getId()).willReturn(workplaceId);
-        given(requesterMember.getWorkplace()).willReturn(workplace);
-        given(request.getRequesterMember()).willReturn(requesterMember);
-        given(request.getShift()).willReturn(shift);
+        setupValidRequestFullInfo();
+        setupValidCandidateInfo();
 
-        given(request.getStatus()).willReturn(RequestStatus.ACCEPTED);
-        given(schedule.getStatus()).willReturn(ScheduleStatus.PUBLISHED);
-        given(shift.getSchedule()).willReturn(schedule);
-        given(shift.getStatus()).willReturn(ShiftStatus.SCHEDULED);
-        given(shift.getStartAt()).willReturn(LocalDateTime.now().plusDays(1));
-        given(shift.getEndAt()).willReturn(LocalDateTime.now().plusDays(1).plusHours(8));
-        given(shift.getMember()).willReturn(requesterMember);
-
-        given(candidateUser.getId()).willReturn(candidateUserId);
-        given(candidateMember.getId()).willReturn(candidateMemberId);
-        given(candidateMember.getWorkplace()).willReturn(workplace);
-        given(candidateMember.getLeftAt()).willReturn(null);
-        given(candidateMember.getUser()).willReturn(candidateUser);
-        given(candidate.getMember()).willReturn(candidateMember);
+        given(shift.getStartAt()).willReturn(now.plusDays(1));
+        given(shift.getEndAt()).willReturn(now.plusDays(1).plusHours(8));
 
         given(substituteRequestRepository.findById(requestId)).willReturn(Optional.of(request));
         given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
-        given(substituteCandidateRepository.findByRequestIdAndStatus
-            (requestId, CandidateStatus.ACCEPTED))
+        given(substituteCandidateRepository.findByRequestIdAndStatus(
+            requestId, CandidateStatus.ACCEPTED))
             .willReturn(Optional.of(candidate));
 
         given(shiftRepository.existsConflictingShift(
-            eq(candidateMemberId), any(), any())).willReturn(false);
+            eq(candidateUserId), any(), any())).willReturn(false);
         given(unavailableTimeRepository.existsOverlappingUnavailableTime(
             eq(candidateUserId), any(), any())).willReturn(false);
         given(substituteCandidateRepository.existsConflictingActiveSubstitute(
-            eq(candidateMemberId), eq(requestId), any(), any()))
+            eq(candidateUserId), eq(requestId), any(), any(), any()))
             .willReturn(false);
 
         // when
@@ -161,18 +187,16 @@ class SubstituteRequestServiceTest {
     @DisplayName("근무 시작일이 이미 지난 경우 예외가 발생한다")
     void approve_fail_past_shift_start_time() {
         // given
-        given(workplace.getId()).willReturn(workplaceId);
-        given(requesterMember.getWorkplace()).willReturn(workplace);
-        given(request.getRequesterMember()).willReturn(requesterMember);
-        given(request.getShift()).willReturn(shift);
+        setupValidRequestFullInfo();
+        setupValidCandidateInfo();
 
-        given(request.getStatus()).willReturn(RequestStatus.ACCEPTED);
-        given(schedule.getStatus()).willReturn(ScheduleStatus.PUBLISHED);
-        given(shift.getSchedule()).willReturn(schedule);
-        given(shift.getStatus()).willReturn(ShiftStatus.SCHEDULED);
-        given(shift.getStartAt()).willReturn(LocalDateTime.now().minusHours(1));
+        given(shift.getStartAt()).willReturn(now.minusHours(1));
 
         given(substituteRequestRepository.findById(requestId)).willReturn(Optional.of(request));
+        given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
+        given(substituteCandidateRepository.findByRequestIdAndStatus(
+            requestId, CandidateStatus.ACCEPTED))
+            .willReturn(Optional.of(candidate));
 
         // when & then
         assertThatThrownBy(() -> substituteRequestService.approve(requestId, actorId))
@@ -181,58 +205,30 @@ class SubstituteRequestServiceTest {
     }
 
     @Test
-    @DisplayName("후보자가 해당 근무지 소속이 아니거나 퇴사한 경우 예외가 발생한다")
-    void approve_fail_candidate_not_in_workplace() {
+    @DisplayName("승인 요청자가 해당 근무지 소속이 아니거나 매니저가 아닌 경우 예외가 발생한다")
+    void approve_fail_actor_not_in_workplace() {
         // given
-        given(workplace.getId()).willReturn(workplaceId);
-        given(requesterMember.getWorkplace()).willReturn(workplace);
-        given(request.getRequesterMember()).willReturn(requesterMember);
-        given(request.getShift()).willReturn(shift);
-
-        given(request.getStatus()).willReturn(RequestStatus.ACCEPTED);
-        given(schedule.getStatus()).willReturn(ScheduleStatus.PUBLISHED);
-        given(shift.getSchedule()).willReturn(schedule);
-        given(shift.getStatus()).willReturn(ShiftStatus.SCHEDULED);
-        given(shift.getStartAt()).willReturn(LocalDateTime.now().plusDays(1));
-        given(shift.getMember()).willReturn(requesterMember);
-
-        Workplace otherWorkplace = mock(Workplace.class);
-        given(candidateMember.getWorkplace()).willReturn(otherWorkplace);
-        given(candidate.getMember()).willReturn(candidateMember);
-
+        setupValidRequestBasicInfo();
         given(substituteRequestRepository.findById(requestId)).willReturn(Optional.of(request));
-        given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
-        given(substituteCandidateRepository.findByRequestIdAndStatus(
-            requestId, CandidateStatus.ACCEPTED))
-            .willReturn(Optional.of(candidate));
+
+        doThrow(new BusinessException(WorkplaceErrorCode.NOT_WORKPLACE_MEMBER))
+            .when(workplaceMemberService).requireManager(actorId, workplaceId);
 
         // when & then
         assertThatThrownBy(() -> substituteRequestService.approve(requestId, actorId))
             .isInstanceOf(BusinessException.class)
-            .hasMessageContaining(ShiftErrorCode.INVALID_WORKPLACE_MEMBER_VALUE.getMessage());
+            .hasMessageContaining(WorkplaceErrorCode.NOT_WORKPLACE_MEMBER.getMessage());
     }
 
     @Test
     @DisplayName("후보자에게 충돌하는 기존 Shift가 존재하는 경우 예외가 발생한다")
     void approve_fail_conflicting_shift() {
         // given
-        given(workplace.getId()).willReturn(workplaceId);
-        given(requesterMember.getWorkplace()).willReturn(workplace);
-        given(request.getRequesterMember()).willReturn(requesterMember);
-        given(request.getShift()).willReturn(shift);
+        setupValidRequestFullInfo();
+        setupValidCandidateInfo();
 
-        given(request.getStatus()).willReturn(RequestStatus.ACCEPTED);
-        given(schedule.getStatus()).willReturn(ScheduleStatus.PUBLISHED);
-        given(shift.getSchedule()).willReturn(schedule);
-        given(shift.getStatus()).willReturn(ShiftStatus.SCHEDULED);
-        given(shift.getStartAt()).willReturn(LocalDateTime.now().plusDays(1));
-        given(shift.getEndAt()).willReturn(LocalDateTime.now().plusDays(1).plusHours(8));
-        given(shift.getMember()).willReturn(requesterMember);
-
-        given(candidateMember.getId()).willReturn(candidateMemberId);
-        given(candidateMember.getWorkplace()).willReturn(workplace);
-        given(candidateMember.getLeftAt()).willReturn(null);
-        given(candidate.getMember()).willReturn(candidateMember);
+        given(shift.getStartAt()).willReturn(now.plusDays(1));
+        given(shift.getEndAt()).willReturn(now.plusDays(1).plusHours(8));
 
         given(substituteRequestRepository.findById(requestId)).willReturn(Optional.of(request));
         given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
@@ -241,7 +237,7 @@ class SubstituteRequestServiceTest {
             .willReturn(Optional.of(candidate));
 
         given(shiftRepository.existsConflictingShift(
-            eq(candidateMemberId), any(), any())).willReturn(true);
+            eq(candidateUserId), any(), any())).willReturn(true);
 
         // when & then
         assertThatThrownBy(() -> substituteRequestService.approve(requestId, actorId))
@@ -253,25 +249,11 @@ class SubstituteRequestServiceTest {
     @DisplayName("후보자의 불가능한 시간과 중복되는 경우 예외가 발생한다")
     void approve_fail_conflicting_unavailable_time() {
         // given
-        given(workplace.getId()).willReturn(workplaceId);
-        given(requesterMember.getWorkplace()).willReturn(workplace);
-        given(request.getRequesterMember()).willReturn(requesterMember);
-        given(request.getShift()).willReturn(shift);
+        setupValidRequestFullInfo();
+        setupValidCandidateInfo();
 
-        given(request.getStatus()).willReturn(RequestStatus.ACCEPTED);
-        given(schedule.getStatus()).willReturn(ScheduleStatus.PUBLISHED);
-        given(shift.getSchedule()).willReturn(schedule);
-        given(shift.getStatus()).willReturn(ShiftStatus.SCHEDULED);
-        given(shift.getStartAt()).willReturn(LocalDateTime.now().plusDays(1));
-        given(shift.getEndAt()).willReturn(LocalDateTime.now().plusDays(1).plusHours(8));
-        given(shift.getMember()).willReturn(requesterMember);
-
-        given(candidateUser.getId()).willReturn(candidateUserId);
-        given(candidateMember.getId()).willReturn(candidateMemberId);
-        given(candidateMember.getWorkplace()).willReturn(workplace);
-        given(candidateMember.getLeftAt()).willReturn(null);
-        given(candidateMember.getUser()).willReturn(candidateUser);
-        given(candidate.getMember()).willReturn(candidateMember);
+        given(shift.getStartAt()).willReturn(now.plusDays(1));
+        given(shift.getEndAt()).willReturn(now.plusDays(1).plusHours(8));
 
         given(substituteRequestRepository.findById(requestId)).willReturn(Optional.of(request));
         given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
@@ -279,60 +261,46 @@ class SubstituteRequestServiceTest {
             requestId, CandidateStatus.ACCEPTED))
             .willReturn(Optional.of(candidate));
 
-        given(shiftRepository.existsConflictingShift
-            (eq(candidateMemberId), any(), any())).willReturn(false);
+        given(shiftRepository.existsConflictingShift(
+            eq(candidateUserId), any(), any())).willReturn(false);
         given(unavailableTimeRepository.existsOverlappingUnavailableTime(
             eq(candidateUserId), any(), any())).willReturn(true);
 
         // when & then
         assertThatThrownBy(() -> substituteRequestService.approve(requestId, actorId))
             .isInstanceOf(BusinessException.class)
-            .hasMessageContaining(SubstituteRequestErrorCode
-                .CONFLICT_UNAVAILABLE_TIME.getMessage());
+            .hasMessageContaining(
+                SubstituteRequestErrorCode.CONFLICT_UNAVAILABLE_TIME.getMessage());
     }
 
     @Test
     @DisplayName("후보자가 다른 활성 대타 약속과 시간 충돌이 있는 경우 예외가 발생한다")
     void approve_fail_conflicting_active_substitute() {
         // given
-        given(workplace.getId()).willReturn(workplaceId);
-        given(requesterMember.getWorkplace()).willReturn(workplace);
-        given(request.getRequesterMember()).willReturn(requesterMember);
-        given(request.getShift()).willReturn(shift);
+        setupValidRequestFullInfo();
+        setupValidCandidateInfo();
 
-        given(request.getStatus()).willReturn(RequestStatus.ACCEPTED);
-        given(schedule.getStatus()).willReturn(ScheduleStatus.PUBLISHED);
-        given(shift.getSchedule()).willReturn(schedule);
-        given(shift.getStatus()).willReturn(ShiftStatus.SCHEDULED);
-        given(shift.getStartAt()).willReturn(LocalDateTime.now().plusDays(1));
-        given(shift.getEndAt()).willReturn(LocalDateTime.now().plusDays(1).plusHours(8));
-        given(shift.getMember()).willReturn(requesterMember);
-
-        given(candidateUser.getId()).willReturn(candidateUserId);
-        given(candidateMember.getId()).willReturn(candidateMemberId);
-        given(candidateMember.getWorkplace()).willReturn(workplace);
-        given(candidateMember.getLeftAt()).willReturn(null);
-        given(candidateMember.getUser()).willReturn(candidateUser);
-        given(candidate.getMember()).willReturn(candidateMember);
+        given(shift.getStartAt()).willReturn(now.plusDays(1));
+        given(shift.getEndAt()).willReturn(now.plusDays(1).plusHours(8));
 
         given(substituteRequestRepository.findById(requestId)).willReturn(Optional.of(request));
         given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
-        given(substituteCandidateRepository.findByRequestIdAndStatus
-            (requestId, CandidateStatus.ACCEPTED))
+        given(substituteCandidateRepository.findByRequestIdAndStatus(
+            requestId, CandidateStatus.ACCEPTED))
             .willReturn(Optional.of(candidate));
 
         given(shiftRepository.existsConflictingShift(
-            eq(candidateMemberId), any(), any())).willReturn(false);
+            eq(candidateUserId), any(), any())).willReturn(false);
         given(unavailableTimeRepository.existsOverlappingUnavailableTime(
             eq(candidateUserId), any(), any())).willReturn(false);
         given(substituteCandidateRepository.existsConflictingActiveSubstitute(
-            eq(candidateMemberId), eq(requestId), any(), any()))
+            eq(candidateUserId), eq(requestId), any(), any(), any()))
             .willReturn(true);
 
         // when & then
         assertThatThrownBy(() -> substituteRequestService.approve(requestId, actorId))
             .isInstanceOf(BusinessException.class)
-            .hasMessageContaining(SubstituteRequestErrorCode
-                .CONFLICT_ACTIVE_SUBSTITUTE.getMessage());
+            .hasMessageContaining(
+                SubstituteRequestErrorCode.CONFLICT_ACTIVE_SUBSTITUTE.getMessage());
     }
 }
