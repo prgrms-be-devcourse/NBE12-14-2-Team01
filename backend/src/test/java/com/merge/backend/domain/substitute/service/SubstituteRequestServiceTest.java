@@ -21,8 +21,11 @@ import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import com.merge.backend.global.exception.BusinessException;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -50,8 +53,16 @@ class SubstituteRequestServiceTest {
     @Mock
     private SubstituteRequestRepository substituteRequestRepository;
 
+    @Mock
+    private Clock clock;
+
     @InjectMocks
     private SubstituteRequestService substituteRequestService;
+
+    private void stubClockAsNow() {
+        given(clock.instant()).willReturn(Instant.now());
+        given(clock.getZone()).willReturn(ZoneId.of("Asia/Seoul"));
+    }
 
     @Test
     @DisplayName("SUB-01 - 검증을 통과하면 대타 요청이 OPEN으로 저장된다")
@@ -60,6 +71,7 @@ class SubstituteRequestServiceTest {
             publishedSchedule(), REQUESTER_USER_ID, futureStartAt(), ShiftStatus.SCHEDULED
         );
         given(shiftRepository.findById(SHIFT_ID)).willReturn(Optional.of(shift));
+        stubClockAsNow();
         given(substituteRequestRepository.existsByShift_IdAndStatusIn(SHIFT_ID, ACTIVE_STATUSES))
             .willReturn(false);
         given(substituteRequestRepository.save(any(SubstituteRequest.class)))
@@ -138,6 +150,7 @@ class SubstituteRequestServiceTest {
             ShiftStatus.SCHEDULED
         );
         given(shiftRepository.findById(SHIFT_ID)).willReturn(Optional.of(shift));
+        stubClockAsNow();
 
         assertCreateFails(SubstituteErrorCode.SHIFT_ALREADY_STARTED);
     }
@@ -149,6 +162,7 @@ class SubstituteRequestServiceTest {
             publishedSchedule(), REQUESTER_USER_ID, futureStartAt(), ShiftStatus.SCHEDULED
         );
         given(shiftRepository.findById(SHIFT_ID)).willReturn(Optional.of(shift));
+        stubClockAsNow();
         given(substituteRequestRepository.existsByShift_IdAndStatusIn(SHIFT_ID, ACTIVE_STATUSES))
             .willReturn(true);
 
