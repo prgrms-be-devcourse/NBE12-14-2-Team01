@@ -9,15 +9,16 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface SubstituteCandidateRepository extends JpaRepository<SubstituteCandidate, Long> {
+
     @Query(""" 
-          SELECT COUNT(c) > 0
-          FROM SubstituteCandidate c
-          WHERE c.member.user.id = :userId
-              AND c.status = 'ACCEPTED'
-              AND c.request.status = 'ACCEPTED'
-              AND c.request.shift.startAt < :endAt
-              AND c.request.shift.endAt > :startAt
-          """)
+        SELECT COUNT(c) > 0
+        FROM SubstituteCandidate c
+        WHERE c.member.user.id = :userId
+            AND c.status = 'ACCEPTED'
+            AND c.request.status = 'ACCEPTED'
+            AND c.request.shift.startAt < :endAt
+            AND c.request.shift.endAt > :startAt
+        """)
     boolean existsOverlappingAcceptedSubstitute(
         @Param("userId") Long userId,
         @Param("startAt") LocalDateTime startAt,
@@ -33,16 +34,18 @@ public interface SubstituteCandidateRepository extends JpaRepository<SubstituteC
         "request.requesterMember.user"      // 요청한 사람의 이름 등 User 정보
     })
     @Query("""
-    SELECT c
-    FROM SubstituteCandidate c
-    WHERE c.member.user.id = :userId
-      AND c.member.leftAt IS NULL
-      AND c.status = 'PENDING'
-      AND c.request.status = 'OPEN'
-      AND c.request.shift.startAt > :now
-      AND c.request.shift.schedule.status = 'PUBLISHED'
-      AND c.request.shift.status = 'SCHEDULED'
-    """)
+        SELECT c
+        FROM SubstituteCandidate c
+        WHERE c.member.user.id = :userId
+          AND c.member.leftAt IS NULL
+          AND c.status = 'PENDING'
+          AND c.request.status = 'OPEN'
+          AND c.request.shift.startAt > :now
+          AND c.request.shift.schedule.status = 'PUBLISHED'
+          AND c.request.shift.status = 'SCHEDULED'
+              ORDER BY c.request.shift.startAt ASC,
+                  c.request.id ASC
+        """)
     List<SubstituteCandidate> findReceivedRequests(
         @Param("userId") Long userId,   // 현재 로그인한 사용자
         @Param("now") LocalDateTime now // 현재 시간
