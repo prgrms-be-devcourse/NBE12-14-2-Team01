@@ -3,10 +3,13 @@ package com.merge.backend.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.BDDMockito.doThrow;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.merge.backend.domain.shift.entity.Schedule;
@@ -35,9 +38,12 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -79,7 +85,7 @@ class SubstituteRequestServiceTest {
     private Long actorId;
     private Long workplaceId;
     private Long requesterMemberId;
-    private Long candidateMemberId;
+
     private Long candidateUserId;
 
     private Workplace workplace;
@@ -98,7 +104,6 @@ class SubstituteRequestServiceTest {
         actorId = 10L;
         workplaceId = 100L;
         requesterMemberId = 15L;
-        candidateMemberId = 20L;
         candidateUserId = 200L;
         now = LocalDateTime.now(clock);
 
@@ -219,7 +224,6 @@ class SubstituteRequestServiceTest {
             .isInstanceOf(BusinessException.class)
             .hasMessageContaining(WorkplaceErrorCode.NOT_WORKPLACE_MEMBER.getMessage());
     }
-
     @Test
     @DisplayName("후보자에게 충돌하는 기존 Shift가 존재하는 경우 예외가 발생한다")
     void approve_fail_conflicting_shift() {
@@ -302,5 +306,132 @@ class SubstituteRequestServiceTest {
             .isInstanceOf(BusinessException.class)
             .hasMessageContaining(
                 SubstituteRequestErrorCode.CONFLICT_ACTIVE_SUBSTITUTE.getMessage());
+    }
+    @Nested
+    @DisplayName("진행 중인 대타 요청 목록 조회 (list)")
+    class ListTest {
+
+        @Test
+        @DisplayName("성공: Workplace가 존재하고 매니저 권한이 있으면 대타 요청 목록을 반환한다.")
+        void list_Success() {
+            // given
+            given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
+            WorkplaceMember mockManager = mock(WorkplaceMember.class);
+            given(workplaceMemberService.requireManager(actorId, workplaceId))
+                .willReturn(mockManager);
+            given(substituteRequestRepository
+                .findAllByWorkplaceId(eq(workplaceId), any(LocalDateTime.class)))
+                .willReturn(List.of(request));
+
+            // when
+            List<SubstituteRequest> result = substituteRequestService.list(workplaceId, actorId);
+
+            // then
+            assertThat(result).containsExactly(request);
+            verify(workplaceRepository).findById(workplaceId);
+            verify(workplaceMemberService).requireManager(actorId, workplaceId);
+            verify(substituteRequestRepository).findAllByWorkplaceId(eq(workplaceId),
+                any(LocalDateTime.class));
+        }
+
+        @Test
+        @DisplayName("실패: 근무지가 존재하지 않으면 "
+            + "BusinessException(WORKPLACE_NOT_FOUND)이 발생한다.")
+        void list_NotFoundWorkplace_ThrowsException() {
+            // given
+            given(workplaceRepository.findById(workplaceId)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> substituteRequestService.list(workplaceId, actorId))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining(WorkplaceErrorCode.WORKPLACE_NOT_FOUND.getMessage());
+        }
+
+        @Test
+        @DisplayName("실패: 매니저 권한이 없으면 예외가 발생한다.")
+        void list_NotManager_ThrowsException() {
+            // given
+            given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
+
+            // workplaceMemberService에서 권한 검증 실패 예외 발생 설정
+            given(workplaceMemberService.requireManager(actorId, workplaceId))
+                .willThrow(new BusinessException(WorkplaceErrorCode.MANAGER_REQUIRED));
+
+            // when & then
+            assertThatThrownBy(() -> substituteRequestService.list(workplaceId, actorId))
+                .isInstanceOf(BusinessException.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("수락된 후보자 Map 조회 (getAcceptedCandidates)")
+    class GetAcceptedCandidatesTest {
+
+        @Test
+        @DisplayName("성공: requestId가 주어지면 candidate가 Map에 담겨 반환된다.")
+        void getAcceptedCandidates_WithRequestIds_ReturnsMap() {
+            // given
+            given(candidate.getRequest()).willReturn(request);
+            given(request.getId()).willReturn(requestId);
+
+            given(substituteCandidateRepository
+                .findByRequestIdInAndStatus(List.of(requestId), CandidateStatus.ACCEPTED))
+                .willReturn(List.of(candidate));
+
+            // when
+            Map<Long, SubstituteCandidate> result =
+                substituteRequestService.getAcceptedCandidates(List.of(requestId));
+
+            // then
+            assertThat(result).containsEntry(requestId, candidate);
+            verify(substituteCandidateRepository)
+                .findByRequestIdInAndStatus(List.of(requestId), CandidateStatus.ACCEPTED);
+        }
+
+        @Test
+        @DisplayName("성공: requestId 목록이 비어있으면 조회 쿼리를 호출하지 않고 빈 Map을 반환한다.")
+        void getAcceptedCandidates_EmptyRequestIds_ReturnsEmptyMapWithoutQuery() {
+            // when
+            Map<Long, SubstituteCandidate> result =
+                substituteRequestService.getAcceptedCandidates(List.of());
+
+            // then
+            assertThat(result).isEmpty();
+            verify(substituteCandidateRepository, never())
+                .findByRequestIdInAndStatus(anyList(), any());
+        }
+
+        @Test
+        @DisplayName("성공: requestId가 여러 건이면 IN 절 쿼리 한 번으로 모두 조회된다.")
+        void getAcceptedCandidates_MultipleRequestIds_SingleQueryCall() {
+            // given
+            Long requestId2 = 2L;
+
+            SubstituteRequest req1 = mock(SubstituteRequest.class);
+            given(req1.getId()).willReturn(requestId);
+
+            SubstituteRequest req2 = mock(SubstituteRequest.class);
+            given(req2.getId()).willReturn(requestId2);
+
+            SubstituteCandidate candidate2 = mock(SubstituteCandidate.class);
+            given(candidate.getRequest()).willReturn(req1);
+            given(candidate2.getRequest()).willReturn(req2);
+
+            given(substituteCandidateRepository
+                .findByRequestIdInAndStatus(
+                    List.of(requestId, requestId2), CandidateStatus.ACCEPTED))
+                .willReturn(List.of(candidate, candidate2));
+
+            // when
+            Map<Long, SubstituteCandidate> result =
+                substituteRequestService.getAcceptedCandidates(List.of(requestId, requestId2));
+
+            // then
+            assertThat(result)
+                .containsEntry(requestId, candidate)
+                .containsEntry(requestId2, candidate2);
+            verify(substituteCandidateRepository, times(1))
+                .findByRequestIdInAndStatus(anyList(), eq(CandidateStatus.ACCEPTED));
+        }
     }
 }
