@@ -26,7 +26,8 @@ public class SubstituteRequestController {
 
     // SUB-02 - 내가 받은 응답 가능한 대타 요청 조회
     @GetMapping("/substitute-requests/received")
-    public ResponseEntity<ApiResponse<List<ReceivedSubstituteRequestResponse>>> getReceivedRequests() {
+    public ResponseEntity<ApiResponse<List<ReceivedSubstituteRequestResponse>>>
+        getReceivedRequests() {
 
         Long userId = rq.getActorId();
 

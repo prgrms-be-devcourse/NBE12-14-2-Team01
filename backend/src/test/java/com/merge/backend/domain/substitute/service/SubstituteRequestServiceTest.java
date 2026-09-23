@@ -13,6 +13,7 @@ import com.merge.backend.domain.shift.entity.ShiftStatus;
 import com.merge.backend.domain.shift.repository.ShiftRepository;
 import com.merge.backend.domain.substitute.dto.response.SubstituteRequestCreateResponse;
 import com.merge.backend.domain.substitute.entity.RequestStatus;
+import com.merge.backend.domain.substitute.entity.SubstituteCandidate;
 import com.merge.backend.domain.substitute.entity.SubstituteRequest;
 import com.merge.backend.domain.substitute.exception.SubstituteErrorCode;
 import com.merge.backend.domain.substitute.repository.SubstituteRequestRepository;
@@ -59,6 +60,9 @@ class SubstituteRequestServiceTest {
     @InjectMocks
     private SubstituteRequestService substituteRequestService;
 
+    @Mock
+    private SubstituteCandidateService substituteCandidateService;
+
     private void stubClockAsNow() {
         given(clock.instant()).willReturn(Instant.now());
         given(clock.getZone()).willReturn(ZoneId.of("Asia/Seoul"));
@@ -74,12 +78,35 @@ class SubstituteRequestServiceTest {
         stubClockAsNow();
         given(substituteRequestRepository.existsByShift_IdAndStatusIn(SHIFT_ID, ACTIVE_STATUSES))
             .willReturn(false);
+        WorkplaceMember candidate = new WorkplaceMember(
+            shift.getSchedule().getWorkplace(),
+            new User(30L, "candidate@example.com", "후보자"),
+            WorkplaceRole.EMPLOYEE,
+            LocalDateTime.now().minusDays(10),
+            null
+        );
+
+        given(substituteCandidateService.findCandidates(
+            shift.getSchedule().getWorkplace().getId(),
+            shift.getMember().getId(),
+            shift
+        )).willReturn(List.of(candidate));
         given(substituteRequestRepository.save(any(SubstituteRequest.class)))
             .willAnswer(invocation -> {
                 SubstituteRequest request = invocation.getArgument(0);
                 ReflectionTestUtils.setField(request, "id", SAVED_REQUEST_ID);
                 return request;
             });
+        given(substituteCandidateService.createCandidates(
+            any(SubstituteRequest.class),
+            any()
+        )).willAnswer(invocation -> {
+            SubstituteRequest request = invocation.getArgument(0);
+
+            return List.of(
+                new SubstituteCandidate(request, candidate)
+            );
+        });
 
         SubstituteRequestCreateResponse response =
             substituteRequestService.create(SHIFT_ID, REQUESTER_USER_ID);
@@ -96,7 +123,7 @@ class SubstituteRequestServiceTest {
         assertThat(response.requestId()).isEqualTo(SAVED_REQUEST_ID);
         assertThat(response.shiftId()).isEqualTo(SHIFT_ID);
         assertThat(response.status()).isEqualTo(RequestStatus.OPEN);
-        assertThat(response.candidateCount()).isZero();
+        assertThat(response.candidateCount()).isEqualTo(1);
     }
 
     @Test
