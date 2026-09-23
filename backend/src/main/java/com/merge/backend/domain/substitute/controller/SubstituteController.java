@@ -1,6 +1,6 @@
 package com.merge.backend.domain.substitute.controller;
 
-import com.merge.backend.domain.substitute.dto.SubstituteRequestCreateResponse;
+import com.merge.backend.domain.substitute.dto.response.SubstituteRequestCreateResponse;
 import com.merge.backend.domain.substitute.service.SubstituteRequestService;
 import com.merge.backend.global.dto.ApiResponse;
 import com.merge.backend.global.rq.Rq;

@@ -1,5 +1,6 @@
 package com.merge.backend.domain.substitute.repository;
 
+import com.merge.backend.domain.substitute.entity.CandidateStatus;
 import com.merge.backend.domain.substitute.entity.SubstituteCandidate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -49,5 +50,11 @@ public interface SubstituteCandidateRepository extends JpaRepository<SubstituteC
     List<SubstituteCandidate> findReceivedRequests(
         @Param("userId") Long userId,   // 현재 로그인한 사용자
         @Param("now") LocalDateTime now // 현재 시간
+    );
+
+    boolean existsByRequest_IdAndStatusAndIdNot(
+        Long requestId,
+        CandidateStatus status,
+        Long candidateId
     );
 }

@@ -39,4 +39,14 @@ public class SubstituteCandidate extends BaseEntity {
         this.member = member;
         this.status = CandidateStatus.PENDING;
     }
+
+    public void accept(LocalDateTime now) {
+        this.status = CandidateStatus.ACCEPTED; // 대타 요청을 수락한 상태
+        this.respondedAt = now;                 // 수락한 시간
+    }
+
+    public void reject(LocalDateTime now) {
+        this.status = CandidateStatus.REJECTED; // 대타 요청을 거절한 상태
+        this.respondedAt = now;                 // 거절한 시간
+    }
 }

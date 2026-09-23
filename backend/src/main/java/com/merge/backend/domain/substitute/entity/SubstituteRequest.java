@@ -41,4 +41,15 @@ public class SubstituteRequest extends BaseEntity {
         this.requesterMember = requesterMember;
         this.status = status;
     }
+
+    public void accept() {
+        this.status = RequestStatus.ACCEPTED;
+    }
+
+    public void closeAllCandidatesRejected(LocalDateTime now) {
+        this.status = RequestStatus.CLOSED;
+        this.closeReason = RequestCloseReason.ALL_CANDIDATES_REJECTED;
+        this.closedAt = now;
+    }
+
 }

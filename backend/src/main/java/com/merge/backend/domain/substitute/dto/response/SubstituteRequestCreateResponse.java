@@ -1,4 +1,4 @@
-package com.merge.backend.domain.substitute.dto;
+package com.merge.backend.domain.substitute.dto.response;
 
 import com.merge.backend.domain.substitute.entity.RequestStatus;
 
