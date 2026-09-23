@@ -8,19 +8,23 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.merge.backend.domain.notification.dto.NotificationReadResponse;
+import com.merge.backend.domain.notification.dto.NotificationResponse;
 import com.merge.backend.domain.notification.entity.Notification;
 import com.merge.backend.domain.notification.entity.NotificationType;
 import com.merge.backend.domain.notification.exception.NotificationErrorCode;
 import com.merge.backend.domain.notification.repository.NotificationRepository;
 import com.merge.backend.domain.user.entity.User;
+import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.global.config.TestClock;
 import com.merge.backend.global.exception.BusinessException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class NotificationServiceTest {
@@ -46,6 +50,7 @@ class NotificationServiceTest {
     }
 
     @Test
+    @DisplayName("알림을 생성한다")
     void createNotification() {
         WorkplaceMember recipientMember =
             mock(WorkplaceMember.class);
@@ -80,6 +85,7 @@ class NotificationServiceTest {
     }
 
     @Test
+    @DisplayName("알림을 읽음 처리한다")
     void markAsRead() {
         Long actorUserId = 1L;
         Long notificationId = 100L;
@@ -128,6 +134,7 @@ class NotificationServiceTest {
     }
 
     @Test
+    @DisplayName("존재하지 않는 알림은 읽음 처리할 수 없다")
     void markAsReadFailsWhenNotificationNotFound() {
         Long actorUserId = 1L;
         Long notificationId = 100L;
@@ -154,6 +161,7 @@ class NotificationServiceTest {
     }
 
     @Test
+    @DisplayName("다른 사용자의 알림은 읽음 처리할 수 없다")
     void markAsReadFailsWhenNotificationBelongsToAnotherUser() {
         Long actorUserId = 1L;
         Long recipientUserId = 2L;
@@ -199,4 +207,228 @@ class NotificationServiceTest {
 
         assertThat(notification.getReadAt()).isNull();
     }
+
+    @Test
+    @DisplayName("내 알림 목록을 조회한다")
+    void getNotifications() {
+        Long actorUserId = 1L;
+
+        Notification notification =
+            mock(Notification.class);
+
+        WorkplaceMember recipientMember =
+            mock(WorkplaceMember.class);
+
+        Workplace workplace =
+            mock(Workplace.class);
+
+        LocalDateTime createdAt =
+            LocalDateTime.of(
+                2026,
+                9,
+                15,
+                10,
+                0
+            );
+
+        when(notification.getId())
+            .thenReturn(100L);
+
+        when(notification.getRecipientMember())
+            .thenReturn(recipientMember);
+
+        when(recipientMember.getWorkplace())
+            .thenReturn(workplace);
+
+        when(workplace.getId())
+            .thenReturn(10L);
+
+        when(workplace.getName())
+            .thenReturn("SWITCH 카페");
+
+        when(notification.getType())
+            .thenReturn(
+                NotificationType.SCHEDULE_PUBLISHED
+            );
+
+        when(notification.getMessage())
+            .thenReturn(
+                "새로운 주간 근무표가 공개되었습니다."
+            );
+
+        when(notification.getCreateDate())
+            .thenReturn(createdAt);
+
+        when(notification.getReadAt())
+            .thenReturn(null);
+
+        when(notificationRepository.findAllByUserId(actorUserId))
+            .thenReturn(List.of(notification));
+
+        List<NotificationResponse> result =
+            notificationService.getNotifications(
+                actorUserId
+            );
+
+        assertThat(result).hasSize(1);
+
+        NotificationResponse response =
+            result.get(0);
+
+        assertThat(response.notificationId())
+            .isEqualTo(100L);
+
+        assertThat(response.workplaceId())
+            .isEqualTo(10L);
+
+        assertThat(response.workplaceName())
+            .isEqualTo("SWITCH 카페");
+
+        assertThat(response.type())
+            .isEqualTo(
+                NotificationType.SCHEDULE_PUBLISHED
+            );
+
+        assertThat(response.message())
+            .isEqualTo(
+                "새로운 주간 근무표가 공개되었습니다."
+            );
+
+        assertThat(response.createdAt())
+            .isEqualTo(createdAt);
+
+        assertThat(response.readAt())
+            .isNull();
+
+        verify(notificationRepository)
+            .findAllByUserId(actorUserId);
+    }
+
+    @Test
+    @DisplayName("읽은 알림과 읽지 않은 알림을 모두 조회한다")
+    void getNotificationsIncludesReadAndUnreadNotifications() {
+        Long actorUserId = 1L;
+
+        Notification unreadNotification =
+            mock(Notification.class);
+
+        Notification readNotification =
+            mock(Notification.class);
+
+        WorkplaceMember unreadRecipientMember =
+            mock(WorkplaceMember.class);
+
+        WorkplaceMember readRecipientMember =
+            mock(WorkplaceMember.class);
+
+        Workplace workplace =
+            mock(Workplace.class);
+
+        LocalDateTime unreadCreatedAt =
+            LocalDateTime.of(
+                2026,
+                9,
+                15,
+                11,
+                0
+            );
+
+        LocalDateTime readCreatedAt =
+            LocalDateTime.of(
+                2026,
+                9,
+                15,
+                10,
+                0
+            );
+
+        LocalDateTime readAt =
+            LocalDateTime.of(
+                2026,
+                9,
+                15,
+                10,
+                30
+            );
+
+        when(unreadNotification.getId())
+            .thenReturn(101L);
+
+        when(unreadNotification.getRecipientMember())
+            .thenReturn(unreadRecipientMember);
+
+        when(unreadRecipientMember.getWorkplace())
+            .thenReturn(workplace);
+
+        when(unreadNotification.getType())
+            .thenReturn(
+                NotificationType.SCHEDULE_PUBLISHED
+            );
+
+        when(unreadNotification.getMessage())
+            .thenReturn("새로운 주간 근무표가 공개되었습니다.");
+
+        when(unreadNotification.getCreateDate())
+            .thenReturn(unreadCreatedAt);
+
+        when(unreadNotification.getReadAt())
+            .thenReturn(null);
+
+        when(readNotification.getId())
+            .thenReturn(100L);
+
+        when(readNotification.getRecipientMember())
+            .thenReturn(readRecipientMember);
+
+        when(readRecipientMember.getWorkplace())
+            .thenReturn(workplace);
+
+        when(readNotification.getType())
+            .thenReturn(
+                NotificationType.SUBSTITUTE_APPROVED
+            );
+
+        when(readNotification.getMessage())
+            .thenReturn("대타 요청이 최종 승인되었습니다.");
+
+        when(readNotification.getCreateDate())
+            .thenReturn(readCreatedAt);
+
+        when(readNotification.getReadAt())
+            .thenReturn(readAt);
+
+        when(workplace.getId())
+            .thenReturn(10L);
+
+        when(workplace.getName())
+            .thenReturn("SWITCH 카페");
+
+        when(notificationRepository.findAllByUserId(actorUserId))
+            .thenReturn(
+                List.of(
+                    unreadNotification,
+                    readNotification
+                )
+            );
+
+        List<NotificationResponse> result =
+            notificationService.getNotifications(
+                actorUserId
+            );
+
+        assertThat(result).hasSize(2);
+
+        assertThat(result.get(0).notificationId())
+            .isEqualTo(101L);
+
+        assertThat(result.get(0).readAt())
+            .isNull();
+
+        assertThat(result.get(1).notificationId())
+            .isEqualTo(100L);
+
+        assertThat(result.get(1).readAt())
+            .isEqualTo(readAt);
+    }
+
 }

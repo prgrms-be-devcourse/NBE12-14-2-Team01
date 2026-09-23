@@ -11,7 +11,9 @@ import com.merge.backend.domain.shift.entity.Schedule;
 import com.merge.backend.domain.shift.entity.Shift;
 import com.merge.backend.domain.shift.entity.ShiftStatus;
 import com.merge.backend.domain.shift.repository.ShiftRepository;
-import com.merge.backend.domain.substitute.dto.response.SubstituteRequestCreateResponse;
+import com.merge.backend.domain.substitute.dto.SentSubstituteRequestResponse;
+import com.merge.backend.domain.substitute.dto.SubstituteRequestCreateResponse;
+import com.merge.backend.domain.substitute.entity.RequestCloseReason;
 import com.merge.backend.domain.substitute.entity.RequestStatus;
 import com.merge.backend.domain.substitute.entity.SubstituteCandidate;
 import com.merge.backend.domain.substitute.entity.SubstituteRequest;
@@ -248,6 +250,58 @@ class SubstituteRequestServiceTest {
             .willReturn(true);
 
         assertCreateFails(SubstituteErrorCode.ACTIVE_REQUEST_EXISTS);
+    }
+
+    @Test
+    @DisplayName("SUB-05 - 보낸 요청 목록을 최신순으로 반환하고, 만료된 요청은 CLOSED/EXPIRED로 표시된다")
+    void test8() {
+        Shift openShift = createShift(
+            publishedSchedule(), REQUESTER_USER_ID, futureStartAt(), ShiftStatus.SCHEDULED
+        );
+        SubstituteRequest openRequest =
+            new SubstituteRequest(openShift, openShift.getMember(), RequestStatus.OPEN);
+        ReflectionTestUtils.setField(openRequest, "id", 1L);
+        ReflectionTestUtils.setField(openRequest, "createDate", LocalDateTime.now().minusDays(1));
+
+        Shift expiredShift = createShift(
+            publishedSchedule(),
+            REQUESTER_USER_ID,
+            LocalDateTime.now().minusMinutes(1),
+            ShiftStatus.SCHEDULED
+        );
+        SubstituteRequest expiredRequest =
+            new SubstituteRequest(expiredShift, expiredShift.getMember(), RequestStatus.OPEN);
+        ReflectionTestUtils.setField(expiredRequest, "id", 2L);
+        ReflectionTestUtils.setField(expiredRequest, "createDate", LocalDateTime.now());
+
+        stubClockAsNow();
+        given(substituteRequestRepository
+            .findAllByRequesterMember_User_IdOrderByCreateDateDesc(REQUESTER_USER_ID))
+            .willReturn(List.of(expiredRequest, openRequest));
+
+        List<SentSubstituteRequestResponse> responses =
+            substituteRequestService.getSentRequests(REQUESTER_USER_ID);
+
+        assertThat(responses).hasSize(2);
+        assertThat(responses.get(0).requestId()).isEqualTo(2L);
+        assertThat(responses.get(0).status()).isEqualTo(RequestStatus.CLOSED);
+        assertThat(responses.get(0).closeReason()).isEqualTo(RequestCloseReason.EXPIRED);
+        assertThat(responses.get(1).requestId()).isEqualTo(1L);
+        assertThat(responses.get(1).status()).isEqualTo(RequestStatus.OPEN);
+    }
+
+    @Test
+    @DisplayName("SUB-05 - 보낸 요청이 없으면 빈 리스트를 반환한다")
+    void test9() {
+        stubClockAsNow();
+        given(substituteRequestRepository
+            .findAllByRequesterMember_User_IdOrderByCreateDateDesc(REQUESTER_USER_ID))
+            .willReturn(List.of());
+
+        List<SentSubstituteRequestResponse> responses =
+            substituteRequestService.getSentRequests(REQUESTER_USER_ID);
+
+        assertThat(responses).isEmpty();
     }
 
     private void assertCreateFails(SubstituteErrorCode expected) {

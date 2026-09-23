@@ -1,4 +1,4 @@
-package com.merge.backend.domain.substitute.dto.request;
+package com.merge.backend.domain.substitute.dto;
 
 import jakarta.validation.constraints.NotNull;
 

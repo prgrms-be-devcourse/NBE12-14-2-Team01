@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.merge.backend.domain.shift.entity.Schedule;
@@ -451,6 +452,231 @@ class SubstituteRequestServiceTest {
 
             assertThatThrownBy(() -> substituteRequestService.list(workplaceId, actorId))
                 .isInstanceOf(BusinessException.class);
+        }
+    }
+    @Nested
+    @DisplayName("MANAGER 대타 요청 전체 종료 (close)")
+    class CloseTest {
+
+        @Test
+        @DisplayName("성공: OPEN 상태의 요청을 MANAGER가 종료하면 CLOSED로 변경된다.")
+        void close_OpenRequest_Success() {
+            // given
+            given(substituteRequestRepository.findById(requestId)).willReturn(Optional.of(request));
+            given(request.getShift()).willReturn(shift);
+            given(shift.getSchedule()).willReturn(schedule);
+            given(schedule.getWorkplace()).willReturn(workplace);
+            given(workplace.getId()).willReturn(workplaceId);
+
+            given(request.getStatus()).willReturn(RequestStatus.OPEN);
+            given(schedule.getStatus()).willReturn(ScheduleStatus.PUBLISHED);
+            given(shift.getStatus()).willReturn(ShiftStatus.SCHEDULED);
+            given(shift.getStartAt()).willReturn(now.plusDays(1));
+
+            // when
+            SubstituteRequest result = substituteRequestService.close(requestId, actorId);
+
+            // then
+            assertThat(result).isEqualTo(request);
+            verify(workplaceMemberService).requireManager(actorId, workplaceId);
+            verify(request).closeByManager(any(LocalDateTime.class));
+        }
+
+        @Test
+        @DisplayName("성공: ACCEPTED 상태의 요청도 MANAGER가 종료할 수 있다.")
+        void close_AcceptedRequest_Success() {
+            // given
+            given(substituteRequestRepository.findById(requestId)).willReturn(Optional.of(request));
+            given(request.getShift()).willReturn(shift);
+            given(shift.getSchedule()).willReturn(schedule);
+            given(schedule.getWorkplace()).willReturn(workplace);
+            given(workplace.getId()).willReturn(workplaceId);
+
+            given(request.getStatus()).willReturn(RequestStatus.ACCEPTED);
+            given(schedule.getStatus()).willReturn(ScheduleStatus.PUBLISHED);
+            given(shift.getStatus()).willReturn(ShiftStatus.SCHEDULED);
+            given(shift.getStartAt()).willReturn(now.plusDays(1));
+
+            // when
+            SubstituteRequest result = substituteRequestService.close(requestId, actorId);
+
+            // then
+            assertThat(result).isEqualTo(request);
+            verify(request).closeByManager(any(LocalDateTime.class));
+        }
+
+        @Test
+        @DisplayName("실패: 존재하지 않는 요청이면 예외가 발생한다.")
+        void close_RequestNotFound_ThrowsException() {
+            // given
+            given(substituteRequestRepository.findById(requestId))
+                .willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> substituteRequestService.close(requestId, actorId))
+                .isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("실패: 실제 Workplace의 MANAGER가 아니면 예외가 발생한다.")
+        void close_NotManager_ThrowsException() {
+            // given
+            given(substituteRequestRepository.findById(requestId)).willReturn(Optional.of(request));
+            given(request.getShift()).willReturn(shift);
+            given(shift.getSchedule()).willReturn(schedule);
+            given(schedule.getWorkplace()).willReturn(workplace);
+            given(workplace.getId()).willReturn(workplaceId);
+
+            given(workplaceMemberService.requireManager(actorId, workplaceId))
+                .willThrow(new BusinessException(WorkplaceErrorCode.NOT_WORKPLACE_MEMBER));
+
+            // when & then
+            assertThatThrownBy(() -> substituteRequestService.close(requestId, actorId))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining(WorkplaceErrorCode.NOT_WORKPLACE_MEMBER.getMessage());
+        }
+
+        @Test
+        @DisplayName("실패: 요청이 이미 APPROVED 상태면 예외가 발생한다.")
+        void close_AlreadyApproved_ThrowsException() {
+            // given
+            given(substituteRequestRepository.findById(requestId)).willReturn(Optional.of(request));
+            given(request.getShift()).willReturn(shift);
+            given(shift.getSchedule()).willReturn(schedule);
+            given(schedule.getWorkplace()).willReturn(workplace);
+            given(workplace.getId()).willReturn(workplaceId);
+
+            given(request.getStatus()).willReturn(RequestStatus.APPROVED);
+
+            // when & then
+            assertThatThrownBy(() -> substituteRequestService.close(requestId, actorId))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining(SubstituteRequestErrorCode.ALREADY_TERMINATED.getMessage());
+        }
+
+        @Test
+        @DisplayName("실패: 요청이 이미 CLOSED 상태면 예외가 발생한다.")
+        void close_AlreadyClosed_ThrowsException() {
+            // given
+            given(substituteRequestRepository.findById(requestId)).willReturn(Optional.of(request));
+            given(request.getShift()).willReturn(shift);
+            given(shift.getSchedule()).willReturn(schedule);
+            given(schedule.getWorkplace()).willReturn(workplace);
+            given(workplace.getId()).willReturn(workplaceId);
+
+            given(request.getStatus()).willReturn(RequestStatus.CLOSED);
+
+            // when & then
+            assertThatThrownBy(() -> substituteRequestService.close(requestId, actorId))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining(SubstituteRequestErrorCode.ALREADY_TERMINATED.getMessage());
+        }
+
+        @Test
+        @DisplayName("실패: Schedule이 PUBLISHED 상태가 아니면 예외가 발생한다.")
+        void close_ScheduleNotPublished_ThrowsException() {
+            // given
+            given(substituteRequestRepository.findById(requestId)).willReturn(Optional.of(request));
+            given(request.getShift()).willReturn(shift);
+            given(shift.getSchedule()).willReturn(schedule);
+            given(schedule.getWorkplace()).willReturn(workplace);
+            given(workplace.getId()).willReturn(workplaceId);
+
+            given(request.getStatus()).willReturn(RequestStatus.OPEN);
+            given(schedule.getStatus()).willReturn(ScheduleStatus.DRAFT);
+
+            // when & then
+            assertThatThrownBy(() -> substituteRequestService.close(requestId, actorId))
+                .isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("실패: Shift가 SCHEDULED 상태가 아니면 예외가 발생한다.")
+        void close_ShiftNotScheduled_ThrowsException() {
+            // given
+            given(substituteRequestRepository.findById(requestId)).willReturn(Optional.of(request));
+            given(request.getShift()).willReturn(shift);
+            given(shift.getSchedule()).willReturn(schedule);
+            given(schedule.getWorkplace()).willReturn(workplace);
+            given(workplace.getId()).willReturn(workplaceId);
+
+            given(request.getStatus()).willReturn(RequestStatus.OPEN);
+            given(schedule.getStatus()).willReturn(ScheduleStatus.PUBLISHED);
+            given(shift.getStatus()).willReturn(ShiftStatus.CANCELLED);
+
+            // when & then
+            assertThatThrownBy(() -> substituteRequestService.close(requestId, actorId))
+                .isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("실패: Shift가 이미 시작된 경우(now >= startAt) 예외가 발생한다.")
+        void close_ShiftAlreadyStarted_ThrowsException() {
+            // given
+            given(substituteRequestRepository.findById(requestId)).willReturn(Optional.of(request));
+            given(request.getShift()).willReturn(shift);
+            given(shift.getSchedule()).willReturn(schedule);
+            given(schedule.getWorkplace()).willReturn(workplace);
+            given(workplace.getId()).willReturn(workplaceId);
+
+            given(request.getStatus()).willReturn(RequestStatus.OPEN);
+            given(schedule.getStatus()).willReturn(ScheduleStatus.PUBLISHED);
+            given(shift.getStatus()).willReturn(ShiftStatus.SCHEDULED);
+            given(shift.getStartAt()).willReturn(now.minusMinutes(1)); // 이미 시작됨
+
+            // when & then
+            assertThatThrownBy(() -> substituteRequestService.close(requestId, actorId))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining(SubstituteRequestErrorCode
+                    .SHIFT_ALREADY_STARTED.getMessage());
+        }
+
+        @Test
+        @DisplayName("실패: Shift 시작 시각이 정확히 now와 같으면(경계값) 예외가 발생한다.")
+        void close_ShiftStartsExactlyNow_ThrowsException() {
+            // given
+            given(substituteRequestRepository.findById(requestId))
+                .willReturn(Optional.of(request));
+            given(request.getShift()).willReturn(shift);
+            given(shift.getSchedule()).willReturn(schedule);
+            given(schedule.getWorkplace()).willReturn(workplace);
+            given(workplace.getId()).willReturn(workplaceId);
+
+            given(request.getStatus()).willReturn(RequestStatus.OPEN);
+            given(schedule.getStatus()).willReturn(ScheduleStatus.PUBLISHED);
+            given(shift.getStatus()).willReturn(ShiftStatus.SCHEDULED);
+            given(shift.getStartAt()).willReturn(now); // startAt == now
+
+            // when & then
+            assertThatThrownBy(() -> substituteRequestService.close(requestId, actorId))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining(SubstituteRequestErrorCode
+                    .SHIFT_ALREADY_STARTED.getMessage());
+        }
+
+        @Test
+        @DisplayName("성공: Candidate 상태는 변경되지 않는다 (요청만 CLOSED 처리).")
+        void close_DoesNotModifyCandidateStatus() {
+            // given
+            given(substituteRequestRepository.findById(requestId))
+                .willReturn(Optional.of(request));
+            given(request.getShift()).willReturn(shift);
+            given(shift.getSchedule()).willReturn(schedule);
+            given(schedule.getWorkplace()).willReturn(workplace);
+            given(workplace.getId()).willReturn(workplaceId);
+
+            given(request.getStatus()).willReturn(RequestStatus.ACCEPTED);
+            given(schedule.getStatus()).willReturn(ScheduleStatus.PUBLISHED);
+            given(shift.getStatus()).willReturn(ShiftStatus.SCHEDULED);
+            given(shift.getStartAt()).willReturn(now.plusDays(1));
+
+            // when
+            substituteRequestService.close(requestId, actorId);
+
+            // then
+            // Candidate나 Shift.member를 변경하는 어떤 메서드도 호출되지 않아야 함
+            verify(request, never()).approveRequest(any(), any());
+            verify(shift, never()).changeMember(any()); // 실제 메서드명에 맞게 조정 필요
         }
     }
 }

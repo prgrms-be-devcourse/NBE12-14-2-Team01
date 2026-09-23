@@ -1,7 +1,7 @@
 package com.merge.backend.domain.substitute.controller;
 
-import com.merge.backend.domain.substitute.dto.request.SubstituteCandidateRespondRequest;
-import com.merge.backend.domain.substitute.dto.response.SubstituteCandidateRespondResponse;
+import com.merge.backend.domain.substitute.dto.SubstituteCandidateRespondRequest;
+import com.merge.backend.domain.substitute.dto.SubstituteCandidateRespondResponse;
 import com.merge.backend.domain.substitute.entity.SubstituteCandidate;
 import com.merge.backend.domain.substitute.service.SubstituteCandidateService;
 import com.merge.backend.global.dto.ApiResponse;

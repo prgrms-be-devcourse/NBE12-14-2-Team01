@@ -5,7 +5,13 @@ import com.merge.backend.domain.substitute.exception.SubstituteRequestErrorCode;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.global.entity.BaseEntity;
 import com.merge.backend.global.exception.BusinessException;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -80,5 +86,13 @@ public class SubstituteRequest extends BaseEntity {
         this.approvedAt = now;
         this.closedAt = now;
         this.closeReason = null;
+    }
+
+    //요청 종료
+    public void closeByManager(LocalDateTime now) {
+        this.status = RequestStatus.CLOSED;
+        this.closeReason = RequestCloseReason.MANAGER_CLOSED;
+        this.closedAt = now;
+        this.approvedAt = null;
     }
 }

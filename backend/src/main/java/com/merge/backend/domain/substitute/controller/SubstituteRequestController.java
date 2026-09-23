@@ -1,9 +1,10 @@
 package com.merge.backend.domain.substitute.controller;
 
+import com.merge.backend.domain.substitute.dto.AcceptedPendingSubstituteRequestResponse;
+import com.merge.backend.domain.substitute.dto.ReceivedSubstituteRequestResponse;
+import com.merge.backend.domain.substitute.dto.SubstituteRequestCloseResponse;
 import com.merge.backend.domain.substitute.dto.SubstituteRequestListResponse;
 import com.merge.backend.domain.substitute.dto.SubstituteRequestResponse;
-import com.merge.backend.domain.substitute.dto.response.AcceptedPendingSubstituteRequestResponse;
-import com.merge.backend.domain.substitute.dto.response.ReceivedSubstituteRequestResponse;
 import com.merge.backend.domain.substitute.entity.SubstituteRequest;
 import com.merge.backend.domain.substitute.service.SubstituteCandidateService;
 import com.merge.backend.domain.substitute.service.SubstituteRequestService;
@@ -53,13 +54,13 @@ public class SubstituteRequestController {
     public ResponseEntity<ApiResponse<List<AcceptedPendingSubstituteRequestResponse>>>
         getAcceptedPendingRequests() {
 
-        Long userId = rq.getActorId(); // 현재 로그인한 User ID
+        Long userId = rq.getActorId();
 
         List<AcceptedPendingSubstituteRequestResponse> response =
             substituteCandidateService
-                .findAcceptedPendingRequests(userId) // 승인 대기 중인 Candidate 조회
+                .findAcceptedPendingRequests(userId)
                 .stream()
-                .map(AcceptedPendingSubstituteRequestResponse::from) // Entity → DTO 변환
+                .map(AcceptedPendingSubstituteRequestResponse::from)
                 .toList();
 
         return ResponseEntity.ok(
@@ -105,6 +106,24 @@ public class SubstituteRequestController {
                 "200",
                 "대타 요청이 최종 승인되었습니다.",
                 SubstituteRequestResponse.from(request)
+            )
+        );
+    }
+
+    @PatchMapping("/substitute-requests/{requestId}/close")
+    public ResponseEntity<ApiResponse<SubstituteRequestCloseResponse>> close(
+        @PathVariable Long requestId
+    ) {
+        Long actorId = rq.getActorId();
+
+        SubstituteRequest request =
+            substituteRequestService.close(requestId, actorId);
+
+        return ResponseEntity.status(200).body(
+            ApiResponse.success(
+                "200",
+                "대타 요청이 종료되었습니다.",
+                SubstituteRequestCloseResponse.from(request)
             )
         );
     }

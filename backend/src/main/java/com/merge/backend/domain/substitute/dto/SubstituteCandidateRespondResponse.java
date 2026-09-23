@@ -1,4 +1,4 @@
-package com.merge.backend.domain.substitute.dto.response;
+package com.merge.backend.domain.substitute.dto;
 
 import com.merge.backend.domain.substitute.entity.CandidateStatus;
 import com.merge.backend.domain.substitute.entity.RequestCloseReason;

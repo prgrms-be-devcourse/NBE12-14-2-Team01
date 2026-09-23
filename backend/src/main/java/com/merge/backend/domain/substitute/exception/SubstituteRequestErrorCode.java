@@ -58,6 +58,16 @@ public enum SubstituteRequestErrorCode implements ErrorCode {
         HttpStatus.BAD_REQUEST,
         "SUB-016",
         "하나의 요청에 대해 수락자가 여러 명 조회되었습니다."
+    ),
+    ALREADY_TERMINATED(
+        HttpStatus.BAD_REQUEST,
+        "SUB-017",
+        "이미 종료되었거나 승인된 요청은 종료할 수 없습니다."
+    ),
+    SHIFT_ALREADY_STARTED(
+        HttpStatus.BAD_REQUEST,
+        "SUB-018",
+        "근무 시작 이후에는 요청을 종료할 수 없습니다."
     );
     private final HttpStatus httpStatus;
     private final String code;

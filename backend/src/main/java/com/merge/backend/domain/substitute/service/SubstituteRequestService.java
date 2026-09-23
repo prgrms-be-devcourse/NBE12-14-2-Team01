@@ -1,5 +1,6 @@
 package com.merge.backend.domain.substitute.service;
 
+import com.merge.backend.domain.shift.entity.Schedule;
 import com.merge.backend.domain.shift.entity.ScheduleStatus;
 import com.merge.backend.domain.shift.entity.Shift;
 import com.merge.backend.domain.shift.entity.ShiftStatus;
@@ -7,8 +8,9 @@ import com.merge.backend.domain.shift.exception.ScheduleErrorCode;
 import com.merge.backend.domain.shift.exception.ShiftErrorCode;
 import com.merge.backend.domain.shift.repository.ShiftRepository;
 import com.merge.backend.domain.shift.repository.UnavailableTimeRepository;
+import com.merge.backend.domain.substitute.dto.SentSubstituteRequestResponse;
+import com.merge.backend.domain.substitute.dto.SubstituteRequestCreateResponse;
 import com.merge.backend.domain.substitute.dto.SubstituteRequestListResponse;
-import com.merge.backend.domain.substitute.dto.response.SubstituteRequestCreateResponse;
 import com.merge.backend.domain.substitute.entity.CandidateStatus;
 import com.merge.backend.domain.substitute.entity.RequestStatus;
 import com.merge.backend.domain.substitute.entity.SubstituteCandidate;
@@ -97,6 +99,19 @@ public class SubstituteRequestService {
             request.getStatus(),      // OPEN
             createdCandidates.size()  // 실제 생성된 Candidate 수
         );
+    }
+
+    @Transactional(readOnly = true)
+    public List<SentSubstituteRequestResponse> getSentRequests(Long actorUserId) {
+        LocalDateTime now = LocalDateTime.now(clock);
+
+        List<SubstituteRequest> requests =
+            substituteRequestRepository.findAllByRequesterMember_User_IdOrderByCreateDateDesc(
+                actorUserId);
+
+        return requests.stream()
+            .map(request -> SentSubstituteRequestResponse.from(request, now))
+            .toList();
     }
 
     private Shift validateSubstituteRequest(
@@ -481,5 +496,47 @@ public class SubstituteRequestService {
                 ShiftErrorCode.INVALID_TIME_VALUE
             );
         }
+    }
+
+    @Transactional
+    public SubstituteRequest close(Long requestId, Long actorId) {
+        // Request 조회
+        SubstituteRequest request = substituteRequestRepository.findById(requestId)
+            .orElseThrow(() -> new BusinessException(SubstituteRequestErrorCode
+                .SUBSTITUTE_REQUEST_NOT_FOUND));
+
+        Shift shift = request.getShift();
+        Schedule schedule = shift.getSchedule();
+        Workplace workplace = schedule.getWorkplace();
+
+        // 매니저 인가 검증
+        workplaceMemberService.requireManager(actorId, workplace.getId());
+
+        //Request 상태 검증. OPEN 또는 ACCEPTED만 종료 가능
+        if (request.getStatus() != RequestStatus.OPEN
+            && request.getStatus() != RequestStatus.ACCEPTED) {
+            throw new BusinessException(SubstituteRequestErrorCode.ALREADY_TERMINATED);
+        }
+
+        //Schedule/Shift 상태 검증
+        if (schedule.getStatus() != ScheduleStatus.PUBLISHED) {
+            throw new BusinessException(ScheduleErrorCode.NOT_PUBLISHED);
+        }
+        if (shift.getStatus() != ShiftStatus.SCHEDULED) {
+            throw new BusinessException(ShiftErrorCode.INVALID_STATUS_VALUE);
+        }
+
+        //Shift 시작 전인지 검증
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (!shift.getStartAt().isAfter(now)) {
+            throw new BusinessException(SubstituteRequestErrorCode.SHIFT_ALREADY_STARTED);
+        }
+
+        //Request 종료 처리 (Shift.member, Candidate 상태는 변경하지 않음)
+        request.closeByManager(now);
+
+        //TODO: 알림 연동
+
+        return request;
     }
 }

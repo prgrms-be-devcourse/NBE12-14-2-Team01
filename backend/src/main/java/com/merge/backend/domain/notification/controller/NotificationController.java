@@ -1,11 +1,14 @@
 package com.merge.backend.domain.notification.controller;
 
 import com.merge.backend.domain.notification.dto.NotificationReadResponse;
+import com.merge.backend.domain.notification.dto.NotificationResponse;
 import com.merge.backend.domain.notification.service.NotificationService;
 import com.merge.backend.global.dto.ApiResponse;
 import com.merge.backend.global.rq.Rq;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -40,4 +43,26 @@ public class NotificationController {
             )
         );
     }
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<NotificationResponse>>>
+        getNotifications()
+    {
+        Long actorUserId =
+            rq.getActorId();
+
+        List<NotificationResponse> response =
+            notificationService.getNotifications(
+                actorUserId
+            );
+
+        return ResponseEntity.ok(
+            ApiResponse.success(
+                "200",
+                "알림 목록을 조회했습니다.",
+                response
+            )
+        );
+    }
+
 }
