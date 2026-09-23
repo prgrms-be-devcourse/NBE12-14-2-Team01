@@ -1,6 +1,7 @@
 package com.merge.backend.domain.notification.service;
 
 import com.merge.backend.domain.notification.dto.NotificationReadResponse;
+import com.merge.backend.domain.notification.dto.NotificationResponse;
 import com.merge.backend.domain.notification.entity.Notification;
 import com.merge.backend.domain.notification.entity.NotificationType;
 import com.merge.backend.domain.notification.exception.NotificationErrorCode;
@@ -9,6 +10,7 @@ import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.global.exception.BusinessException;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,6 +64,17 @@ public class NotificationService {
         return NotificationReadResponse.from(
             notification
         );
+    }
+
+    @Transactional(readOnly = true)
+    public List<NotificationResponse> getNotifications(
+        Long actorUserId
+    ) {
+        return notificationRepository
+            .findAllByUserId(actorUserId)
+            .stream()
+            .map(NotificationResponse::from)
+            .toList();
     }
 
 }
