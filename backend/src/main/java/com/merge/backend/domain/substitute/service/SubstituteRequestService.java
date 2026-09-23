@@ -8,6 +8,7 @@ import com.merge.backend.domain.shift.exception.ShiftErrorCode;
 import com.merge.backend.domain.shift.repository.ShiftRepository;
 import com.merge.backend.domain.shift.repository.UnavailableTimeRepository;
 import com.merge.backend.domain.substitute.dto.SubstituteRequestCreateResponse;
+import com.merge.backend.domain.substitute.dto.SubstituteRequestListResponse;
 import com.merge.backend.domain.substitute.entity.CandidateStatus;
 import com.merge.backend.domain.substitute.entity.RequestStatus;
 import com.merge.backend.domain.substitute.entity.SubstituteCandidate;
@@ -24,12 +25,17 @@ import com.merge.backend.domain.workplace.service.WorkplaceMemberService;
 import com.merge.backend.global.exception.BusinessException;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SubstituteRequestService {
@@ -82,6 +88,78 @@ public class SubstituteRequestService {
             throw new BusinessException(SubstituteErrorCode.ACTIVE_REQUEST_EXISTS);
         }
         return shift;
+    }
+
+    @Transactional(readOnly = true)
+    public List<SubstituteRequestListResponse> list(Long workplaceId, Long actorId) {
+
+        Workplace workplace = workplaceRepository.findById(workplaceId)
+            .orElseThrow(() -> new BusinessException(WorkplaceErrorCode.WORKPLACE_NOT_FOUND));
+
+        workplaceMemberService.requireManager(actorId, workplaceId);
+
+        //requests 조회
+        List<SubstituteRequest> requests = substituteRequestRepository
+            .findAllByWorkplaceId(workplaceId, LocalDateTime.now(clock));
+
+        //ACCEPTED 상태들 선별
+        List<Long> acceptedRequestIds = requests.stream()
+            .filter(r -> r.getStatus() == RequestStatus.ACCEPTED)
+            .map(SubstituteRequest::getId)
+            .toList();
+
+        Map<Long, SubstituteCandidate> acceptedCandidateMap =
+            getAcceptedCandidates(acceptedRequestIds);
+
+        return requests.stream()
+            .map(request ->
+                SubstituteRequestListResponse.from(request, acceptedCandidateMap))
+            .toList();
+    }
+
+    // 내부적으로 사용하는 수락자 조회 - private으로 캡슐화
+    private Map<Long, SubstituteCandidate> getAcceptedCandidates(List<Long> requestIds) {
+        if (requestIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        //수락자 조회
+        List<SubstituteCandidate> candidates = substituteCandidateRepository
+            .findByRequestIdInAndStatus(requestIds, CandidateStatus.ACCEPTED);
+
+        //그룹화로 수락자가 2명인 경우도 감안
+        Map<Long, List<SubstituteCandidate>> grouped = candidates.stream()
+            .collect(Collectors.groupingBy(c -> c.getRequest().getId()));
+
+        //수락자가 다수 있을 시 예외
+        grouped.forEach((requestId, matchedCandidates) -> {
+            if (matchedCandidates.size() > 1) {
+                log.error(
+                    "ACCEPTED 요청(requestId={})에 수락자가 {}명 조회되었습니다. candidateIds={}",
+                    requestId,
+                    matchedCandidates.size(),
+                    matchedCandidates.stream().map(SubstituteCandidate::getId).toList()
+                );
+                throw new BusinessException(
+                    SubstituteRequestErrorCode.ACCEPTED_CANDIDATE_DUPLICATED);
+            }
+        });
+
+        //요청 == ACCEPTED + 수락자 == null일 때
+        List<Long> missingRequestIds = requestIds.stream()
+            .filter(requestId -> !grouped.containsKey(requestId))
+            .toList();
+
+        if (!missingRequestIds.isEmpty()) {
+            log.error(
+                "ACCEPTED 상태인 요청의 수락자 정보가 누락되었습니다. requestIds={}",
+                missingRequestIds
+            );
+            throw new BusinessException(SubstituteRequestErrorCode.ACCEPTED_CANDIDATE_NOT_FOUND);
+        }
+
+        return grouped.entrySet().stream()
+            .collect(Collectors.toMap(
+                Map.Entry::getKey, e -> e.getValue().get(0)));
     }
 
     @Transactional
