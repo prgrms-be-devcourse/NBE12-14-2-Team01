@@ -12,6 +12,6 @@ public record UnavailableTimeUpdateReqBody(
         LocalDateTime endAt,
         
         @NotNull
-        boolean confirmOfficialShiftConflict
+        Boolean confirmOfficialShiftConflict
 ) {
 }
