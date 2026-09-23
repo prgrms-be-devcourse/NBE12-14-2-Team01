@@ -49,6 +49,11 @@ public class SecurityConfig {
                         .authenticated()
                 )
                 .csrf(csrf -> csrf.disable())
+                .headers(headers ->
+                        headers.frameOptions(frame ->
+                                frame.sameOrigin()
+                        )
+                )
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
