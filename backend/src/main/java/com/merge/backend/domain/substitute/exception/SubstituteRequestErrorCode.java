@@ -48,6 +48,16 @@ public enum SubstituteRequestErrorCode implements ErrorCode {
         HttpStatus.CONFLICT,
         "SUB-008",
         "수락한 후보자를 찾을 수 없습니다."
+    ),
+    ACCEPTED_CANDIDATE_NOT_FOUND(
+        HttpStatus.NOT_FOUND,
+        "SUB-015",
+        "ACCEPTED 상태인 요청의 수락자 정보를 찾을 수 없습니다."
+    ),
+    ACCEPTED_CANDIDATE_DUPLICATED(
+        HttpStatus.BAD_REQUEST,
+        "SUB-016",
+        "하나의 요청에 대해 수락자가 여러 명 조회되었습니다."
     );
     private final HttpStatus httpStatus;
     private final String code;
