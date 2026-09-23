@@ -1,9 +1,5 @@
 package com.merge.backend.domain.shift.service;
 
-import com.merge.backend.domain.shift.dto.UnavailableTimeListResponse;
-import com.merge.backend.domain.shift.dto.UnavailableTimeRegisterReqBody;
-import com.merge.backend.domain.shift.dto.UnavailableTimeRegisterResponse;
-import com.merge.backend.domain.shift.dto.UnavailableTimeUpdateReqBody;
 import com.merge.backend.domain.shift.entity.ScheduleStatus;
 import com.merge.backend.domain.shift.entity.UnavailableTime;
 import com.merge.backend.domain.shift.exception.UnavailableTimeErrorCode;
@@ -20,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -56,21 +51,21 @@ public class UnavailableTimeService {
 
         return unavailableTimes.stream()
                 .map(unavailableTime ->{
-                            boolean officialShiftConflict =
-                                    shiftRepository.existsOverlappingOfficialShift(
-                                            userId,
-                                            ScheduleStatus.PUBLISHED,
-                                            unavailableTime.getStartAt(),
-                                            unavailableTime.getEndAt(),
-                                            null
+                    boolean officialShiftConflict =
+                            shiftRepository.existsOverlappingOfficialShift(
+                                     userId,
+                                     ScheduleStatus.PUBLISHED,
+                                     unavailableTime.getStartAt(),
+                                     unavailableTime.getEndAt(),
+                                     null
                             );
 
-                            return new UnavailableTimeResult(
-                                    unavailableTime.getId(),
-                                    unavailableTime.getStartAt(),
-                                    unavailableTime.getEndAt(),
-                                    officialShiftConflict
-                            );
+                    return new UnavailableTimeResult(
+                            unavailableTime.getId(),
+                            unavailableTime.getStartAt(),
+                            unavailableTime.getEndAt(),
+                            officialShiftConflict
+                    );
                 })
                 .toList();
 
@@ -113,8 +108,10 @@ public class UnavailableTimeService {
 
         Long userId = rq.getActorId();
 
-        UnavailableTime unavailableTime = unavailableTimeRepository.findById(unavailableTimeId).orElseThrow(
-                () -> new BusinessException(
+        UnavailableTime unavailableTime =
+            unavailableTimeRepository.findById(unavailableTimeId)
+                .orElseThrow( () ->
+                    new BusinessException(
                         UnavailableTimeErrorCode.NOT_FOUND
                 )
         );

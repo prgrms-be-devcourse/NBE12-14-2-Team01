@@ -18,12 +18,14 @@ import com.merge.backend.domain.user.service.UserService;
 import com.merge.backend.global.dto.ConfirmationRequiredResponse;
 import com.merge.backend.global.exception.BusinessException;
 import com.merge.backend.global.rq.Rq;
+
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -59,21 +61,21 @@ class UnavailableTimeServiceTest {
     private static final Long USER_ID = 1L;
 
     private static final LocalDateTime NOW =
-            LocalDateTime.of(2026, 9, 21, 15, 0);
+        LocalDateTime.of(2026, 9, 21, 15, 0);
 
     @BeforeEach
     void setUp() {
         lenient()
-                .when(clock.instant())
-                .thenReturn(
-                        Instant.parse("2026-09-21T06:00:00Z")
-                );
+            .when(clock.instant())
+            .thenReturn(
+                Instant.parse("2026-09-21T06:00:00Z")
+            );
 
         lenient()
-                .when(clock.getZone())
-                .thenReturn(
-                        ZoneId.of("Asia/Seoul")
-                );
+            .when(clock.getZone())
+            .thenReturn(
+                ZoneId.of("Asia/Seoul")
+            );
     }
 
     // =========================================================
@@ -86,42 +88,42 @@ class UnavailableTimeServiceTest {
 
         // given
         LocalDateTime startAt =
-                LocalDateTime.of(2026, 9, 22, 10, 0);
+            LocalDateTime.of(2026, 9, 22, 10, 0);
 
         LocalDateTime endAt =
-                LocalDateTime.of(2026, 9, 22, 12, 0);
+            LocalDateTime.of(2026, 9, 22, 12, 0);
 
         User user = org.mockito.Mockito.mock(User.class);
 
         when(rq.getActorId())
-                .thenReturn(USER_ID);
+            .thenReturn(USER_ID);
 
         when(userService.getById(USER_ID))
-                .thenReturn(user);
+            .thenReturn(user);
 
         when(unavailableTimeRepository.findByUserId(USER_ID))
-                .thenReturn(List.of());
+            .thenReturn(List.of());
 
         when(
-                shiftRepository.existsOverlappingOfficialShift(
-                        USER_ID,
-                        ScheduleStatus.PUBLISHED,
-                        startAt,
-                        endAt,
-                        null
-                )
+            shiftRepository.existsOverlappingOfficialShift(
+                USER_ID,
+                ScheduleStatus.PUBLISHED,
+                startAt,
+                endAt,
+                null
+            )
         ).thenReturn(false);
 
         when(unavailableTimeRepository.save(any(UnavailableTime.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+            .thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
         UnavailableTime result =
-                unavailableTimeService.register(
-                        startAt,
-                        endAt,
-                        false
-                );
+            unavailableTimeService.register(
+                startAt,
+                endAt,
+                false
+            );
 
         // then
         assertThat(result).isNotNull();
@@ -130,7 +132,7 @@ class UnavailableTimeServiceTest {
         assertThat(result.getEndAt()).isEqualTo(endAt);
 
         verify(unavailableTimeRepository)
-                .save(any(UnavailableTime.class));
+            .save(any(UnavailableTime.class));
     }
 
     @Test
@@ -139,29 +141,29 @@ class UnavailableTimeServiceTest {
 
         // given
         LocalDateTime sameTime =
-                LocalDateTime.of(2026, 9, 22, 10, 0);
+            LocalDateTime.of(2026, 9, 22, 10, 0);
 
         mockRegisterUser();
 
         // when
         BusinessException exception =
-                assertThrows(
-                        BusinessException.class,
-                        () -> unavailableTimeService.register(
-                                sameTime,
-                                sameTime,
-                                false
-                        )
-                );
+            assertThrows(
+                BusinessException.class,
+                () -> unavailableTimeService.register(
+                    sameTime,
+                    sameTime,
+                    false
+                )
+            );
 
         // then
         assertThat(exception.getErrorCode())
-                .isEqualTo(
-                        UnavailableTimeErrorCode.INVALID_TIME_RANGE
-                );
+            .isEqualTo(
+                UnavailableTimeErrorCode.INVALID_TIME_RANGE
+            );
 
         verify(unavailableTimeRepository, never())
-                .save(any());
+            .save(any());
     }
 
     @Test
@@ -170,32 +172,32 @@ class UnavailableTimeServiceTest {
 
         // given
         LocalDateTime startAt =
-                LocalDateTime.of(2026, 9, 22, 12, 0);
+            LocalDateTime.of(2026, 9, 22, 12, 0);
 
         LocalDateTime endAt =
-                LocalDateTime.of(2026, 9, 22, 10, 0);
+            LocalDateTime.of(2026, 9, 22, 10, 0);
 
         mockRegisterUser();
 
         // when
         BusinessException exception =
-                assertThrows(
-                        BusinessException.class,
-                        () -> unavailableTimeService.register(
-                                startAt,
-                                endAt,
-                                false
-                        )
-                );
+            assertThrows(
+                BusinessException.class,
+                () -> unavailableTimeService.register(
+                    startAt,
+                    endAt,
+                    false
+                )
+            );
 
         // then
         assertThat(exception.getErrorCode())
-                .isEqualTo(
-                        UnavailableTimeErrorCode.INVALID_TIME_RANGE
-                );
+            .isEqualTo(
+                UnavailableTimeErrorCode.INVALID_TIME_RANGE
+            );
 
         verify(unavailableTimeRepository, never())
-                .save(any());
+            .save(any());
     }
 
     @Test
@@ -207,23 +209,23 @@ class UnavailableTimeServiceTest {
 
         // when
         BusinessException exception =
-                assertThrows(
-                        BusinessException.class,
-                        () -> unavailableTimeService.register(
-                                NOW,
-                                NOW.plusHours(1),
-                                false
-                        )
-                );
+            assertThrows(
+                BusinessException.class,
+                () -> unavailableTimeService.register(
+                    NOW,
+                    NOW.plusHours(1),
+                    false
+                )
+            );
 
         // then
         assertThat(exception.getErrorCode())
-                .isEqualTo(
-                        UnavailableTimeErrorCode.NOT_FUTURE_TIME
-                );
+            .isEqualTo(
+                UnavailableTimeErrorCode.NOT_FUTURE_TIME
+            );
 
         verify(unavailableTimeRepository, never())
-                .save(any());
+            .save(any());
     }
 
     @Test
@@ -235,23 +237,23 @@ class UnavailableTimeServiceTest {
 
         // when
         BusinessException exception =
-                assertThrows(
-                        BusinessException.class,
-                        () -> unavailableTimeService.register(
-                                NOW.minusMinutes(1),
-                                NOW.plusHours(1),
-                                false
-                        )
-                );
+            assertThrows(
+                BusinessException.class,
+                () -> unavailableTimeService.register(
+                    NOW.minusMinutes(1),
+                    NOW.plusHours(1),
+                    false
+                )
+            );
 
         // then
         assertThat(exception.getErrorCode())
-                .isEqualTo(
-                        UnavailableTimeErrorCode.NOT_FUTURE_TIME
-                );
+            .isEqualTo(
+                UnavailableTimeErrorCode.NOT_FUTURE_TIME
+            );
 
         verify(unavailableTimeRepository, never())
-                .save(any());
+            .save(any());
     }
 
     @Test
@@ -259,10 +261,10 @@ class UnavailableTimeServiceTest {
     void registerThrowsExceptionWhenFrontPartOverlaps() {
 
         assertRegisterOverlap(
-                LocalDateTime.of(2026, 9, 22, 10, 0),
-                LocalDateTime.of(2026, 9, 22, 12, 0),
-                LocalDateTime.of(2026, 9, 22, 9, 0),
-                LocalDateTime.of(2026, 9, 22, 11, 0)
+            LocalDateTime.of(2026, 9, 22, 10, 0),
+            LocalDateTime.of(2026, 9, 22, 12, 0),
+            LocalDateTime.of(2026, 9, 22, 9, 0),
+            LocalDateTime.of(2026, 9, 22, 11, 0)
         );
     }
 
@@ -271,10 +273,10 @@ class UnavailableTimeServiceTest {
     void registerThrowsExceptionWhenBackPartOverlaps() {
 
         assertRegisterOverlap(
-                LocalDateTime.of(2026, 9, 22, 10, 0),
-                LocalDateTime.of(2026, 9, 22, 12, 0),
-                LocalDateTime.of(2026, 9, 22, 11, 0),
-                LocalDateTime.of(2026, 9, 22, 13, 0)
+            LocalDateTime.of(2026, 9, 22, 10, 0),
+            LocalDateTime.of(2026, 9, 22, 12, 0),
+            LocalDateTime.of(2026, 9, 22, 11, 0),
+            LocalDateTime.of(2026, 9, 22, 13, 0)
         );
     }
 
@@ -283,10 +285,10 @@ class UnavailableTimeServiceTest {
     void registerThrowsExceptionWhenNewTimeIsInsideExistingTime() {
 
         assertRegisterOverlap(
-                LocalDateTime.of(2026, 9, 22, 10, 0),
-                LocalDateTime.of(2026, 9, 22, 14, 0),
-                LocalDateTime.of(2026, 9, 22, 11, 0),
-                LocalDateTime.of(2026, 9, 22, 12, 0)
+            LocalDateTime.of(2026, 9, 22, 10, 0),
+            LocalDateTime.of(2026, 9, 22, 14, 0),
+            LocalDateTime.of(2026, 9, 22, 11, 0),
+            LocalDateTime.of(2026, 9, 22, 12, 0)
         );
     }
 
@@ -295,10 +297,10 @@ class UnavailableTimeServiceTest {
     void registerThrowsExceptionWhenNewTimeContainsExistingTime() {
 
         assertRegisterOverlap(
-                LocalDateTime.of(2026, 9, 22, 10, 0),
-                LocalDateTime.of(2026, 9, 22, 12, 0),
-                LocalDateTime.of(2026, 9, 22, 9, 0),
-                LocalDateTime.of(2026, 9, 22, 13, 0)
+            LocalDateTime.of(2026, 9, 22, 10, 0),
+            LocalDateTime.of(2026, 9, 22, 12, 0),
+            LocalDateTime.of(2026, 9, 22, 9, 0),
+            LocalDateTime.of(2026, 9, 22, 13, 0)
         );
     }
 
@@ -308,22 +310,22 @@ class UnavailableTimeServiceTest {
 
         // given
         LocalDateTime existingStartAt =
-                LocalDateTime.of(2026, 9, 22, 12, 0);
+            LocalDateTime.of(2026, 9, 22, 12, 0);
 
         LocalDateTime existingEndAt =
-                LocalDateTime.of(2026, 9, 22, 14, 0);
+            LocalDateTime.of(2026, 9, 22, 14, 0);
 
         LocalDateTime newStartAt =
-                LocalDateTime.of(2026, 9, 22, 10, 0);
+            LocalDateTime.of(2026, 9, 22, 10, 0);
 
         LocalDateTime newEndAt =
-                LocalDateTime.of(2026, 9, 22, 12, 0);
+            LocalDateTime.of(2026, 9, 22, 12, 0);
 
         assertRegisterAdjacentSuccess(
-                existingStartAt,
-                existingEndAt,
-                newStartAt,
-                newEndAt
+            existingStartAt,
+            existingEndAt,
+            newStartAt,
+            newEndAt
         );
     }
 
@@ -333,22 +335,22 @@ class UnavailableTimeServiceTest {
 
         // given
         LocalDateTime existingStartAt =
-                LocalDateTime.of(2026, 9, 22, 10, 0);
+            LocalDateTime.of(2026, 9, 22, 10, 0);
 
         LocalDateTime existingEndAt =
-                LocalDateTime.of(2026, 9, 22, 12, 0);
+            LocalDateTime.of(2026, 9, 22, 12, 0);
 
         LocalDateTime newStartAt =
-                LocalDateTime.of(2026, 9, 22, 12, 0);
+            LocalDateTime.of(2026, 9, 22, 12, 0);
 
         LocalDateTime newEndAt =
-                LocalDateTime.of(2026, 9, 22, 14, 0);
+            LocalDateTime.of(2026, 9, 22, 14, 0);
 
         assertRegisterAdjacentSuccess(
-                existingStartAt,
-                existingEndAt,
-                newStartAt,
-                newEndAt
+            existingStartAt,
+            existingEndAt,
+            newStartAt,
+            newEndAt
         );
     }
 
@@ -358,45 +360,45 @@ class UnavailableTimeServiceTest {
 
         // given
         LocalDateTime startAt =
-                LocalDateTime.of(2026, 9, 22, 10, 0);
+            LocalDateTime.of(2026, 9, 22, 10, 0);
 
         LocalDateTime endAt =
-                LocalDateTime.of(2026, 9, 22, 12, 0);
+            LocalDateTime.of(2026, 9, 22, 12, 0);
 
         User user = mockRegisterUser();
 
         when(unavailableTimeRepository.findByUserId(USER_ID))
-                .thenReturn(List.of());
+            .thenReturn(List.of());
 
         when(
-                shiftRepository.existsOverlappingOfficialShift(
-                        USER_ID,
-                        ScheduleStatus.PUBLISHED,
-                        startAt,
-                        endAt,
-                        null
-                )
+            shiftRepository.existsOverlappingOfficialShift(
+                USER_ID,
+                ScheduleStatus.PUBLISHED,
+                startAt,
+                endAt,
+                null
+            )
         ).thenReturn(true);
 
         // when
         BusinessException exception =
-                assertThrows(
-                        BusinessException.class,
-                        () -> unavailableTimeService.register(
-                                startAt,
-                                endAt,
-                                false
-                        )
-                );
+            assertThrows(
+                BusinessException.class,
+                () -> unavailableTimeService.register(
+                    startAt,
+                    endAt,
+                    false
+                )
+            );
 
         // then
         assertThat(exception.getErrorCode())
-                .isEqualTo(
-                        UnavailableTimeErrorCode.OFFICIAL_SHIFT_CONFLICT
-                );
+            .isEqualTo(
+                UnavailableTimeErrorCode.OFFICIAL_SHIFT_CONFLICT
+            );
 
         verify(unavailableTimeRepository, never())
-                .save(any());
+            .save(any());
     }
 
     @Test
@@ -405,36 +407,36 @@ class UnavailableTimeServiceTest {
 
         // given
         LocalDateTime startAt =
-                LocalDateTime.of(2026, 9, 22, 10, 0);
+            LocalDateTime.of(2026, 9, 22, 10, 0);
 
         LocalDateTime endAt =
-                LocalDateTime.of(2026, 9, 22, 12, 0);
+            LocalDateTime.of(2026, 9, 22, 12, 0);
 
         User user = mockRegisterUser();
 
         when(unavailableTimeRepository.findByUserId(USER_ID))
-                .thenReturn(List.of());
+            .thenReturn(List.of());
 
         when(
-                shiftRepository.existsOverlappingOfficialShift(
-                        USER_ID,
-                        ScheduleStatus.PUBLISHED,
-                        startAt,
-                        endAt,
-                        null
-                )
+            shiftRepository.existsOverlappingOfficialShift(
+                USER_ID,
+                ScheduleStatus.PUBLISHED,
+                startAt,
+                endAt,
+                null
+            )
         ).thenReturn(true);
 
         when(unavailableTimeRepository.save(any(UnavailableTime.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+            .thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
         UnavailableTime result =
-                unavailableTimeService.register(
-                        startAt,
-                        endAt,
-                        true
-                );
+            unavailableTimeService.register(
+                startAt,
+                endAt,
+                true
+            );
 
         // then
         assertThat(result.getUser()).isEqualTo(user);
@@ -442,7 +444,7 @@ class UnavailableTimeServiceTest {
         assertThat(result.getEndAt()).isEqualTo(endAt);
 
         verify(unavailableTimeRepository)
-                .save(any(UnavailableTime.class));
+            .save(any(UnavailableTime.class));
     }
 
     // =========================================================
@@ -455,68 +457,68 @@ class UnavailableTimeServiceTest {
 
         // given
         LocalDateTime startAt =
-                LocalDateTime.of(2026, 9, 22, 10, 0);
+            LocalDateTime.of(2026, 9, 22, 10, 0);
 
         LocalDateTime endAt =
-                LocalDateTime.of(2026, 9, 22, 12, 0);
+            LocalDateTime.of(2026, 9, 22, 12, 0);
 
         UnavailableTime unavailableTime =
-                org.mockito.Mockito.mock(UnavailableTime.class);
+            org.mockito.Mockito.mock(UnavailableTime.class);
 
         when(rq.getActorId())
-                .thenReturn(USER_ID);
+            .thenReturn(USER_ID);
 
         when(
-                unavailableTimeRepository
-                        .findByUserIdAndEndAtAfterOrderByStartAtAsc(
-                                USER_ID,
-                                NOW
-                        )
+            unavailableTimeRepository
+                .findByUserIdAndEndAtAfterOrderByStartAtAsc(
+                    USER_ID,
+                    NOW
+                )
         ).thenReturn(List.of(unavailableTime));
 
         when(unavailableTime.getId())
-                .thenReturn(10L);
+            .thenReturn(10L);
 
         when(unavailableTime.getStartAt())
-                .thenReturn(startAt);
+            .thenReturn(startAt);
 
         when(unavailableTime.getEndAt())
-                .thenReturn(endAt);
+            .thenReturn(endAt);
 
         when(
-                shiftRepository.existsOverlappingOfficialShift(
-                        USER_ID,
-                        ScheduleStatus.PUBLISHED,
-                        startAt,
-                        endAt,
-                        null
-                )
+            shiftRepository.existsOverlappingOfficialShift(
+                USER_ID,
+                ScheduleStatus.PUBLISHED,
+                startAt,
+                endAt,
+                null
+            )
         ).thenReturn(false);
 
         // when
         List<UnavailableTimeService.UnavailableTimeResult> result =
-                unavailableTimeService.findAll();
+            unavailableTimeService.findAll();
 
         // then
         assertThat(result).hasSize(1);
 
         assertThat(result.get(0).unavailableTimeId())
-                .isEqualTo(10L);
+            .isEqualTo(10L);
 
         assertThat(result.get(0).startAt())
-                .isEqualTo(startAt);
+            .isEqualTo(startAt);
 
         assertThat(result.get(0).endAt())
-                .isEqualTo(endAt);
+            .isEqualTo(endAt);
 
         assertThat(result.get(0).officialShiftConflict())
-                .isFalse();
+            .isFalse();
 
         verify(unavailableTimeRepository)
-                .findByUserIdAndEndAtAfterOrderByStartAtAsc(
-                        USER_ID,
-                        NOW
-                );
+            .findByUserIdAndEndAtAfterOrderByStartAtAsc(
+                USER_ID,
+                NOW
+            );
     }
 
     @Test
@@ -525,53 +527,53 @@ class UnavailableTimeServiceTest {
 
         // given
         LocalDateTime startAt =
-                LocalDateTime.of(2026, 9, 22, 10, 0);
+            LocalDateTime.of(2026, 9, 22, 10, 0);
 
         LocalDateTime endAt =
-                LocalDateTime.of(2026, 9, 22, 12, 0);
+            LocalDateTime.of(2026, 9, 22, 12, 0);
 
         UnavailableTime unavailableTime =
-                org.mockito.Mockito.mock(UnavailableTime.class);
+            org.mockito.Mockito.mock(UnavailableTime.class);
 
         when(rq.getActorId())
-                .thenReturn(USER_ID);
+            .thenReturn(USER_ID);
 
         when(
-                unavailableTimeRepository
-                        .findByUserIdAndEndAtAfterOrderByStartAtAsc(
-                                USER_ID,
-                                NOW
-                        )
+            unavailableTimeRepository
+                .findByUserIdAndEndAtAfterOrderByStartAtAsc(
+                    USER_ID,
+                    NOW
+                )
         ).thenReturn(List.of(unavailableTime));
 
         when(unavailableTime.getId())
-                .thenReturn(10L);
+            .thenReturn(10L);
 
         when(unavailableTime.getStartAt())
-                .thenReturn(startAt);
+            .thenReturn(startAt);
 
         when(unavailableTime.getEndAt())
-                .thenReturn(endAt);
+            .thenReturn(endAt);
 
         when(
-                shiftRepository.existsOverlappingOfficialShift(
-                        USER_ID,
-                        ScheduleStatus.PUBLISHED,
-                        startAt,
-                        endAt,
-                        null
-                )
+            shiftRepository.existsOverlappingOfficialShift(
+                USER_ID,
+                ScheduleStatus.PUBLISHED,
+                startAt,
+                endAt,
+                null
+            )
         ).thenReturn(true);
 
         // when
         List<UnavailableTimeService.UnavailableTimeResult> result =
-                unavailableTimeService.findAll();
+            unavailableTimeService.findAll();
 
         // then
         assertThat(result).hasSize(1);
 
         assertThat(result.get(0).officialShiftConflict())
-                .isTrue();
+            .isTrue();
     }
 
     @Test
@@ -580,31 +582,31 @@ class UnavailableTimeServiceTest {
 
         // given
         when(rq.getActorId())
-                .thenReturn(USER_ID);
+            .thenReturn(USER_ID);
 
         when(
-                unavailableTimeRepository
-                        .findByUserIdAndEndAtAfterOrderByStartAtAsc(
-                                USER_ID,
-                                NOW
-                        )
+            unavailableTimeRepository
+                .findByUserIdAndEndAtAfterOrderByStartAtAsc(
+                    USER_ID,
+                    NOW
+                )
         ).thenReturn(List.of());
 
         // when
         List<UnavailableTimeService.UnavailableTimeResult> result =
-                unavailableTimeService.findAll();
+            unavailableTimeService.findAll();
 
         // then
         assertThat(result).isEmpty();
 
         verify(shiftRepository, never())
-                .existsOverlappingOfficialShift(
-                        any(),
-                        any(),
-                        any(),
-                        any(),
-                        any()
-                );
+            .existsOverlappingOfficialShift(
+                any(),
+                any(),
+                any(),
+                any(),
+                any()
+            );
     }
 
     // =========================================================
@@ -619,64 +621,64 @@ class UnavailableTimeServiceTest {
         Long unavailableTimeId = 10L;
 
         LocalDateTime oldStartAt =
-                LocalDateTime.of(2026, 9, 22, 10, 0);
+            LocalDateTime.of(2026, 9, 22, 10, 0);
 
         LocalDateTime newStartAt =
-                LocalDateTime.of(2026, 9, 22, 13, 0);
+            LocalDateTime.of(2026, 9, 22, 13, 0);
 
         LocalDateTime newEndAt =
-                LocalDateTime.of(2026, 9, 22, 15, 0);
+            LocalDateTime.of(2026, 9, 22, 15, 0);
 
         User user = mockUser(USER_ID);
 
         UnavailableTime unavailableTime =
-                org.mockito.Mockito.mock(UnavailableTime.class);
+            org.mockito.Mockito.mock(UnavailableTime.class);
 
         when(unavailableTime.getUser())
-                .thenReturn(user);
+            .thenReturn(user);
 
         when(unavailableTime.getStartAt())
-                .thenReturn(oldStartAt);
+            .thenReturn(oldStartAt);
 
         when(unavailableTime.getId())
-                .thenReturn(unavailableTimeId);
+            .thenReturn(unavailableTimeId);
 
         when(rq.getActorId())
-                .thenReturn(USER_ID);
+            .thenReturn(USER_ID);
 
         when(unavailableTimeRepository.findById(unavailableTimeId))
-                .thenReturn(Optional.of(unavailableTime));
+            .thenReturn(Optional.of(unavailableTime));
 
         when(unavailableTimeRepository.findByUserId(USER_ID))
-                .thenReturn(List.of(unavailableTime));
+            .thenReturn(List.of(unavailableTime));
 
         when(
-                shiftRepository.existsOverlappingOfficialShift(
-                        USER_ID,
-                        ScheduleStatus.PUBLISHED,
-                        newStartAt,
-                        newEndAt,
-                        null
-                )
+            shiftRepository.existsOverlappingOfficialShift(
+                USER_ID,
+                ScheduleStatus.PUBLISHED,
+                newStartAt,
+                newEndAt,
+                null
+            )
         ).thenReturn(false);
 
         // when
         UnavailableTime result =
-                unavailableTimeService.update(
-                        unavailableTimeId,
-                        newStartAt,
-                        newEndAt,
-                        false
-                );
+            unavailableTimeService.update(
+                unavailableTimeId,
+                newStartAt,
+                newEndAt,
+                false
+            );
 
         // then
         assertThat(result).isEqualTo(unavailableTime);
 
         verify(unavailableTime)
-                .update(
-                        newStartAt,
-                        newEndAt
-                );
+            .update(
+                newStartAt,
+                newEndAt
+            );
     }
 
     @Test
@@ -687,28 +689,28 @@ class UnavailableTimeServiceTest {
         Long unavailableTimeId = 999L;
 
         when(rq.getActorId())
-                .thenReturn(USER_ID);
+            .thenReturn(USER_ID);
 
         when(unavailableTimeRepository.findById(unavailableTimeId))
-                .thenReturn(Optional.empty());
+            .thenReturn(Optional.empty());
 
         // when
         BusinessException exception =
-                assertThrows(
-                        BusinessException.class,
-                        () -> unavailableTimeService.update(
-                                unavailableTimeId,
-                                NOW.plusHours(1),
-                                NOW.plusHours(2),
-                                false
-                        )
-                );
+            assertThrows(
+                BusinessException.class,
+                () -> unavailableTimeService.update(
+                    unavailableTimeId,
+                    NOW.plusHours(1),
+                    NOW.plusHours(2),
+                    false
+                )
+            );
 
         // then
         assertThat(exception.getErrorCode())
-                .isEqualTo(
-                        UnavailableTimeErrorCode.NOT_FOUND
-                );
+            .isEqualTo(
+                UnavailableTimeErrorCode.NOT_FOUND
+            );
     }
 
     @Test
@@ -721,37 +723,37 @@ class UnavailableTimeServiceTest {
         User otherUser = mockUser(999L);
 
         UnavailableTime unavailableTime =
-                org.mockito.Mockito.mock(UnavailableTime.class);
+            org.mockito.Mockito.mock(UnavailableTime.class);
 
         when(unavailableTime.getUser())
-                .thenReturn(otherUser);
+            .thenReturn(otherUser);
 
         when(rq.getActorId())
-                .thenReturn(USER_ID);
+            .thenReturn(USER_ID);
 
         when(unavailableTimeRepository.findById(unavailableTimeId))
-                .thenReturn(Optional.of(unavailableTime));
+            .thenReturn(Optional.of(unavailableTime));
 
         // when
         BusinessException exception =
-                assertThrows(
-                        BusinessException.class,
-                        () -> unavailableTimeService.update(
-                                unavailableTimeId,
-                                NOW.plusHours(1),
-                                NOW.plusHours(2),
-                                false
-                        )
-                );
+            assertThrows(
+                BusinessException.class,
+                () -> unavailableTimeService.update(
+                    unavailableTimeId,
+                    NOW.plusHours(1),
+                    NOW.plusHours(2),
+                    false
+                )
+            );
 
         // then
         assertThat(exception.getErrorCode())
-                .isEqualTo(
-                        UnavailableTimeErrorCode.FORBIDDEN
-                );
+            .isEqualTo(
+                UnavailableTimeErrorCode.FORBIDDEN
+            );
 
         verify(unavailableTime, never())
-                .update(any(), any());
+            .update(any(), any());
     }
 
     @Test
@@ -764,40 +766,40 @@ class UnavailableTimeServiceTest {
         User user = mockUser(USER_ID);
 
         UnavailableTime unavailableTime =
-                org.mockito.Mockito.mock(UnavailableTime.class);
+            org.mockito.Mockito.mock(UnavailableTime.class);
 
         when(unavailableTime.getUser())
-                .thenReturn(user);
+            .thenReturn(user);
 
         when(unavailableTime.getStartAt())
-                .thenReturn(NOW);
+            .thenReturn(NOW);
 
         when(rq.getActorId())
-                .thenReturn(USER_ID);
+            .thenReturn(USER_ID);
 
         when(unavailableTimeRepository.findById(unavailableTimeId))
-                .thenReturn(Optional.of(unavailableTime));
+            .thenReturn(Optional.of(unavailableTime));
 
         // when
         BusinessException exception =
-                assertThrows(
-                        BusinessException.class,
-                        () -> unavailableTimeService.update(
-                                unavailableTimeId,
-                                NOW.plusHours(1),
-                                NOW.plusHours(2),
-                                false
-                        )
-                );
+            assertThrows(
+                BusinessException.class,
+                () -> unavailableTimeService.update(
+                    unavailableTimeId,
+                    NOW.plusHours(1),
+                    NOW.plusHours(2),
+                    false
+                )
+            );
 
         // then
         assertThat(exception.getErrorCode())
-                .isEqualTo(
-                        UnavailableTimeErrorCode.NOT_MODIFIABLE_TIME
-                );
+            .isEqualTo(
+                UnavailableTimeErrorCode.NOT_MODIFIABLE_TIME
+            );
 
         verify(unavailableTime, never())
-                .update(any(), any());
+            .update(any(), any());
     }
 
     @Test
@@ -810,40 +812,40 @@ class UnavailableTimeServiceTest {
         User user = mockUser(USER_ID);
 
         UnavailableTime unavailableTime =
-                org.mockito.Mockito.mock(UnavailableTime.class);
+            org.mockito.Mockito.mock(UnavailableTime.class);
 
         when(unavailableTime.getUser())
-                .thenReturn(user);
+            .thenReturn(user);
 
         when(unavailableTime.getStartAt())
-                .thenReturn(NOW.minusMinutes(1));
+            .thenReturn(NOW.minusMinutes(1));
 
         when(rq.getActorId())
-                .thenReturn(USER_ID);
+            .thenReturn(USER_ID);
 
         when(unavailableTimeRepository.findById(unavailableTimeId))
-                .thenReturn(Optional.of(unavailableTime));
+            .thenReturn(Optional.of(unavailableTime));
 
         // when
         BusinessException exception =
-                assertThrows(
-                        BusinessException.class,
-                        () -> unavailableTimeService.update(
-                                unavailableTimeId,
-                                NOW.plusHours(1),
-                                NOW.plusHours(2),
-                                false
-                        )
-                );
+            assertThrows(
+                BusinessException.class,
+                () -> unavailableTimeService.update(
+                    unavailableTimeId,
+                    NOW.plusHours(1),
+                    NOW.plusHours(2),
+                    false
+                )
+            );
 
         // then
         assertThat(exception.getErrorCode())
-                .isEqualTo(
-                        UnavailableTimeErrorCode.NOT_MODIFIABLE_TIME
-                );
+            .isEqualTo(
+                UnavailableTimeErrorCode.NOT_MODIFIABLE_TIME
+            );
 
         verify(unavailableTime, never())
-                .update(any(), any());
+            .update(any(), any());
     }
 
     @Test
@@ -854,34 +856,34 @@ class UnavailableTimeServiceTest {
         Long unavailableTimeId = 10L;
 
         LocalDateTime sameTime =
-                NOW.plusHours(2);
+            NOW.plusHours(2);
 
         UnavailableTime unavailableTime =
-                mockOwnedFutureUnavailableTime(
-                        unavailableTimeId,
-                        NOW.plusDays(1)
-                );
+            mockOwnedFutureUnavailableTime(
+                unavailableTimeId,
+                NOW.plusDays(1)
+            );
 
         // when
         BusinessException exception =
-                assertThrows(
-                        BusinessException.class,
-                        () -> unavailableTimeService.update(
-                                unavailableTimeId,
-                                sameTime,
-                                sameTime,
-                                false
-                        )
-                );
+            assertThrows(
+                BusinessException.class,
+                () -> unavailableTimeService.update(
+                    unavailableTimeId,
+                    sameTime,
+                    sameTime,
+                    false
+                )
+            );
 
         // then
         assertThat(exception.getErrorCode())
-                .isEqualTo(
-                        UnavailableTimeErrorCode.INVALID_TIME_RANGE
-                );
+            .isEqualTo(
+                UnavailableTimeErrorCode.INVALID_TIME_RANGE
+            );
 
         verify(unavailableTime, never())
-                .update(any(), any());
+            .update(any(), any());
     }
 
     @Test
@@ -892,31 +894,31 @@ class UnavailableTimeServiceTest {
         Long unavailableTimeId = 10L;
 
         UnavailableTime unavailableTime =
-                mockOwnedFutureUnavailableTime(
-                        unavailableTimeId,
-                        NOW.plusDays(1)
-                );
+            mockOwnedFutureUnavailableTime(
+                unavailableTimeId,
+                NOW.plusDays(1)
+            );
 
         // when
         BusinessException exception =
-                assertThrows(
-                        BusinessException.class,
-                        () -> unavailableTimeService.update(
-                                unavailableTimeId,
-                                NOW.plusHours(3),
-                                NOW.plusHours(2),
-                                false
-                        )
-                );
+            assertThrows(
+                BusinessException.class,
+                () -> unavailableTimeService.update(
+                    unavailableTimeId,
+                    NOW.plusHours(3),
+                    NOW.plusHours(2),
+                    false
+                )
+            );
 
         // then
         assertThat(exception.getErrorCode())
-                .isEqualTo(
-                        UnavailableTimeErrorCode.INVALID_TIME_RANGE
-                );
+            .isEqualTo(
+                UnavailableTimeErrorCode.INVALID_TIME_RANGE
+            );
 
         verify(unavailableTime, never())
-                .update(any(), any());
+            .update(any(), any());
     }
 
     @Test
@@ -927,31 +929,31 @@ class UnavailableTimeServiceTest {
         Long unavailableTimeId = 10L;
 
         UnavailableTime unavailableTime =
-                mockOwnedFutureUnavailableTime(
-                        unavailableTimeId,
-                        NOW.plusDays(1)
-                );
+            mockOwnedFutureUnavailableTime(
+                unavailableTimeId,
+                NOW.plusDays(1)
+            );
 
         // when
         BusinessException exception =
-                assertThrows(
-                        BusinessException.class,
-                        () -> unavailableTimeService.update(
-                                unavailableTimeId,
-                                NOW,
-                                NOW.plusHours(1),
-                                false
-                        )
-                );
+            assertThrows(
+                BusinessException.class,
+                () -> unavailableTimeService.update(
+                    unavailableTimeId,
+                    NOW,
+                    NOW.plusHours(1),
+                    false
+                )
+            );
 
         // then
         assertThat(exception.getErrorCode())
-                .isEqualTo(
-                        UnavailableTimeErrorCode.NOT_FUTURE_TIME
-                );
+            .isEqualTo(
+                UnavailableTimeErrorCode.NOT_FUTURE_TIME
+            );
 
         verify(unavailableTime, never())
-                .update(any(), any());
+            .update(any(), any());
     }
 
     @Test
@@ -962,31 +964,31 @@ class UnavailableTimeServiceTest {
         Long unavailableTimeId = 10L;
 
         UnavailableTime unavailableTime =
-                mockOwnedFutureUnavailableTime(
-                        unavailableTimeId,
-                        NOW.plusDays(1)
-                );
+            mockOwnedFutureUnavailableTime(
+                unavailableTimeId,
+                NOW.plusDays(1)
+            );
 
         // when
         BusinessException exception =
-                assertThrows(
-                        BusinessException.class,
-                        () -> unavailableTimeService.update(
-                                unavailableTimeId,
-                                NOW.minusMinutes(1),
-                                NOW.plusHours(1),
-                                false
-                        )
-                );
+            assertThrows(
+                BusinessException.class,
+                () -> unavailableTimeService.update(
+                    unavailableTimeId,
+                    NOW.minusMinutes(1),
+                    NOW.plusHours(1),
+                    false
+                )
+            );
 
         // then
         assertThat(exception.getErrorCode())
-                .isEqualTo(
-                        UnavailableTimeErrorCode.NOT_FUTURE_TIME
-                );
+            .isEqualTo(
+                UnavailableTimeErrorCode.NOT_FUTURE_TIME
+            );
 
         verify(unavailableTime, never())
-                .update(any(), any());
+            .update(any(), any());
     }
 
     @Test
@@ -997,49 +999,49 @@ class UnavailableTimeServiceTest {
         Long unavailableTimeId = 10L;
 
         LocalDateTime newStartAt =
-                LocalDateTime.of(2026, 9, 22, 11, 0);
+            LocalDateTime.of(2026, 9, 22, 11, 0);
 
         LocalDateTime newEndAt =
-                LocalDateTime.of(2026, 9, 22, 13, 0);
+            LocalDateTime.of(2026, 9, 22, 13, 0);
 
         UnavailableTime unavailableTime =
-                mockOwnedFutureUnavailableTime(
-                        unavailableTimeId,
-                        LocalDateTime.of(
-                                2026, 9, 22, 10, 0
-                        )
-                );
+            mockOwnedFutureUnavailableTime(
+                unavailableTimeId,
+                LocalDateTime.of(
+                    2026, 9, 22, 10, 0
+                )
+            );
 
         when(unavailableTimeRepository.findByUserId(USER_ID))
-                .thenReturn(List.of(unavailableTime));
+            .thenReturn(List.of(unavailableTime));
 
         when(
-                shiftRepository.existsOverlappingOfficialShift(
-                        USER_ID,
-                        ScheduleStatus.PUBLISHED,
-                        newStartAt,
-                        newEndAt,
-                        null
-                )
+            shiftRepository.existsOverlappingOfficialShift(
+                USER_ID,
+                ScheduleStatus.PUBLISHED,
+                newStartAt,
+                newEndAt,
+                null
+            )
         ).thenReturn(false);
 
         // when
         UnavailableTime result =
-                unavailableTimeService.update(
-                        unavailableTimeId,
-                        newStartAt,
-                        newEndAt,
-                        false
-                );
+            unavailableTimeService.update(
+                unavailableTimeId,
+                newStartAt,
+                newEndAt,
+                false
+            );
 
         // then
         assertThat(result).isEqualTo(unavailableTime);
 
         verify(unavailableTime)
-                .update(
-                        newStartAt,
-                        newEndAt
-                );
+            .update(
+                newStartAt,
+                newEndAt
+            );
     }
 
     @Test
@@ -1050,67 +1052,67 @@ class UnavailableTimeServiceTest {
         Long unavailableTimeId = 10L;
 
         LocalDateTime newStartAt =
-                LocalDateTime.of(2026, 9, 22, 11, 0);
+            LocalDateTime.of(2026, 9, 22, 11, 0);
 
         LocalDateTime newEndAt =
-                LocalDateTime.of(2026, 9, 22, 13, 0);
+            LocalDateTime.of(2026, 9, 22, 13, 0);
 
         UnavailableTime target =
-                mockOwnedFutureUnavailableTime(
-                        unavailableTimeId,
-                        LocalDateTime.of(
-                                2026, 9, 23, 10, 0
-                        )
-                );
+            mockOwnedFutureUnavailableTime(
+                unavailableTimeId,
+                LocalDateTime.of(
+                    2026, 9, 23, 10, 0
+                )
+            );
 
         UnavailableTime another =
-                org.mockito.Mockito.mock(UnavailableTime.class);
+            org.mockito.Mockito.mock(UnavailableTime.class);
 
         when(another.getId())
-                .thenReturn(20L);
+            .thenReturn(20L);
 
         when(another.getStartAt())
-                .thenReturn(
-                        LocalDateTime.of(
-                                2026, 9, 22, 10, 0
-                        )
-                );
+            .thenReturn(
+                LocalDateTime.of(
+                    2026, 9, 22, 10, 0
+                )
+            );
 
         when(another.getEndAt())
-                .thenReturn(
-                        LocalDateTime.of(
-                                2026, 9, 22, 12, 0
-                        )
-                );
+            .thenReturn(
+                LocalDateTime.of(
+                    2026, 9, 22, 12, 0
+                )
+            );
 
         when(unavailableTimeRepository.findByUserId(USER_ID))
-                .thenReturn(
-                        List.of(
-                                target,
-                                another
-                        )
-                );
+            .thenReturn(
+                List.of(
+                    target,
+                    another
+                )
+            );
 
         // when
         BusinessException exception =
-                assertThrows(
-                        BusinessException.class,
-                        () -> unavailableTimeService.update(
-                                unavailableTimeId,
-                                newStartAt,
-                                newEndAt,
-                                false
-                        )
-                );
+            assertThrows(
+                BusinessException.class,
+                () -> unavailableTimeService.update(
+                    unavailableTimeId,
+                    newStartAt,
+                    newEndAt,
+                    false
+                )
+            );
 
         // then
         assertThat(exception.getErrorCode())
-                .isEqualTo(
-                        UnavailableTimeErrorCode.TIME_OVERLAP
-                );
+            .isEqualTo(
+                UnavailableTimeErrorCode.TIME_OVERLAP
+            );
 
         verify(target, never())
-                .update(any(), any());
+            .update(any(), any());
     }
 
     @Test
@@ -1121,52 +1123,52 @@ class UnavailableTimeServiceTest {
         Long unavailableTimeId = 10L;
 
         LocalDateTime newStartAt =
-                LocalDateTime.of(2026, 9, 22, 10, 0);
+            LocalDateTime.of(2026, 9, 22, 10, 0);
 
         LocalDateTime newEndAt =
-                LocalDateTime.of(2026, 9, 22, 12, 0);
+            LocalDateTime.of(2026, 9, 22, 12, 0);
 
         UnavailableTime unavailableTime =
-                mockOwnedFutureUnavailableTime(
-                        unavailableTimeId,
-                        LocalDateTime.of(
-                                2026, 9, 23, 10, 0
-                        )
-                );
+            mockOwnedFutureUnavailableTime(
+                unavailableTimeId,
+                LocalDateTime.of(
+                    2026, 9, 23, 10, 0
+                )
+            );
 
         when(unavailableTimeRepository.findByUserId(USER_ID))
-                .thenReturn(List.of(unavailableTime));
+            .thenReturn(List.of(unavailableTime));
 
         when(
-                shiftRepository.existsOverlappingOfficialShift(
-                        USER_ID,
-                        ScheduleStatus.PUBLISHED,
-                        newStartAt,
-                        newEndAt,
-                        null
-                )
+            shiftRepository.existsOverlappingOfficialShift(
+                USER_ID,
+                ScheduleStatus.PUBLISHED,
+                newStartAt,
+                newEndAt,
+                null
+            )
         ).thenReturn(true);
 
         // when
         BusinessException exception =
-                assertThrows(
-                        BusinessException.class,
-                        () -> unavailableTimeService.update(
-                                unavailableTimeId,
-                                newStartAt,
-                                newEndAt,
-                                false
-                        )
-                );
+            assertThrows(
+                BusinessException.class,
+                () -> unavailableTimeService.update(
+                    unavailableTimeId,
+                    newStartAt,
+                    newEndAt,
+                    false
+                )
+            );
 
         // then
         assertThat(exception.getErrorCode())
-                .isEqualTo(
-                        UnavailableTimeErrorCode.OFFICIAL_SHIFT_CONFLICT
-                );
+            .isEqualTo(
+                UnavailableTimeErrorCode.OFFICIAL_SHIFT_CONFLICT
+            );
 
         verify(unavailableTime, never())
-                .update(any(), any());
+            .update(any(), any());
     }
 
     @Test
@@ -1177,49 +1179,49 @@ class UnavailableTimeServiceTest {
         Long unavailableTimeId = 10L;
 
         LocalDateTime newStartAt =
-                LocalDateTime.of(2026, 9, 22, 10, 0);
+            LocalDateTime.of(2026, 9, 22, 10, 0);
 
         LocalDateTime newEndAt =
-                LocalDateTime.of(2026, 9, 22, 12, 0);
+            LocalDateTime.of(2026, 9, 22, 12, 0);
 
         UnavailableTime unavailableTime =
-                mockOwnedFutureUnavailableTime(
-                        unavailableTimeId,
-                        LocalDateTime.of(
-                                2026, 9, 23, 10, 0
-                        )
-                );
+            mockOwnedFutureUnavailableTime(
+                unavailableTimeId,
+                LocalDateTime.of(
+                    2026, 9, 23, 10, 0
+                )
+            );
 
         when(unavailableTimeRepository.findByUserId(USER_ID))
-                .thenReturn(List.of(unavailableTime));
+            .thenReturn(List.of(unavailableTime));
 
         when(
-                shiftRepository.existsOverlappingOfficialShift(
-                        USER_ID,
-                        ScheduleStatus.PUBLISHED,
-                        newStartAt,
-                        newEndAt,
-                        null
-                )
+            shiftRepository.existsOverlappingOfficialShift(
+                USER_ID,
+                ScheduleStatus.PUBLISHED,
+                newStartAt,
+                newEndAt,
+                null
+            )
         ).thenReturn(true);
 
         // when
         UnavailableTime result =
-                unavailableTimeService.update(
-                        unavailableTimeId,
-                        newStartAt,
-                        newEndAt,
-                        true
-                );
+            unavailableTimeService.update(
+                unavailableTimeId,
+                newStartAt,
+                newEndAt,
+                true
+            );
 
         // then
         assertThat(result).isEqualTo(unavailableTime);
 
         verify(unavailableTime)
-                .update(
-                        newStartAt,
-                        newEndAt
-                );
+            .update(
+                newStartAt,
+                newEndAt
+            );
     }
 
     // =========================================================
@@ -1236,23 +1238,23 @@ class UnavailableTimeServiceTest {
         User user = mockUser(USER_ID);
 
         UnavailableTime unavailableTime =
-                org.mockito.Mockito.mock(UnavailableTime.class);
+            org.mockito.Mockito.mock(UnavailableTime.class);
 
         when(unavailableTime.getUser())
-                .thenReturn(user);
+            .thenReturn(user);
 
         when(rq.getActorId())
-                .thenReturn(USER_ID);
+            .thenReturn(USER_ID);
 
         when(unavailableTimeRepository.findById(unavailableTimeId))
-                .thenReturn(Optional.of(unavailableTime));
+            .thenReturn(Optional.of(unavailableTime));
 
         // when
         unavailableTimeService.delete(unavailableTimeId);
 
         // then
         verify(unavailableTimeRepository)
-                .delete(unavailableTime);
+            .delete(unavailableTime);
     }
 
     @Test
@@ -1263,28 +1265,28 @@ class UnavailableTimeServiceTest {
         Long unavailableTimeId = 999L;
 
         when(rq.getActorId())
-                .thenReturn(USER_ID);
+            .thenReturn(USER_ID);
 
         when(unavailableTimeRepository.findById(unavailableTimeId))
-                .thenReturn(Optional.empty());
+            .thenReturn(Optional.empty());
 
         // when
         BusinessException exception =
-                assertThrows(
-                        BusinessException.class,
-                        () -> unavailableTimeService.delete(
-                                unavailableTimeId
-                        )
-                );
+            assertThrows(
+                BusinessException.class,
+                () -> unavailableTimeService.delete(
+                    unavailableTimeId
+                )
+            );
 
         // then
         assertThat(exception.getErrorCode())
-                .isEqualTo(
-                        UnavailableTimeErrorCode.NOT_FOUND
-                );
+            .isEqualTo(
+                UnavailableTimeErrorCode.NOT_FOUND
+            );
 
         verify(unavailableTimeRepository, never())
-                .delete(any());
+            .delete(any());
     }
 
     @Test
@@ -1297,34 +1299,34 @@ class UnavailableTimeServiceTest {
         User otherUser = mockUser(999L);
 
         UnavailableTime unavailableTime =
-                org.mockito.Mockito.mock(UnavailableTime.class);
+            org.mockito.Mockito.mock(UnavailableTime.class);
 
         when(unavailableTime.getUser())
-                .thenReturn(otherUser);
+            .thenReturn(otherUser);
 
         when(rq.getActorId())
-                .thenReturn(USER_ID);
+            .thenReturn(USER_ID);
 
         when(unavailableTimeRepository.findById(unavailableTimeId))
-                .thenReturn(Optional.of(unavailableTime));
+            .thenReturn(Optional.of(unavailableTime));
 
         // when
         BusinessException exception =
-                assertThrows(
-                        BusinessException.class,
-                        () -> unavailableTimeService.delete(
-                                unavailableTimeId
-                        )
-                );
+            assertThrows(
+                BusinessException.class,
+                () -> unavailableTimeService.delete(
+                    unavailableTimeId
+                )
+            );
 
         // then
         assertThat(exception.getErrorCode())
-                .isEqualTo(
-                        UnavailableTimeErrorCode.FORBIDDEN
-                );
+            .isEqualTo(
+                UnavailableTimeErrorCode.FORBIDDEN
+            );
 
         verify(unavailableTimeRepository, never())
-                .delete(any());
+            .delete(any());
     }
 
     @Test
@@ -1337,38 +1339,38 @@ class UnavailableTimeServiceTest {
         User user = mockUser(USER_ID);
 
         UnavailableTime unavailableTime =
-                org.mockito.Mockito.mock(UnavailableTime.class);
+            org.mockito.Mockito.mock(UnavailableTime.class);
 
         when(unavailableTime.getUser())
-                .thenReturn(user);
+            .thenReturn(user);
 
         when(rq.getActorId())
-                .thenReturn(USER_ID);
+            .thenReturn(USER_ID);
 
         when(unavailableTimeRepository.findById(unavailableTimeId))
-                .thenReturn(Optional.of(unavailableTime));
+            .thenReturn(Optional.of(unavailableTime));
 
         // when
         unavailableTimeService.delete(unavailableTimeId);
 
         // then
         verify(unavailableTimeRepository)
-                .delete(unavailableTime);
+            .delete(unavailableTime);
 
         verify(unavailableTime, never())
-                .getStartAt();
+            .getStartAt();
 
         verify(unavailableTime, never())
-                .getEndAt();
+            .getEndAt();
 
         verify(shiftRepository, never())
-                .existsOverlappingOfficialShift(
-                        any(),
-                        any(),
-                        any(),
-                        any(),
-                        any()
-                );
+            .existsOverlappingOfficialShift(
+                any(),
+                any(),
+                any(),
+                any(),
+                any()
+            );
     }
 
     // =========================================================
@@ -1378,13 +1380,13 @@ class UnavailableTimeServiceTest {
     private User mockRegisterUser() {
 
         User user =
-                org.mockito.Mockito.mock(User.class);
+            org.mockito.Mockito.mock(User.class);
 
         when(rq.getActorId())
-                .thenReturn(USER_ID);
+            .thenReturn(USER_ID);
 
         when(userService.getById(USER_ID))
-                .thenReturn(user);
+            .thenReturn(user);
 
         return user;
     }
@@ -1392,128 +1394,128 @@ class UnavailableTimeServiceTest {
     private User mockUser(Long userId) {
 
         User user =
-                org.mockito.Mockito.mock(User.class);
+            org.mockito.Mockito.mock(User.class);
 
         when(user.getId())
-                .thenReturn(userId);
+            .thenReturn(userId);
 
         return user;
     }
 
     private UnavailableTime mockOwnedFutureUnavailableTime(
-            Long unavailableTimeId,
-            LocalDateTime existingStartAt
+        Long unavailableTimeId,
+        LocalDateTime existingStartAt
     ) {
 
         User user = mockUser(USER_ID);
 
         UnavailableTime unavailableTime =
-                org.mockito.Mockito.mock(UnavailableTime.class);
+            org.mockito.Mockito.mock(UnavailableTime.class);
 
         lenient()
-                .when(unavailableTime.getId())
-                .thenReturn(unavailableTimeId);
+            .when(unavailableTime.getId())
+            .thenReturn(unavailableTimeId);
 
         when(unavailableTime.getUser())
-                .thenReturn(user);
+            .thenReturn(user);
 
         when(unavailableTime.getStartAt())
-                .thenReturn(existingStartAt);
+            .thenReturn(existingStartAt);
 
         when(rq.getActorId())
-                .thenReturn(USER_ID);
+            .thenReturn(USER_ID);
 
         when(unavailableTimeRepository.findById(unavailableTimeId))
-                .thenReturn(Optional.of(unavailableTime));
+            .thenReturn(Optional.of(unavailableTime));
 
         return unavailableTime;
     }
 
     private void assertRegisterOverlap(
-            LocalDateTime existingStartAt,
-            LocalDateTime existingEndAt,
-            LocalDateTime newStartAt,
-            LocalDateTime newEndAt
+        LocalDateTime existingStartAt,
+        LocalDateTime existingEndAt,
+        LocalDateTime newStartAt,
+        LocalDateTime newEndAt
     ) {
 
         User user = mockRegisterUser();
 
         UnavailableTime existing =
-                new UnavailableTime(
-                        user,
-                        existingStartAt,
-                        existingEndAt
-                );
+            new UnavailableTime(
+                user,
+                existingStartAt,
+                existingEndAt
+            );
 
         when(unavailableTimeRepository.findByUserId(USER_ID))
-                .thenReturn(List.of(existing));
+            .thenReturn(List.of(existing));
 
         BusinessException exception =
-                assertThrows(
-                        BusinessException.class,
-                        () -> unavailableTimeService.register(
-                                newStartAt,
-                                newEndAt,
-                                false
-                        )
-                );
+            assertThrows(
+                BusinessException.class,
+                () -> unavailableTimeService.register(
+                    newStartAt,
+                    newEndAt,
+                    false
+                )
+            );
 
         assertThat(exception.getErrorCode())
-                .isEqualTo(
-                        UnavailableTimeErrorCode.TIME_OVERLAP
-                );
+            .isEqualTo(
+                UnavailableTimeErrorCode.TIME_OVERLAP
+            );
 
         verify(unavailableTimeRepository, never())
-                .save(any());
+            .save(any());
     }
 
     private void assertRegisterAdjacentSuccess(
-            LocalDateTime existingStartAt,
-            LocalDateTime existingEndAt,
-            LocalDateTime newStartAt,
-            LocalDateTime newEndAt
+        LocalDateTime existingStartAt,
+        LocalDateTime existingEndAt,
+        LocalDateTime newStartAt,
+        LocalDateTime newEndAt
     ) {
 
         User user = mockRegisterUser();
 
         UnavailableTime existing =
-                new UnavailableTime(
-                        user,
-                        existingStartAt,
-                        existingEndAt
-                );
+            new UnavailableTime(
+                user,
+                existingStartAt,
+                existingEndAt
+            );
 
         when(unavailableTimeRepository.findByUserId(USER_ID))
-                .thenReturn(List.of(existing));
+            .thenReturn(List.of(existing));
 
         when(
-                shiftRepository.existsOverlappingOfficialShift(
-                        USER_ID,
-                        ScheduleStatus.PUBLISHED,
-                        newStartAt,
-                        newEndAt,
-                        null
-                )
+            shiftRepository.existsOverlappingOfficialShift(
+                USER_ID,
+                ScheduleStatus.PUBLISHED,
+                newStartAt,
+                newEndAt,
+                null
+            )
         ).thenReturn(false);
 
         when(unavailableTimeRepository.save(any(UnavailableTime.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+            .thenAnswer(invocation -> invocation.getArgument(0));
 
         UnavailableTime result =
-                unavailableTimeService.register(
-                        newStartAt,
-                        newEndAt,
-                        false
-                );
+            unavailableTimeService.register(
+                newStartAt,
+                newEndAt,
+                false
+            );
 
         assertThat(result.getStartAt())
-                .isEqualTo(newStartAt);
+            .isEqualTo(newStartAt);
 
         assertThat(result.getEndAt())
-                .isEqualTo(newEndAt);
+            .isEqualTo(newEndAt);
 
         verify(unavailableTimeRepository)
-                .save(any(UnavailableTime.class));
+            .save(any(UnavailableTime.class));
     }
 
     @Test
@@ -1524,49 +1526,49 @@ class UnavailableTimeServiceTest {
         LocalDateTime endAt = NOW.plusDays(1).withHour(12);
 
         when(rq.getActorId())
-                .thenReturn(USER_ID);
+            .thenReturn(USER_ID);
 
         when(userService.getById(USER_ID))
-                .thenReturn(user);
+            .thenReturn(user);
 
         when(unavailableTimeRepository.findByUserId(USER_ID))
-                .thenReturn(List.of());
+            .thenReturn(List.of());
 
         when(shiftRepository.existsOverlappingOfficialShift(
-                USER_ID,
-                ScheduleStatus.PUBLISHED,
-                startAt,
-                endAt,
-                null
+            USER_ID,
+            ScheduleStatus.PUBLISHED,
+            startAt,
+            endAt,
+            null
         )).thenReturn(true);
 
         // when
         BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> unavailableTimeService.register(
-                        startAt,
-                        endAt,
-                        false
-                )
+            BusinessException.class,
+            () -> unavailableTimeService.register(
+                startAt,
+                endAt,
+                false
+            )
         );
 
         // then
         assertThat(exception.getErrorCode())
-                .isEqualTo(
-                        UnavailableTimeErrorCode.OFFICIAL_SHIFT_CONFLICT
-                );
+            .isEqualTo(
+                UnavailableTimeErrorCode.OFFICIAL_SHIFT_CONFLICT
+            );
 
         assertThat(exception.getData())
-                .isInstanceOf(ConfirmationRequiredResponse.class);
+            .isInstanceOf(ConfirmationRequiredResponse.class);
 
         ConfirmationRequiredResponse data =
-                (ConfirmationRequiredResponse) exception.getData();
+            (ConfirmationRequiredResponse) exception.getData();
 
         assertThat(data.requiresConfirmation())
-                .isTrue();
+            .isTrue();
 
         verify(unavailableTimeRepository, never())
-                .save(any(UnavailableTime.class));
+            .save(any(UnavailableTime.class));
     }
 
     @Test
@@ -1577,42 +1579,42 @@ class UnavailableTimeServiceTest {
         LocalDateTime endAt = NOW.plusDays(1).withHour(12);
 
         when(rq.getActorId())
-                .thenReturn(USER_ID);
+            .thenReturn(USER_ID);
 
         when(userService.getById(USER_ID))
-                .thenReturn(user);
+            .thenReturn(user);
 
         when(unavailableTimeRepository.findByUserId(USER_ID))
-                .thenReturn(List.of());
+            .thenReturn(List.of());
 
         when(shiftRepository.existsOverlappingOfficialShift(
-                USER_ID,
-                ScheduleStatus.PUBLISHED,
-                startAt,
-                endAt,
-                null
+            USER_ID,
+            ScheduleStatus.PUBLISHED,
+            startAt,
+            endAt,
+            null
         )).thenReturn(true);
 
         when(unavailableTimeRepository.save(any(UnavailableTime.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+            .thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
         UnavailableTime result =
-                unavailableTimeService.register(
-                        startAt,
-                        endAt,
-                        true
-                );
+            unavailableTimeService.register(
+                startAt,
+                endAt,
+                true
+            );
 
         // then
         assertThat(result.getStartAt())
-                .isEqualTo(startAt);
+            .isEqualTo(startAt);
 
         assertThat(result.getEndAt())
-                .isEqualTo(endAt);
+            .isEqualTo(endAt);
 
         verify(unavailableTimeRepository)
-                .save(any(UnavailableTime.class));
+            .save(any(UnavailableTime.class));
     }
 
     @Test
@@ -1622,75 +1624,75 @@ class UnavailableTimeServiceTest {
         Long unavailableTimeId = 1L;
 
         LocalDateTime existingStartAt =
-                NOW.plusDays(1).withHour(9);
+            NOW.plusDays(1).withHour(9);
 
         LocalDateTime existingEndAt =
-                NOW.plusDays(1).withHour(11);
+            NOW.plusDays(1).withHour(11);
 
         LocalDateTime newStartAt =
-                NOW.plusDays(2).withHour(10);
+            NOW.plusDays(2).withHour(10);
 
         LocalDateTime newEndAt =
-                NOW.plusDays(2).withHour(12);
+            NOW.plusDays(2).withHour(12);
 
         UnavailableTime unavailableTime =
-                new UnavailableTime(
-                        user,
-                        existingStartAt,
-                        existingEndAt
-                );
+            new UnavailableTime(
+                user,
+                existingStartAt,
+                existingEndAt
+            );
 
         when(user.getId()).thenReturn(USER_ID);
 
         when(rq.getActorId())
-                .thenReturn(USER_ID);
+            .thenReturn(USER_ID);
 
         when(unavailableTimeRepository.findById(unavailableTimeId))
-                .thenReturn(Optional.of(unavailableTime));
+            .thenReturn(Optional.of(unavailableTime));
 
         when(unavailableTimeRepository.findByUserId(USER_ID))
-                .thenReturn(List.of());
+            .thenReturn(List.of());
 
         when(shiftRepository.existsOverlappingOfficialShift(
-                USER_ID,
-                ScheduleStatus.PUBLISHED,
-                newStartAt,
-                newEndAt,
-                null
+            USER_ID,
+            ScheduleStatus.PUBLISHED,
+            newStartAt,
+            newEndAt,
+            null
         )).thenReturn(true);
 
         // when
         BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> unavailableTimeService.update(
-                        unavailableTimeId,
-                        newStartAt,
-                        newEndAt,
-                        false
-                )
+            BusinessException.class,
+            () -> unavailableTimeService.update(
+                unavailableTimeId,
+                newStartAt,
+                newEndAt,
+                false
+            )
         );
 
         // then
         assertThat(exception.getErrorCode())
-                .isEqualTo(
-                        UnavailableTimeErrorCode.OFFICIAL_SHIFT_CONFLICT
-                );
+            .isEqualTo(
+                UnavailableTimeErrorCode.OFFICIAL_SHIFT_CONFLICT
+            );
 
         assertThat(exception.getData())
-                .isInstanceOf(ConfirmationRequiredResponse.class);
+            .isInstanceOf(ConfirmationRequiredResponse.class);
 
         ConfirmationRequiredResponse data =
-                (ConfirmationRequiredResponse) exception.getData();
+            (ConfirmationRequiredResponse) exception.getData();
 
         assertThat(data.requiresConfirmation())
-                .isTrue();
+            .isTrue();
 
         // Warning 때문에 수정되지 않았는지도 확인
         assertThat(unavailableTime.getStartAt())
-                .isEqualTo(existingStartAt);
+            .isEqualTo(existingStartAt);
 
         assertThat(unavailableTime.getEndAt())
-                .isEqualTo(existingEndAt);
+            .isEqualTo(existingEndAt);
     }
 
     @Test
@@ -1700,58 +1702,58 @@ class UnavailableTimeServiceTest {
         Long unavailableTimeId = 1L;
 
         LocalDateTime existingStartAt =
-                NOW.plusDays(1).withHour(9);
+            NOW.plusDays(1).withHour(9);
 
         LocalDateTime existingEndAt =
-                NOW.plusDays(1).withHour(11);
+            NOW.plusDays(1).withHour(11);
 
         LocalDateTime newStartAt =
-                NOW.plusDays(2).withHour(10);
+            NOW.plusDays(2).withHour(10);
 
         LocalDateTime newEndAt =
-                NOW.plusDays(2).withHour(12);
+            NOW.plusDays(2).withHour(12);
 
         UnavailableTime unavailableTime =
-                new UnavailableTime(
-                        user,
-                        existingStartAt,
-                        existingEndAt
-                );
+            new UnavailableTime(
+                user,
+                existingStartAt,
+                existingEndAt
+            );
 
         when(user.getId()).thenReturn(USER_ID);
 
         when(rq.getActorId())
-                .thenReturn(USER_ID);
+            .thenReturn(USER_ID);
 
         when(unavailableTimeRepository.findById(unavailableTimeId))
-                .thenReturn(Optional.of(unavailableTime));
+            .thenReturn(Optional.of(unavailableTime));
 
         when(unavailableTimeRepository.findByUserId(USER_ID))
-                .thenReturn(List.of());
+            .thenReturn(List.of());
 
         when(shiftRepository.existsOverlappingOfficialShift(
-                USER_ID,
-                ScheduleStatus.PUBLISHED,
-                newStartAt,
-                newEndAt,
-                null
+            USER_ID,
+            ScheduleStatus.PUBLISHED,
+            newStartAt,
+            newEndAt,
+            null
         )).thenReturn(true);
 
         // when
         UnavailableTime result =
-                unavailableTimeService.update(
-                        unavailableTimeId,
-                        newStartAt,
-                        newEndAt,
-                        true
-                );
+            unavailableTimeService.update(
+                unavailableTimeId,
+                newStartAt,
+                newEndAt,
+                true
+            );
 
         // then
         assertThat(result.getStartAt())
-                .isEqualTo(newStartAt);
+            .isEqualTo(newStartAt);
 
         assertThat(result.getEndAt())
-                .isEqualTo(newEndAt);
+            .isEqualTo(newEndAt);
     }
 
 }

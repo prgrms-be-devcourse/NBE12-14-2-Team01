@@ -45,7 +45,7 @@ public class UnavailableTimeController {
     @PostMapping
     public ResponseEntity<ApiResponse<UnavailableTimeRegisterResponse>> register(
             @Valid @RequestBody UnavailableTimeRegisterReqBody reqBody
-            ) {
+    ) {
 
         UnavailableTime savedUnavailableTime =
                 unavailableTimeService.register(reqBody.startAt(),
@@ -69,7 +69,7 @@ public class UnavailableTimeController {
     public ResponseEntity<ApiResponse<UnavailableTimeUpdateResponse>> update(
             @PathVariable Long unavailableTimeId,
             @Valid @RequestBody UnavailableTimeUpdateReqBody reqBody
-            ) {
+    ) {
         UnavailableTime unavailableTime =
                 unavailableTimeService.update(
                         unavailableTimeId,
