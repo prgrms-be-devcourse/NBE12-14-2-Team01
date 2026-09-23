@@ -1,11 +1,14 @@
 package com.merge.backend.domain.substitute.controller;
 
+import com.merge.backend.domain.substitute.dto.SentSubstituteRequestResponse;
 import com.merge.backend.domain.substitute.dto.SubstituteRequestCreateResponse;
 import com.merge.backend.domain.substitute.service.SubstituteRequestService;
 import com.merge.backend.global.dto.ApiResponse;
 import com.merge.backend.global.rq.Rq;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -40,6 +43,16 @@ public class SubstituteController {
                 "현재 대타 요청을 보낼 수 있는 후보가 없습니다.",
                 response
             )
+        );
+    }
+
+    @GetMapping("/substitute-requests/sent")
+    public ResponseEntity<ApiResponse<List<SentSubstituteRequestResponse>>> getSentRequests() {
+        List<SentSubstituteRequestResponse> responses =
+            substituteRequestService.getSentRequests(rq.getActorId());
+
+        return ResponseEntity.status(200).body(
+            ApiResponse.success("200", "보낸 대타 요청 목록을 조회했습니다.", responses)
         );
     }
 }
