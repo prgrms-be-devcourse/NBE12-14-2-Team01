@@ -32,6 +32,7 @@ import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import com.merge.backend.domain.workplace.exception.WorkplaceErrorCode;
 import com.merge.backend.domain.workplace.service.WorkplaceMemberService;
+import com.merge.backend.global.dto.ConfirmationRequiredResponse;
 import com.merge.backend.global.exception.BusinessException;
 import java.time.Clock;
 import java.time.DayOfWeek;
@@ -2084,6 +2085,18 @@ class ScheduleServiceTest {
             .isEqualTo(
                 ShiftErrorCode.UNAVAILABLE_TIME_CONFLICT
             );
+
+        assertThat(exception.getData())
+            .isInstanceOf(
+                ConfirmationRequiredResponse.class
+            );
+
+        ConfirmationRequiredResponse data =
+            (ConfirmationRequiredResponse)
+                exception.getData();
+
+        assertThat(data.requiresConfirmation())
+            .isTrue();
 
         verify(scheduleRepository)
             .findByIdForUpdate(
