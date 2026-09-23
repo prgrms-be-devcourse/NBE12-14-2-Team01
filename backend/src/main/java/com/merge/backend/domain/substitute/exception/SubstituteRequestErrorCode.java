@@ -49,6 +49,36 @@ public enum SubstituteRequestErrorCode implements ErrorCode {
         "SUB-008",
         "수락한 후보자를 찾을 수 없습니다."
     ),
+    SHIFT_NOT_FOUND(
+        HttpStatus.NOT_FOUND,
+        "SUB-009",
+        "해당 shift를 찾을 수 없습니다."
+    ),
+    SHIFT_NOT_PUBLISHED(
+        HttpStatus.BAD_REQUEST,
+        "SUB-010",
+        "아직 공개되지 않은 근무입니다."
+    ),
+    NOT_OWN_SHIFT(
+        HttpStatus.FORBIDDEN,
+        "SUB-011",
+        "본인 근무에 대해서만 대체근무 요청을 할 수 있습니다"
+    ),
+    SHIFT_ALREADY_STARTED(
+        HttpStatus.BAD_REQUEST,
+        "SUB-012",
+        "이미 시작된 근무는 대체근무를 요청할 수 없습니다"
+    ),
+    ACTIVE_REQUEST_EXISTS(
+        HttpStatus.CONFLICT,
+        "SUB-013",
+        "이미 진행중인 대체근무 요청이 있습니다"
+    ),
+    SHIFT_CANCELLED(
+        HttpStatus.BAD_REQUEST,
+        "SUB-014",
+        "취소된 근무에는 대체근무를 요청할 수 없습니다"
+    ),
     ACCEPTED_CANDIDATE_NOT_FOUND(
         HttpStatus.NOT_FOUND,
         "SUB-015",
@@ -64,7 +94,7 @@ public enum SubstituteRequestErrorCode implements ErrorCode {
         "SUB-017",
         "이미 종료되었거나 승인된 요청은 종료할 수 없습니다."
     ),
-    SHIFT_ALREADY_STARTED(
+    SHIFT_ALREADY_STARTED_NOT_CLOSE(
         HttpStatus.BAD_REQUEST,
         "SUB-018",
         "근무 시작 이후에는 요청을 종료할 수 없습니다."
