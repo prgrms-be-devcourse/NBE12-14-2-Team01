@@ -3,6 +3,7 @@ package com.merge.backend.global.exception;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.merge.backend.global.dto.ApiResponse;
+import com.merge.backend.global.dto.ConfirmationRequiredResponse;
 import com.merge.backend.global.dto.ValidationErrorResponse;
 import java.lang.reflect.Method;
 import org.junit.jupiter.api.Test;
@@ -31,14 +32,14 @@ class GlobalExceptionHandlerTest {
             );
 
         // when
-        ResponseEntity<ApiResponse<Void>> response =
+        ResponseEntity<ApiResponse<Object>> response =
             handler.handleBusinessException(exception);
 
         // then
         assertThat(response.getStatusCode())
             .isEqualTo(HttpStatus.BAD_REQUEST);
 
-        ApiResponse<Void> body = response.getBody();
+        ApiResponse<Object> body = response.getBody();
 
         assertThat(body).isNotNull();
         assertThat(body.isSuccess()).isFalse();
@@ -46,6 +47,37 @@ class GlobalExceptionHandlerTest {
         assertThat(body.getMessage())
             .isEqualTo("요청 형식이 올바르지 않습니다.");
         assertThat(body.getData()).isNull();
+    }
+
+    @Test
+    void BusinessException의_data를_응답_data로_전달한다() {
+        // given
+        ConfirmationRequiredResponse data =
+            new ConfirmationRequiredResponse(true);
+
+        BusinessException exception =
+            new BusinessException(
+                GlobalErrorCode.INVALID_REQUEST_BODY,
+                data
+            );
+
+        // when
+        ResponseEntity<ApiResponse<Object>> response =
+            handler.handleBusinessException(exception);
+
+        // then
+        assertThat(response.getStatusCode())
+            .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        ApiResponse<Object> body =
+            response.getBody();
+
+        assertThat(body).isNotNull();
+        assertThat(body.isSuccess()).isFalse();
+        assertThat(body.getCode())
+            .isEqualTo("COM-002");
+        assertThat(body.getData())
+            .isEqualTo(data);
     }
 
     @Test

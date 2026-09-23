@@ -3,6 +3,7 @@ package com.merge.backend.domain.substitute.repository;
 import com.merge.backend.domain.substitute.entity.CandidateStatus;
 import com.merge.backend.domain.substitute.entity.SubstituteCandidate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -30,5 +31,19 @@ public interface SubstituteCandidateRepository extends JpaRepository<SubstituteC
         @Param("startAt") LocalDateTime startAt,
         @Param("endAt") LocalDateTime endAt,
         @Param("now") LocalDateTime now
+    );
+
+    // N+1 해결용 - IN 절로 한 번에 조회
+    @Query("""
+        SELECT c
+        FROM SubstituteCandidate c
+        JOIN FETCH c.member m
+        JOIN FETCH m.user
+        WHERE c.request.id IN :requestIds
+          AND c.status = :status
+        """)
+    List<SubstituteCandidate> findByRequestIdInAndStatus(
+        @Param("requestIds") List<Long> requestIds,
+        @Param("status") CandidateStatus status
     );
 }
