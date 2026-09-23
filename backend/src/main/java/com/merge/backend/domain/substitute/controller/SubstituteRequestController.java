@@ -2,6 +2,7 @@ package com.merge.backend.domain.substitute.controller;
 
 import com.merge.backend.domain.substitute.dto.SubstituteRequestListResponse;
 import com.merge.backend.domain.substitute.dto.SubstituteRequestResponse;
+import com.merge.backend.domain.substitute.dto.response.AcceptedPendingSubstituteRequestResponse;
 import com.merge.backend.domain.substitute.dto.response.ReceivedSubstituteRequestResponse;
 import com.merge.backend.domain.substitute.entity.SubstituteRequest;
 import com.merge.backend.domain.substitute.service.SubstituteCandidateService;
@@ -42,6 +43,29 @@ public class SubstituteRequestController {
             ApiResponse.success(
                 "200",
                 "응답 가능한 대타 요청을 조회했습니다.",
+                response
+            )
+        );
+    }
+
+    // SUB-07 - 내가 수락한 승인 대기 대타 요청 조회
+    @GetMapping("/substitute-requests/accepted")
+    public ResponseEntity<ApiResponse<List<AcceptedPendingSubstituteRequestResponse>>>
+        getAcceptedPendingRequests() {
+
+        Long userId = rq.getActorId(); // 현재 로그인한 User ID
+
+        List<AcceptedPendingSubstituteRequestResponse> response =
+            substituteCandidateService
+                .findAcceptedPendingRequests(userId) // 승인 대기 중인 Candidate 조회
+                .stream()
+                .map(AcceptedPendingSubstituteRequestResponse::from) // Entity → DTO 변환
+                .toList();
+
+        return ResponseEntity.ok(
+            ApiResponse.success(
+                "200",
+                "승인 대기 중인 대타 요청을 조회했습니다.",
                 response
             )
         );

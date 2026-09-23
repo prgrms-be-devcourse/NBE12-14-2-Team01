@@ -77,6 +77,18 @@ public class SubstituteCandidateService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public List<SubstituteCandidate> findAcceptedPendingRequests(
+        Long userId // 현재 로그인한 User의 ID
+    ) {
+        LocalDateTime now = LocalDateTime.now(clock); // 현재 서버 시간
+
+        return substituteCandidateRepository.findAcceptedPendingRequests(
+            userId, // 내가 수락한 Candidate인지 확인할 User ID
+            now     // 아직 시작하지 않은 Shift인지 판단할 기준 시간
+        );
+    }
+
     private SubstituteCandidate validateRespondableCandidate(
         Long candidateId, // 응답하려는 대타 후보 ID
         Long userId,      // 현재 로그인한 User ID

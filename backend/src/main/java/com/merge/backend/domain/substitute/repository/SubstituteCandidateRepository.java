@@ -57,6 +57,32 @@ public interface SubstituteCandidateRepository
         @Param("userId") Long userId,
         @Param("now") LocalDateTime now
     );
+    // SUB-07
+    // 현재 로그인 User가 수락했고 MANAGER 승인을 기다리는 대타 요청 조회
+    @EntityGraph(attributePaths = {
+        "request",
+        "request.shift",
+        "request.shift.schedule",
+        "request.shift.schedule.workplace",
+        "request.requesterMember",
+        "request.requesterMember.user"
+    })
+    @Query("""
+    SELECT c
+    FROM SubstituteCandidate c
+    WHERE c.member.user.id = :userId
+      AND c.status = 'ACCEPTED'
+      AND c.request.status = 'ACCEPTED'
+      AND c.request.shift.startAt > :now
+      AND c.request.shift.schedule.status = 'PUBLISHED'
+      AND c.request.shift.status = 'SCHEDULED'
+    ORDER BY c.request.shift.startAt ASC,
+             c.request.id ASC
+        """)
+    List<SubstituteCandidate> findAcceptedPendingRequests(
+        @Param("userId") Long userId,
+        @Param("now") LocalDateTime now
+    );
 
     // SUB-03
     // 현재 Candidate를 제외하고 다른 PENDING Candidate가 남아 있는지 확인
