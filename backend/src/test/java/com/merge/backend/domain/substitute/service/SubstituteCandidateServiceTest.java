@@ -121,6 +121,7 @@ class SubstituteCandidateServiceTest {
             );
     }
 
+
     @Test
     @DisplayName("SUB-03 - 대타 요청을 수락한다")
     void acceptCandidate_Success() {

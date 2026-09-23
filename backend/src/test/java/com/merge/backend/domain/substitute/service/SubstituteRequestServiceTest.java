@@ -127,6 +127,60 @@ class SubstituteRequestServiceTest {
     }
 
     @Test
+    @DisplayName("SUB-01 - 대타 후보가 없으면 Request를 생성하지 않는다")
+    void testCandidateEmpty() {
+        Shift shift = createShift(
+            publishedSchedule(),
+            REQUESTER_USER_ID,
+            futureStartAt(),
+            ShiftStatus.SCHEDULED
+        );
+
+        given(shiftRepository.findById(SHIFT_ID))
+            .willReturn(Optional.of(shift));
+
+        stubClockAsNow();
+
+        given(
+            substituteRequestRepository.existsByShift_IdAndStatusIn(
+                SHIFT_ID,
+                ACTIVE_STATUSES
+            )
+        ).willReturn(false);
+
+        // 대타 후보가 한 명도 없는 상황
+        given(substituteCandidateService.findCandidates(
+            shift.getSchedule().getWorkplace().getId(),
+            shift.getMember().getId(),
+            shift
+        )).willReturn(List.of());
+
+        SubstituteRequestCreateResponse response =
+            substituteRequestService.create(
+                SHIFT_ID,
+                REQUESTER_USER_ID
+            );
+
+        // Request가 생성되지 않았는지 응답값 확인
+        assertThat(response.requestCreated()).isFalse();
+        assertThat(response.requestId()).isNull();
+        assertThat(response.shiftId()).isEqualTo(SHIFT_ID);
+        assertThat(response.status()).isNull();
+        assertThat(response.candidateCount()).isZero();
+
+        // 실제 DB 저장도 호출되면 안 됨
+        verify(substituteRequestRepository, never())
+            .save(any(SubstituteRequest.class));
+
+        // Candidate 생성도 호출되면 안 됨
+        verify(substituteCandidateService, never())
+            .createCandidates(
+                any(SubstituteRequest.class),
+                any()
+            );
+    }
+
+    @Test
     @DisplayName("SUB-01 실패 - 존재하지 않는 Shift")
     void test2() {
         given(shiftRepository.findById(SHIFT_ID)).willReturn(Optional.empty());
