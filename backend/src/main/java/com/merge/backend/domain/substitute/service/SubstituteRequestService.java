@@ -1,5 +1,6 @@
 package com.merge.backend.domain.substitute.service;
 
+import com.merge.backend.domain.shift.entity.Schedule;
 import com.merge.backend.domain.shift.entity.ScheduleStatus;
 import com.merge.backend.domain.shift.entity.Shift;
 import com.merge.backend.domain.shift.entity.ShiftStatus;
@@ -253,5 +254,48 @@ public class SubstituteRequestService {
         if (!shift.getStartAt().isAfter(now)) {
             throw new BusinessException(ShiftErrorCode.INVALID_TIME_VALUE);
         }
+    }
+
+    @Transactional
+    public SubstituteRequest close(Long requestId, Long actorId) {
+        // Request 조회
+        SubstituteRequest request = substituteRequestRepository.findById(requestId)
+            .orElseThrow(() -> new BusinessException(SubstituteRequestErrorCode
+                .SUBSTITUTE_REQUEST_NOT_FOUND));
+
+        Shift shift = request.getShift();
+        Schedule schedule = shift.getSchedule();
+        Workplace workplace = schedule.getWorkplace();
+
+        // 매니저 인가 검증
+        workplaceMemberService.requireManager(actorId, workplace.getId());
+
+        //Request 상태 검증. OPEN 또는 ACCEPTED만 종료 가능
+        if (request.getStatus() != RequestStatus.OPEN
+            && request.getStatus() != RequestStatus.ACCEPTED) {
+            throw new BusinessException(SubstituteRequestErrorCode.ALREADY_TERMINATED);
+        }
+
+        //Schedule/Shift 상태 검증
+        //스케줄 exception문이 ShiftErrorCode인건 스케줄 예외 쪽에 관련 예외가 없기 때문
+        if (schedule.getStatus() != ScheduleStatus.PUBLISHED) {
+            throw new BusinessException(ShiftErrorCode.INVALID_STATUS_VALUE);
+        }
+        if (shift.getStatus() != ShiftStatus.SCHEDULED) {
+            throw new BusinessException(ShiftErrorCode.INVALID_STATUS_VALUE);
+        }
+
+        //Shift 시작 전인지 검증
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (!shift.getStartAt().isAfter(now)) {
+            throw new BusinessException(SubstituteRequestErrorCode.SHIFT_ALREADY_STARTED);
+        }
+
+        //Request 종료 처리 (Shift.member, Candidate 상태는 변경하지 않음)
+        request.closeByManager(now);
+
+        //TODO: 알림 연동
+
+        return request;
     }
 }
