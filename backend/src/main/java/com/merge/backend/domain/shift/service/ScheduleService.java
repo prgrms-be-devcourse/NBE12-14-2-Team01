@@ -16,6 +16,7 @@ import com.merge.backend.domain.shift.repository.UnavailableTimeRepository;
 import com.merge.backend.domain.user.repository.UserRepository;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.service.WorkplaceMemberService;
+import com.merge.backend.global.dto.ConfirmationRequiredResponse;
 import com.merge.backend.global.exception.BusinessException;
 import com.merge.backend.global.util.TimeRangeUtils;
 import java.time.Clock;
@@ -491,7 +492,8 @@ public class ScheduleService {
             && !confirmUnavailableConflict) {
 
             throw new BusinessException(
-                ShiftErrorCode.UNAVAILABLE_TIME_CONFLICT
+                ShiftErrorCode.UNAVAILABLE_TIME_CONFLICT,
+                new ConfirmationRequiredResponse(true)
             );
         }
     }

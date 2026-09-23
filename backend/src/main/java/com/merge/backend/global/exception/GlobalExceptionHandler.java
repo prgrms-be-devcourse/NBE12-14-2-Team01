@@ -18,7 +18,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ApiResponse<Void>>
+    public ResponseEntity<ApiResponse<Object>>
         handleBusinessException(BusinessException e)
     {
         ErrorCode errorCode = e.getErrorCode();
@@ -31,7 +31,8 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(errorCode.getHttpStatus())
             .body(ApiResponse.error(
                 errorCode.getCode(),
-                errorCode.getMessage()
+                errorCode.getMessage(),
+                e.getData()
             ));
     }
 

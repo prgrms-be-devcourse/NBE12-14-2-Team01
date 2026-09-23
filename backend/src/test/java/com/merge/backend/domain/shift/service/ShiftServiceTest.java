@@ -3,6 +3,7 @@ package com.merge.backend.domain.shift.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
@@ -12,8 +13,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import static org.mockito.ArgumentMatchers.any;
 
+import com.merge.backend.domain.shift.dto.ShiftRequest;
 import com.merge.backend.domain.shift.entity.Schedule;
 import com.merge.backend.domain.shift.entity.ScheduleStatus;
 import com.merge.backend.domain.shift.entity.Shift;
@@ -21,12 +22,15 @@ import com.merge.backend.domain.shift.entity.ShiftStatus;
 import com.merge.backend.domain.shift.exception.ShiftErrorCode;
 import com.merge.backend.domain.shift.repository.ScheduleRepository;
 import com.merge.backend.domain.shift.repository.ShiftRepository;
+import com.merge.backend.domain.shift.repository.UnavailableTimeRepository;
 import com.merge.backend.domain.user.entity.User;
 import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.exception.WorkplaceErrorCode;
+import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
 import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import com.merge.backend.domain.workplace.service.WorkplaceMemberService;
+import com.merge.backend.global.dto.ConfirmationRequiredResponse;
 import com.merge.backend.global.exception.BusinessException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -57,6 +61,12 @@ class ShiftServiceTest {
 
     @Mock
     private WorkplaceMemberService workplaceMemberService;
+
+    @Mock
+    private WorkplaceMemberRepository workplaceMemberRepository;
+
+    @Mock
+    private UnavailableTimeRepository unavailableTimeRepository;
 
     @Test
     @DisplayName("SCH-01 - Pattern에서 전달된 정보로 SCHEDULED Shift를 저장한다")
@@ -393,6 +403,256 @@ class ShiftServiceTest {
             .isEqualTo(ShiftErrorCode.INVALID_INPUT_VALUE);
 
         verifyNoInteractions(shiftRepository);
+    }
+
+    @Test
+    @DisplayName("SCH-04 - UnavailableTime 충돌 미확인 시 확인 필요 Warning을 반환한다")
+    void createThrowsWarningWhenUnavailableConflictIsNotConfirmed() {
+        // given
+        Long actorId = 1L;
+        Long workplaceId = 10L;
+        Long scheduleId = 20L;
+        Long memberId = 30L;
+        Long userId = 40L;
+
+        LocalDateTime startAt =
+            LocalDateTime.of(2026, 9, 21, 10, 0);
+        LocalDateTime endAt =
+            LocalDateTime.of(2026, 9, 21, 14, 0);
+
+        ShiftRequest reqBody = mock(ShiftRequest.class);
+        Schedule schedule = mock(Schedule.class);
+        Workplace workplace = mock(Workplace.class);
+        WorkplaceMember member = mock(WorkplaceMember.class);
+        User user = mock(User.class);
+
+        when(reqBody.memberId()).thenReturn(memberId);
+        when(reqBody.startAt()).thenReturn(startAt);
+        when(reqBody.endAt()).thenReturn(endAt);
+        when(reqBody.confirmUnavailableConflict()).thenReturn(false);
+
+        when(scheduleRepository.findById(scheduleId))
+            .thenReturn(Optional.of(schedule));
+        when(schedule.getWorkplace()).thenReturn(workplace);
+        when(schedule.getStatus()).thenReturn(ScheduleStatus.DRAFT);
+        when(schedule.getWeekStartDate())
+            .thenReturn(LocalDate.of(2026, 9, 21));
+
+        when(workplace.getId()).thenReturn(workplaceId);
+
+        when(workplaceMemberRepository.findById(memberId))
+            .thenReturn(Optional.of(member));
+        when(member.getWorkplace()).thenReturn(workplace);
+        when(member.getLeftAt()).thenReturn(null);
+        when(member.getId()).thenReturn(memberId);
+        when(member.getUser()).thenReturn(user);
+        when(user.getId()).thenReturn(userId);
+
+        when(
+            unavailableTimeRepository.existsOverlappingUnavailableTime(
+                userId,
+                startAt,
+                endAt
+            )
+        ).thenReturn(true);
+
+        // when
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> shiftService.create(
+                reqBody,
+                workplaceId,
+                scheduleId,
+                actorId
+            )
+        );
+
+        // then
+        assertThat(exception.getErrorCode())
+            .isEqualTo(ShiftErrorCode.UNAVAILABLE_TIME_CONFLICT);
+
+        assertThat(exception.getData())
+            .isInstanceOf(ConfirmationRequiredResponse.class);
+
+        ConfirmationRequiredResponse data =
+            (ConfirmationRequiredResponse) exception.getData();
+
+        assertThat(data.requiresConfirmation()).isTrue();
+
+        verify(shiftRepository, never())
+            .save(any(Shift.class));
+    }
+
+    @Test
+    @DisplayName("SCH-02 - UnavailableTime 충돌 미확인 시 확인 필요 Warning을 반환한다")
+    void modifyThrowsWarningWhenUnavailableConflictIsNotConfirmed() {
+
+        // given
+        Long actorId = 1L;
+        Long workplaceId = 10L;
+        Long scheduleId = 20L;
+        Long shiftId = 30L;
+        Long memberId = 40L;
+        Long userId = 50L;
+
+        LocalDate weekStartDate =
+            LocalDate.of(
+                2026, 9, 21
+            );
+
+        LocalDateTime startAt =
+            LocalDateTime.of(
+                2026, 9, 21,
+                10, 0
+            );
+
+        LocalDateTime endAt =
+            LocalDateTime.of(
+                2026, 9, 21,
+                14, 0
+            );
+
+        ShiftRequest reqBody =
+            mock(ShiftRequest.class);
+
+        Schedule schedule =
+            mock(Schedule.class);
+
+        Shift shift =
+            mock(Shift.class);
+
+        Workplace workplace =
+            mock(Workplace.class);
+
+        WorkplaceMember member =
+            mock(WorkplaceMember.class);
+
+        User user =
+            mock(User.class);
+
+        when(reqBody.memberId())
+            .thenReturn(memberId);
+
+        when(reqBody.startAt())
+            .thenReturn(startAt);
+
+        when(reqBody.endAt())
+            .thenReturn(endAt);
+
+        when(reqBody.confirmUnavailableConflict())
+            .thenReturn(false);
+
+        // Schedule 검증
+        when(scheduleRepository.findById(scheduleId))
+            .thenReturn(
+                Optional.of(schedule)
+            );
+
+        when(schedule.getWorkplace())
+            .thenReturn(workplace);
+
+        when(workplace.getId())
+            .thenReturn(workplaceId);
+
+        when(schedule.getStatus())
+            .thenReturn(
+                ScheduleStatus.DRAFT
+            );
+
+        when(schedule.getWeekStartDate())
+            .thenReturn(weekStartDate);
+
+        // 수정 대상 Shift 검증
+        when(shiftRepository.findById(shiftId))
+            .thenReturn(
+                Optional.of(shift)
+            );
+
+        when(shift.getSchedule())
+            .thenReturn(schedule);
+
+        when(schedule.getId())
+            .thenReturn(scheduleId);
+
+        when(shift.getId())
+            .thenReturn(shiftId);
+
+        // 변경 후 담당 Member 검증
+        when(workplaceMemberRepository.findById(memberId))
+            .thenReturn(
+                Optional.of(member)
+            );
+
+        when(member.getWorkplace())
+            .thenReturn(workplace);
+
+        when(member.getLeftAt())
+            .thenReturn(null);
+
+        when(member.getId())
+            .thenReturn(memberId);
+
+        when(member.getUser())
+            .thenReturn(user);
+
+        when(user.getId())
+            .thenReturn(userId);
+
+        // UnavailableTime 충돌
+        when(
+            unavailableTimeRepository
+                .existsOverlappingUnavailableTime(
+                    userId,
+                    startAt,
+                    endAt
+                )
+        ).thenReturn(true);
+
+        // when
+        BusinessException exception =
+            assertThrows(
+                BusinessException.class,
+                () -> shiftService.modify(
+                    workplaceId,
+                    scheduleId,
+                    shiftId,
+                    reqBody,
+                    actorId
+                )
+            );
+
+        // then
+        assertThat(exception.getErrorCode())
+            .isEqualTo(
+                ShiftErrorCode.UNAVAILABLE_TIME_CONFLICT
+            );
+
+        assertThat(exception.getData())
+            .isInstanceOf(
+                ConfirmationRequiredResponse.class
+            );
+
+        ConfirmationRequiredResponse data =
+            (ConfirmationRequiredResponse)
+                exception.getData();
+
+        assertThat(data.requiresConfirmation())
+            .isTrue();
+
+        verify(
+            unavailableTimeRepository
+        ).existsOverlappingUnavailableTime(
+            userId,
+            startAt,
+            endAt
+        );
+
+        verify(shift, never())
+            .update(
+                any(),
+                any(),
+                any()
+            );
     }
 
 }
