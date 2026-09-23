@@ -11,6 +11,7 @@ import com.merge.backend.domain.shift.repository.ShiftRepository;
 import com.merge.backend.domain.shift.repository.UnavailableTimeRepository;
 import com.merge.backend.domain.user.entity.User;
 import com.merge.backend.domain.user.service.UserService;
+import com.merge.backend.global.dto.ConfirmationRequiredResponse;
 import com.merge.backend.global.exception.BusinessException;
 import com.merge.backend.global.rq.Rq;
 import com.merge.backend.global.util.TimeRangeUtils;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -77,12 +79,13 @@ public class UnavailableTimeService {
     public UnavailableTime register(LocalDateTime startAt,
                                     LocalDateTime endAt,
                                     Boolean confirmOfficialShiftConflict) {
+        LocalDateTime now = LocalDateTime.now(clock);
 
         Long userId = rq.getActorId();
         User user = userService.getById(userId);
 
         validateTimeRange(startAt, endAt);
-        validateFutureTime(startAt);
+        validateFutureTime(startAt, now);
         validateUnavailableTimeOverlap(userId,
                 null,
                 startAt,
@@ -106,6 +109,7 @@ public class UnavailableTimeService {
                                   LocalDateTime startAt,
                                   LocalDateTime endAt,
                                   Boolean confirmOfficialShiftConflict) {
+        LocalDateTime now = LocalDateTime.now(clock);
 
         Long userId = rq.getActorId();
 
@@ -116,12 +120,12 @@ public class UnavailableTimeService {
         );
 
         validateOwner(userId, unavailableTime);
-        validateExistingFutureTime(unavailableTime);
+        validateExistingFutureTime(unavailableTime, now);
         validateTimeRange(
                 startAt,
                 endAt
         );
-        validateFutureTime(startAt);
+        validateFutureTime(startAt, now);
         validateUnavailableTimeOverlap(
                 userId,
                 unavailableTimeId,
@@ -175,9 +179,10 @@ public class UnavailableTimeService {
 
     //새로운 시작 시간이 미래인지
     private void validateFutureTime(
-            LocalDateTime startAt
+            LocalDateTime startAt,
+            LocalDateTime now
     ) {
-        if(!startAt.isAfter(LocalDateTime.now(clock))) {
+        if(!startAt.isAfter(now)) {
             throw new BusinessException(
                     UnavailableTimeErrorCode.NOT_FUTURE_TIME
             );
@@ -186,10 +191,11 @@ public class UnavailableTimeService {
 
     //기존 일정 자체가 아직 시작 전인지
     private void validateExistingFutureTime(
-            UnavailableTime unavailableTime
+            UnavailableTime unavailableTime,
+            LocalDateTime now
     ) {
         if(!unavailableTime.getStartAt()
-                .isAfter(LocalDateTime.now(clock))) {
+                .isAfter(now)) {
             throw new BusinessException(
                     UnavailableTimeErrorCode.NOT_MODIFIABLE_TIME
             );
@@ -258,7 +264,8 @@ public class UnavailableTimeService {
                 confirmOfficialShiftConflict
         )) {
             throw new BusinessException(
-                    UnavailableTimeErrorCode.OFFICIAL_SHIFT_CONFLICT
+                    UnavailableTimeErrorCode.OFFICIAL_SHIFT_CONFLICT,
+                    new ConfirmationRequiredResponse(true)
             );
         }
     }

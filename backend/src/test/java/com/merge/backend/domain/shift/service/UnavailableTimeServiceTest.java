@@ -15,6 +15,7 @@ import com.merge.backend.domain.shift.repository.ShiftRepository;
 import com.merge.backend.domain.shift.repository.UnavailableTimeRepository;
 import com.merge.backend.domain.user.entity.User;
 import com.merge.backend.domain.user.service.UserService;
+import com.merge.backend.global.dto.ConfirmationRequiredResponse;
 import com.merge.backend.global.exception.BusinessException;
 import com.merge.backend.global.rq.Rq;
 import java.time.Clock;
@@ -33,6 +34,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class UnavailableTimeServiceTest {
+
+    @Mock
+    private User user;
 
     @Mock
     private UnavailableTimeRepository unavailableTimeRepository;
@@ -1511,4 +1515,243 @@ class UnavailableTimeServiceTest {
         verify(unavailableTimeRepository)
                 .save(any(UnavailableTime.class));
     }
+
+    @Test
+    @DisplayName("UNA-01: 공식 Shift와 충돌하고 확인하지 않으면 Warning 예외가 발생한다")
+    void register_officialShiftConflict_withoutConfirmation_throwsWarning() {
+        // given
+        LocalDateTime startAt = NOW.plusDays(1).withHour(10);
+        LocalDateTime endAt = NOW.plusDays(1).withHour(12);
+
+        when(rq.getActorId())
+                .thenReturn(USER_ID);
+
+        when(userService.getById(USER_ID))
+                .thenReturn(user);
+
+        when(unavailableTimeRepository.findByUserId(USER_ID))
+                .thenReturn(List.of());
+
+        when(shiftRepository.existsOverlappingOfficialShift(
+                USER_ID,
+                ScheduleStatus.PUBLISHED,
+                startAt,
+                endAt,
+                null
+        )).thenReturn(true);
+
+        // when
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> unavailableTimeService.register(
+                        startAt,
+                        endAt,
+                        false
+                )
+        );
+
+        // then
+        assertThat(exception.getErrorCode())
+                .isEqualTo(
+                        UnavailableTimeErrorCode.OFFICIAL_SHIFT_CONFLICT
+                );
+
+        assertThat(exception.getData())
+                .isInstanceOf(ConfirmationRequiredResponse.class);
+
+        ConfirmationRequiredResponse data =
+                (ConfirmationRequiredResponse) exception.getData();
+
+        assertThat(data.requiresConfirmation())
+                .isTrue();
+
+        verify(unavailableTimeRepository, never())
+                .save(any(UnavailableTime.class));
+    }
+
+    @Test
+    @DisplayName("UNA-01: 공식 Shift와 충돌해도 사용자가 확인하면 등록할 수 있다")
+    void register_officialShiftConflict_withConfirmation_success() {
+        // given
+        LocalDateTime startAt = NOW.plusDays(1).withHour(10);
+        LocalDateTime endAt = NOW.plusDays(1).withHour(12);
+
+        when(rq.getActorId())
+                .thenReturn(USER_ID);
+
+        when(userService.getById(USER_ID))
+                .thenReturn(user);
+
+        when(unavailableTimeRepository.findByUserId(USER_ID))
+                .thenReturn(List.of());
+
+        when(shiftRepository.existsOverlappingOfficialShift(
+                USER_ID,
+                ScheduleStatus.PUBLISHED,
+                startAt,
+                endAt,
+                null
+        )).thenReturn(true);
+
+        when(unavailableTimeRepository.save(any(UnavailableTime.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        UnavailableTime result =
+                unavailableTimeService.register(
+                        startAt,
+                        endAt,
+                        true
+                );
+
+        // then
+        assertThat(result.getStartAt())
+                .isEqualTo(startAt);
+
+        assertThat(result.getEndAt())
+                .isEqualTo(endAt);
+
+        verify(unavailableTimeRepository)
+                .save(any(UnavailableTime.class));
+    }
+
+    @Test
+    @DisplayName("UNA-03: 수정 시간이 공식 Shift와 충돌하고 확인하지 않으면 Warning 예외가 발생한다")
+    void update_officialShiftConflict_withoutConfirmation_throwsWarning() {
+        // given
+        Long unavailableTimeId = 1L;
+
+        LocalDateTime existingStartAt =
+                NOW.plusDays(1).withHour(9);
+
+        LocalDateTime existingEndAt =
+                NOW.plusDays(1).withHour(11);
+
+        LocalDateTime newStartAt =
+                NOW.plusDays(2).withHour(10);
+
+        LocalDateTime newEndAt =
+                NOW.plusDays(2).withHour(12);
+
+        UnavailableTime unavailableTime =
+                new UnavailableTime(
+                        user,
+                        existingStartAt,
+                        existingEndAt
+                );
+
+        when(user.getId()).thenReturn(USER_ID);
+
+        when(rq.getActorId())
+                .thenReturn(USER_ID);
+
+        when(unavailableTimeRepository.findById(unavailableTimeId))
+                .thenReturn(Optional.of(unavailableTime));
+
+        when(unavailableTimeRepository.findByUserId(USER_ID))
+                .thenReturn(List.of());
+
+        when(shiftRepository.existsOverlappingOfficialShift(
+                USER_ID,
+                ScheduleStatus.PUBLISHED,
+                newStartAt,
+                newEndAt,
+                null
+        )).thenReturn(true);
+
+        // when
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> unavailableTimeService.update(
+                        unavailableTimeId,
+                        newStartAt,
+                        newEndAt,
+                        false
+                )
+        );
+
+        // then
+        assertThat(exception.getErrorCode())
+                .isEqualTo(
+                        UnavailableTimeErrorCode.OFFICIAL_SHIFT_CONFLICT
+                );
+
+        assertThat(exception.getData())
+                .isInstanceOf(ConfirmationRequiredResponse.class);
+
+        ConfirmationRequiredResponse data =
+                (ConfirmationRequiredResponse) exception.getData();
+
+        assertThat(data.requiresConfirmation())
+                .isTrue();
+
+        // Warning 때문에 수정되지 않았는지도 확인
+        assertThat(unavailableTime.getStartAt())
+                .isEqualTo(existingStartAt);
+
+        assertThat(unavailableTime.getEndAt())
+                .isEqualTo(existingEndAt);
+    }
+
+    @Test
+    @DisplayName("UNA-03: 수정 시간이 공식 Shift와 충돌해도 사용자가 확인하면 수정할 수 있다")
+    void update_officialShiftConflict_withConfirmation_success() {
+        // given
+        Long unavailableTimeId = 1L;
+
+        LocalDateTime existingStartAt =
+                NOW.plusDays(1).withHour(9);
+
+        LocalDateTime existingEndAt =
+                NOW.plusDays(1).withHour(11);
+
+        LocalDateTime newStartAt =
+                NOW.plusDays(2).withHour(10);
+
+        LocalDateTime newEndAt =
+                NOW.plusDays(2).withHour(12);
+
+        UnavailableTime unavailableTime =
+                new UnavailableTime(
+                        user,
+                        existingStartAt,
+                        existingEndAt
+                );
+
+        when(user.getId()).thenReturn(USER_ID);
+
+        when(rq.getActorId())
+                .thenReturn(USER_ID);
+
+        when(unavailableTimeRepository.findById(unavailableTimeId))
+                .thenReturn(Optional.of(unavailableTime));
+
+        when(unavailableTimeRepository.findByUserId(USER_ID))
+                .thenReturn(List.of());
+
+        when(shiftRepository.existsOverlappingOfficialShift(
+                USER_ID,
+                ScheduleStatus.PUBLISHED,
+                newStartAt,
+                newEndAt,
+                null
+        )).thenReturn(true);
+
+        // when
+        UnavailableTime result =
+                unavailableTimeService.update(
+                        unavailableTimeId,
+                        newStartAt,
+                        newEndAt,
+                        true
+                );
+
+        // then
+        assertThat(result.getStartAt())
+                .isEqualTo(newStartAt);
+
+        assertThat(result.getEndAt())
+                .isEqualTo(newEndAt);
+    }
+
 }
