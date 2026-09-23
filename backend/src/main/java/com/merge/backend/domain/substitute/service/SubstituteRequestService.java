@@ -7,6 +7,7 @@ import com.merge.backend.domain.shift.exception.ScheduleErrorCode;
 import com.merge.backend.domain.shift.exception.ShiftErrorCode;
 import com.merge.backend.domain.shift.repository.ShiftRepository;
 import com.merge.backend.domain.shift.repository.UnavailableTimeRepository;
+import com.merge.backend.domain.substitute.dto.SentSubstituteRequestResponse;
 import com.merge.backend.domain.substitute.dto.SubstituteRequestCreateResponse;
 import com.merge.backend.domain.substitute.entity.CandidateStatus;
 import com.merge.backend.domain.substitute.entity.RequestStatus;
@@ -56,6 +57,20 @@ public class SubstituteRequestService {
             request.getStatus(), 0);
     }
 
+    @Transactional(readOnly = true)
+    public List<SentSubstituteRequestResponse> getSentRequests(Long actorUserId) {
+        LocalDateTime now = LocalDateTime.now(clock);
+
+        List<SubstituteRequest> requests =
+            substituteRequestRepository.findAllByRequesterMember_User_IdOrderByCreateDateDesc(
+                actorUserId);
+
+        return requests.stream()
+            .map(request -> SentSubstituteRequestResponse.from(request, now))
+            .toList();
+    }
+
+
     private Shift validateSubstituteRequest(Long shiftId, Long actorUserId) {
         Shift shift = shiftRepository.findById(shiftId)
             .orElseThrow(() -> new
@@ -93,7 +108,7 @@ public class SubstituteRequestService {
                 new BusinessException(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND));
 
         //request == ACCEPTED 여부 검사
-        if(request.getStatus() != RequestStatus.ACCEPTED) {
+        if (request.getStatus() != RequestStatus.ACCEPTED) {
             throw new BusinessException(SubstituteRequestErrorCode.INVALID_REQUEST);
         }
         //근무지 ID 뽑아오기
@@ -102,11 +117,11 @@ public class SubstituteRequestService {
         workplaceMemberService.requireManager(actorId, workplaceId);
 
         //요청의 스케줄이 공개되지 않았을 때
-        if(request.getShift().getSchedule().getStatus() != ScheduleStatus.PUBLISHED) {
+        if (request.getShift().getSchedule().getStatus() != ScheduleStatus.PUBLISHED) {
             throw new BusinessException(ScheduleErrorCode.NOT_PUBLISHED);
         }
         //요청의 근무가 취소되었다면
-        if(request.getShift().getStatus() != ShiftStatus.SCHEDULED) {
+        if (request.getShift().getStatus() != ShiftStatus.SCHEDULED) {
             throw new BusinessException(ShiftErrorCode.IS_CANCELED_SHIFT);
         }
         //현재 Shift.member != Request.requesterMember
@@ -120,7 +135,7 @@ public class SubstituteRequestService {
                 new BusinessException(WorkplaceErrorCode.WORKPLACE_NOT_FOUND));
 
         SubstituteCandidate candidate = substituteCandidateRepository.findByRequestIdAndStatus(
-            requestId, CandidateStatus.ACCEPTED)
+                requestId, CandidateStatus.ACCEPTED)
             .orElseThrow(() ->
                 new BusinessException(SubstituteRequestErrorCode.NOT_FOUND_CANDIDATE));
 
@@ -138,7 +153,7 @@ public class SubstituteRequestService {
             request.getShift().getStartAt(), // 시작 시간
             request.getShift().getEndAt()// 종료 시간
         );
-        if(hasConflictingShift){
+        if (hasConflictingShift) {
             throw new BusinessException(SubstituteRequestErrorCode.CONFLICT_SHIFT);
         }
         //현재를 기준으로 대체 근무 시작 시간이 지나거나 같다면 (now >= startAt)
@@ -146,18 +161,18 @@ public class SubstituteRequestService {
         validateNotStarted(request.getShift(), validationNow);
 
         //불가능 시간과 중복되는지
-        if(unavailableTimeRepository.existsOverlappingUnavailableTime(
+        if (unavailableTimeRepository.existsOverlappingUnavailableTime(
             candidate.getMember().getUser().getId(),
             request.getShift().getStartAt(),
             request.getShift().getEndAt()
-        )){
+        )) {
             throw new BusinessException(SubstituteRequestErrorCode.CONFLICT_UNAVAILABLE_TIME);
         }
         //이전에 다른 대체 근무를 수락했다면, 그것과 중복되는지
-        if(substituteCandidateRepository.existsConflictingActiveSubstitute(
+        if (substituteCandidateRepository.existsConflictingActiveSubstitute(
             candidate.getMember().getUser().getId(), requestId,
             request.getShift().getStartAt(), request.getShift().getEndAt(), validationNow)
-        ){
+        ) {
             throw new BusinessException(SubstituteRequestErrorCode.CONFLICT_ACTIVE_SUBSTITUTE);
         }
         //승인 전 시간 재확인
@@ -165,12 +180,13 @@ public class SubstituteRequestService {
         validateNotStarted(request.getShift(), approvedAt);
 
         //최종 승인 시작
-        request.approveRequest(candidate.getMember(),approvedAt);
+        request.approveRequest(candidate.getMember(), approvedAt);
 
         ///todo: 요청자와 수락자에게 알림 주기
 
         return request;
     }
+
     private void validateNotStarted(Shift shift, LocalDateTime now) {
         if (!shift.getStartAt().isAfter(now)) {
             throw new BusinessException(ShiftErrorCode.INVALID_TIME_VALUE);
