@@ -277,9 +277,8 @@ public class SubstituteRequestService {
         }
 
         //Schedule/Shift 상태 검증
-        //스케줄 exception문이 ShiftErrorCode인건 스케줄 예외 쪽에 관련 예외가 없기 때문
         if (schedule.getStatus() != ScheduleStatus.PUBLISHED) {
-            throw new BusinessException(ShiftErrorCode.INVALID_STATUS_VALUE);
+            throw new BusinessException(ScheduleErrorCode.NOT_PUBLISHED);
         }
         if (shift.getStatus() != ShiftStatus.SCHEDULED) {
             throw new BusinessException(ShiftErrorCode.INVALID_STATUS_VALUE);
