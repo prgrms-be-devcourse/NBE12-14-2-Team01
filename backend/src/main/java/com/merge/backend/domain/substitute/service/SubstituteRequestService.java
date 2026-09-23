@@ -15,7 +15,6 @@ import com.merge.backend.domain.substitute.entity.CandidateStatus;
 import com.merge.backend.domain.substitute.entity.RequestStatus;
 import com.merge.backend.domain.substitute.entity.SubstituteCandidate;
 import com.merge.backend.domain.substitute.entity.SubstituteRequest;
-import com.merge.backend.domain.substitute.exception.SubstituteErrorCode;
 import com.merge.backend.domain.substitute.exception.SubstituteRequestErrorCode;
 import com.merge.backend.domain.substitute.repository.SubstituteCandidateRepository;
 import com.merge.backend.domain.substitute.repository.SubstituteRequestRepository;
@@ -81,27 +80,27 @@ public class SubstituteRequestService {
     private Shift validateSubstituteRequest(Long shiftId, Long actorUserId) {
         Shift shift = shiftRepository.findById(shiftId)
             .orElseThrow(() -> new
-                BusinessException(SubstituteErrorCode.SHIFT_NOT_FOUND));
+                BusinessException(SubstituteRequestErrorCode.SHIFT_NOT_FOUND));
 
         if (shift.getSchedule().getStatus() != ScheduleStatus.PUBLISHED) {
-            throw new BusinessException(SubstituteErrorCode.SHIFT_NOT_PUBLISHED);
+            throw new BusinessException(SubstituteRequestErrorCode.SHIFT_NOT_PUBLISHED);
         }
 
         if (shift.getStatus() != ShiftStatus.SCHEDULED) {
-            throw new BusinessException(SubstituteErrorCode.SHIFT_CANCELLED);
+            throw new BusinessException(SubstituteRequestErrorCode.SHIFT_CANCELLED);
         }
 
         if (!shift.getMember().getUser().getId().equals(actorUserId)) {
-            throw new BusinessException(SubstituteErrorCode.NOT_OWN_SHIFT);
+            throw new BusinessException(SubstituteRequestErrorCode.NOT_OWN_SHIFT);
         }
 
         if (!shift.getStartAt().isAfter(LocalDateTime.now(clock))) {
-            throw new BusinessException(SubstituteErrorCode.SHIFT_ALREADY_STARTED);
+            throw new BusinessException(SubstituteRequestErrorCode.SHIFT_ALREADY_STARTED);
         }
 
         if (substituteRequestRepository.existsByShift_IdAndStatusIn(
             shiftId, List.of(RequestStatus.OPEN, RequestStatus.ACCEPTED))) {
-            throw new BusinessException(SubstituteErrorCode.ACTIVE_REQUEST_EXISTS);
+            throw new BusinessException(SubstituteRequestErrorCode.ACTIVE_REQUEST_EXISTS);
         }
         return shift;
     }
@@ -303,7 +302,7 @@ public class SubstituteRequestService {
         //Shift 시작 전인지 검증
         LocalDateTime now = LocalDateTime.now(clock);
         if (!shift.getStartAt().isAfter(now)) {
-            throw new BusinessException(SubstituteRequestErrorCode.SHIFT_ALREADY_STARTED);
+            throw new BusinessException(SubstituteRequestErrorCode.SHIFT_ALREADY_STARTED_NOT_CLOSE);
         }
 
         //Request 종료 처리 (Shift.member, Candidate 상태는 변경하지 않음)
