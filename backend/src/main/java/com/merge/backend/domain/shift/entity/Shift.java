@@ -10,7 +10,6 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import java.time.LocalDateTime;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -61,5 +60,9 @@ public class Shift extends BaseEntity {
         this.endAt = endAt;
 
         return this;
+    }
+    //SubstituteRequest에서 넘어옴
+    public void changeMember(WorkplaceMember member) {
+        this.member = member;
     }
 }

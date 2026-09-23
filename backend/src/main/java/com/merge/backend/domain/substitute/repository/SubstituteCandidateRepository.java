@@ -4,14 +4,18 @@ import com.merge.backend.domain.substitute.entity.CandidateStatus;
 import com.merge.backend.domain.substitute.entity.SubstituteCandidate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface SubstituteCandidateRepository extends JpaRepository<SubstituteCandidate, Long> {
+public interface SubstituteCandidateRepository
+    extends JpaRepository<SubstituteCandidate, Long> {
 
-    @Query(""" 
+    // SUB-01 / SUB-03
+    // 이미 수락한 다른 활성 대타 근무와 시간이 겹치는지 확인
+    @Query("""
         SELECT COUNT(c) > 0
         FROM SubstituteCandidate c
         WHERE c.member.user.id = :userId
@@ -26,13 +30,15 @@ public interface SubstituteCandidateRepository extends JpaRepository<SubstituteC
         @Param("endAt") LocalDateTime endAt
     );
 
+    // SUB-02
+    // 현재 로그인 User에게 온 응답 가능한 대타 요청 조회
     @EntityGraph(attributePaths = {
-        "request",                          // 대타 요청 자체
-        "request.shift",                    // 대타가 필요한 근무
-        "request.shift.schedule",           // 그 근무가 속한 근무표
-        "request.shift.schedule.workplace", // 어느 근무지인지
-        "request.requesterMember",          // 대타를 요청한 멤버
-        "request.requesterMember.user"      // 요청한 사람의 이름 등 User 정보
+        "request",
+        "request.shift",
+        "request.shift.schedule",
+        "request.shift.schedule.workplace",
+        "request.requesterMember",
+        "request.requesterMember.user"
     })
     @Query("""
         SELECT c
@@ -44,17 +50,60 @@ public interface SubstituteCandidateRepository extends JpaRepository<SubstituteC
           AND c.request.shift.startAt > :now
           AND c.request.shift.schedule.status = 'PUBLISHED'
           AND c.request.shift.status = 'SCHEDULED'
-              ORDER BY c.request.shift.startAt ASC,
-                  c.request.id ASC
+        ORDER BY c.request.shift.startAt ASC,
+                 c.request.id ASC
         """)
     List<SubstituteCandidate> findReceivedRequests(
-        @Param("userId") Long userId,   // 현재 로그인한 사용자
-        @Param("now") LocalDateTime now // 현재 시간
+        @Param("userId") Long userId,
+        @Param("now") LocalDateTime now
     );
 
+    // SUB-03
+    // 현재 Candidate를 제외하고 다른 PENDING Candidate가 남아 있는지 확인
     boolean existsByRequest_IdAndStatusAndIdNot(
         Long requestId,
         CandidateStatus status,
         Long candidateId
+    );
+
+    // 특정 Request에 대해 상태가 ACCEPTED인 Candidate 단건 조회
+    Optional<SubstituteCandidate> findByRequestIdAndStatus(
+        Long requestId,
+        CandidateStatus status
+    );
+
+    // 후보자가 다른 대체 요청에서 이미 수락한 활성 대타 약속 중,
+    // 동시간대 겹침이 있는지 확인
+    @Query("""
+        select count(c) > 0
+        from SubstituteCandidate c
+        where c.member.user.id = :userId
+            and c.request.id <> :requestId
+            and c.status = CandidateStatus.ACCEPTED
+            and c.request.status = RequestStatus.ACCEPTED
+            and c.request.shift.startAt < :endAt
+            and c.request.shift.endAt > :startAt
+            and c.request.shift.startAt > :now
+        """)
+    boolean existsConflictingActiveSubstitute(
+        @Param("userId") Long userId,
+        @Param("requestId") Long requestId,
+        @Param("startAt") LocalDateTime startAt,
+        @Param("endAt") LocalDateTime endAt,
+        @Param("now") LocalDateTime now
+    );
+
+    // N+1 해결용 - IN 절로 한 번에 조회
+    @Query("""
+        SELECT c
+        FROM SubstituteCandidate c
+        JOIN FETCH c.member m
+        JOIN FETCH m.user
+        WHERE c.request.id IN :requestIds
+          AND c.status = :status
+        """)
+    List<SubstituteCandidate> findByRequestIdInAndStatus(
+        @Param("requestIds") List<Long> requestIds,
+        @Param("status") CandidateStatus status
     );
 }

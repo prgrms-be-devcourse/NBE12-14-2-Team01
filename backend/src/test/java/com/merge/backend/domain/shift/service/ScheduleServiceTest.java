@@ -3,8 +3,9 @@ package com.merge.backend.domain.shift.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -25,11 +26,13 @@ import com.merge.backend.domain.shift.repository.ScheduleRepository;
 import com.merge.backend.domain.shift.repository.ShiftRepository;
 import com.merge.backend.domain.shift.repository.UnavailableTimeRepository;
 import com.merge.backend.domain.user.entity.User;
+import com.merge.backend.domain.user.repository.UserRepository;
 import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import com.merge.backend.domain.workplace.exception.WorkplaceErrorCode;
 import com.merge.backend.domain.workplace.service.WorkplaceMemberService;
+import com.merge.backend.global.dto.ConfirmationRequiredResponse;
 import com.merge.backend.global.exception.BusinessException;
 import java.time.Clock;
 import java.time.DayOfWeek;
@@ -43,6 +46,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -58,6 +62,9 @@ class ScheduleServiceTest {
 
     @Mock
     private ShiftRepository shiftRepository;
+
+    @Mock
+    private UserRepository userRepository;
 
     @Mock
     private ShiftService shiftService;
@@ -902,7 +909,15 @@ class ScheduleServiceTest {
             mock(User.class);
 
         when(
-            scheduleRepository.findById(
+            userRepository.findByIdForUpdate(
+                userId
+            )
+        ).thenReturn(
+            Optional.of(user)
+        );
+
+        when(
+            scheduleRepository.findByIdForUpdate(
                 scheduleId
             )
         ).thenReturn(
@@ -999,6 +1014,12 @@ class ScheduleServiceTest {
         assertThat(result.publishedAt())
             .isEqualTo(publishedAt);
 
+        verify(scheduleRepository)
+            .findByIdForUpdate(scheduleId);
+
+        verify(userRepository)
+            .findByIdForUpdate(userId);
+
         verify(schedule)
             .publish(publishedAt);
     }
@@ -1019,7 +1040,7 @@ class ScheduleServiceTest {
             mock(Workplace.class);
 
         when(
-            scheduleRepository.findById(
+            scheduleRepository.findByIdForUpdate(
                 scheduleId
             )
         ).thenReturn(
@@ -1062,13 +1083,17 @@ class ScheduleServiceTest {
             );
 
         verify(scheduleRepository)
-            .findById(
+            .findByIdForUpdate(
                 scheduleId
             );
 
+        verify(schedule, never())
+            .publish(any());
+
         verifyNoInteractions(
             shiftRepository,
-            unavailableTimeRepository
+            unavailableTimeRepository,
+            clock
         );
     }
 
@@ -1088,7 +1113,7 @@ class ScheduleServiceTest {
             mock(Workplace.class);
 
         when(
-            scheduleRepository.findById(
+            scheduleRepository.findByIdForUpdate(
                 scheduleId
             )
         ).thenReturn(
@@ -1143,7 +1168,7 @@ class ScheduleServiceTest {
             );
 
         verify(scheduleRepository)
-            .findById(
+            .findByIdForUpdate(
                 scheduleId
             );
 
@@ -1152,7 +1177,11 @@ class ScheduleServiceTest {
                 scheduleId
             );
 
+        verify(schedule, never())
+            .publish(any());
+
         verifyNoInteractions(
+            userRepository,
             unavailableTimeRepository,
             clock
         );
@@ -1180,7 +1209,7 @@ class ScheduleServiceTest {
             mock(WorkplaceMember.class);
 
         when(
-            scheduleRepository.findById(
+            scheduleRepository.findByIdForUpdate(
                 scheduleId
             )
         ).thenReturn(
@@ -1242,7 +1271,21 @@ class ScheduleServiceTest {
                 ScheduleErrorCode.INVALID_SHIFT_MEMBER
             );
 
+        verify(scheduleRepository)
+            .findByIdForUpdate(
+                scheduleId
+            );
+
+        verify(shiftRepository)
+            .findBySchedule_IdOrderByStartAtAscIdAsc(
+                scheduleId
+            );
+
+        verify(schedule, never())
+            .publish(any());
+
         verifyNoInteractions(
+            userRepository,
             unavailableTimeRepository,
             clock
         );
@@ -1274,7 +1317,7 @@ class ScheduleServiceTest {
             mock(WorkplaceMember.class);
 
         when(
-            scheduleRepository.findById(
+            scheduleRepository.findByIdForUpdate(
                 scheduleId
             )
         ).thenReturn(
@@ -1331,7 +1374,27 @@ class ScheduleServiceTest {
                 ScheduleErrorCode.INVALID_SHIFT_MEMBER
             );
 
+        verify(workplaceMemberService)
+            .requireManager(
+                actorUserId,
+                workplaceId
+            );
+
+        verify(scheduleRepository)
+            .findByIdForUpdate(
+                scheduleId
+            );
+
+        verify(shiftRepository)
+            .findBySchedule_IdOrderByStartAtAscIdAsc(
+                scheduleId
+            );
+
+        verify(schedule, never())
+            .publish(any());
+
         verifyNoInteractions(
+            userRepository,
             unavailableTimeRepository,
             clock
         );
@@ -1365,7 +1428,7 @@ class ScheduleServiceTest {
             mock(WorkplaceMember.class);
 
         when(
-            scheduleRepository.findById(
+            scheduleRepository.findByIdForUpdate(
                 scheduleId
             )
         ).thenReturn(
@@ -1428,7 +1491,21 @@ class ScheduleServiceTest {
                 ScheduleErrorCode.INVALID_SHIFT_TIME
             );
 
+        verify(scheduleRepository)
+            .findByIdForUpdate(
+                scheduleId
+            );
+
+        verify(shiftRepository)
+            .findBySchedule_IdOrderByStartAtAscIdAsc(
+                scheduleId
+            );
+
+        verify(schedule, never())
+            .publish(any());
+
         verifyNoInteractions(
+            userRepository,
             unavailableTimeRepository,
             clock
         );
@@ -1473,7 +1550,7 @@ class ScheduleServiceTest {
             mock(WorkplaceMember.class);
 
         when(
-            scheduleRepository.findById(
+            scheduleRepository.findByIdForUpdate(
                 scheduleId
             )
         ).thenReturn(
@@ -1539,7 +1616,21 @@ class ScheduleServiceTest {
                 ScheduleErrorCode.INVALID_SHIFT_WEEK
             );
 
+        verify(scheduleRepository)
+            .findByIdForUpdate(
+                scheduleId
+            );
+
+        verify(shiftRepository)
+            .findBySchedule_IdOrderByStartAtAscIdAsc(
+                scheduleId
+            );
+
+        verify(schedule, never())
+            .publish(any());
+
         verifyNoInteractions(
+            userRepository,
             unavailableTimeRepository,
             clock
         );
@@ -1600,7 +1691,7 @@ class ScheduleServiceTest {
             mock(WorkplaceMember.class);
 
         when(
-            scheduleRepository.findById(
+            scheduleRepository.findByIdForUpdate(
                 scheduleId
             )
         ).thenReturn(
@@ -1681,7 +1772,21 @@ class ScheduleServiceTest {
                 ScheduleErrorCode.SHIFT_OVERLAP
             );
 
+        verify(scheduleRepository)
+            .findByIdForUpdate(
+                scheduleId
+            );
+
+        verify(shiftRepository)
+            .findBySchedule_IdOrderByStartAtAscIdAsc(
+                scheduleId
+            );
+
+        verify(schedule, never())
+            .publish(any());
+
         verifyNoInteractions(
+            userRepository,
             unavailableTimeRepository,
             clock
         );
@@ -1730,7 +1835,7 @@ class ScheduleServiceTest {
             mock(User.class);
 
         when(
-            scheduleRepository.findById(
+            scheduleRepository.findByIdForUpdate(
                 scheduleId
             )
         ).thenReturn(
@@ -1778,6 +1883,14 @@ class ScheduleServiceTest {
         when(user.getId())
             .thenReturn(userId);
 
+        when(
+            userRepository.findByIdForUpdate(
+                userId
+            )
+        ).thenReturn(
+            Optional.of(user)
+        );
+
         when(shift.getStartAt())
             .thenReturn(startAt);
 
@@ -1807,10 +1920,24 @@ class ScheduleServiceTest {
                 )
             );
 
-        // then
         assertThat(exception.getErrorCode())
             .isEqualTo(
                 ScheduleErrorCode.OFFICIAL_SHIFT_CONFLICT
+            );
+
+        verify(scheduleRepository)
+            .findByIdForUpdate(
+                scheduleId
+            );
+
+        verify(shiftRepository)
+            .findBySchedule_IdOrderByStartAtAscIdAsc(
+                scheduleId
+            );
+
+        verify(userRepository)
+            .findByIdForUpdate(
+                userId
             );
 
         verify(shiftRepository)
@@ -1821,6 +1948,9 @@ class ScheduleServiceTest {
                 endAt,
                 null
             );
+
+        verify(schedule, never())
+            .publish(any());
 
         verifyNoInteractions(
             unavailableTimeRepository,
@@ -1868,8 +1998,13 @@ class ScheduleServiceTest {
         User user =
             mock(User.class);
 
-        when(scheduleRepository.findById(scheduleId))
-            .thenReturn(Optional.of(schedule));
+        when(
+            scheduleRepository.findByIdForUpdate(
+                scheduleId
+            )
+        ).thenReturn(
+            Optional.of(schedule)
+        );
 
         when(schedule.getId())
             .thenReturn(scheduleId);
@@ -1917,6 +2052,14 @@ class ScheduleServiceTest {
             .thenReturn(userId);
 
         when(
+            userRepository.findByIdForUpdate(
+                userId
+            )
+        ).thenReturn(
+            Optional.of(user)
+        );
+
+        when(
             unavailableTimeRepository
                 .existsOverlappingUnavailableTime(
                     userId,
@@ -1942,6 +2085,47 @@ class ScheduleServiceTest {
             .isEqualTo(
                 ShiftErrorCode.UNAVAILABLE_TIME_CONFLICT
             );
+
+        assertThat(exception.getData())
+            .isInstanceOf(
+                ConfirmationRequiredResponse.class
+            );
+
+        ConfirmationRequiredResponse data =
+            (ConfirmationRequiredResponse)
+                exception.getData();
+
+        assertThat(data.requiresConfirmation())
+            .isTrue();
+
+        verify(scheduleRepository)
+            .findByIdForUpdate(
+                scheduleId
+            );
+
+        verify(userRepository)
+            .findByIdForUpdate(
+                userId
+            );
+
+        verify(shiftRepository)
+            .existsOverlappingOfficialShift(
+                userId,
+                ScheduleStatus.PUBLISHED,
+                startAt,
+                endAt,
+                null
+            );
+
+        verify(unavailableTimeRepository)
+            .existsOverlappingUnavailableTime(
+                userId,
+                startAt,
+                endAt
+            );
+
+        verify(schedule, never())
+            .publish(any());
 
         verifyNoInteractions(clock);
     }
@@ -1992,11 +2176,16 @@ class ScheduleServiceTest {
         User user =
             mock(User.class);
 
-        when(scheduleRepository.findById(scheduleId))
-            .thenReturn(Optional.of(schedule));
-
         when(schedule.getId())
             .thenReturn(scheduleId);
+
+        when(
+            scheduleRepository.findByIdForUpdate(
+                scheduleId
+            )
+        ).thenReturn(
+            Optional.of(schedule)
+        );
 
         when(schedule.getWorkplace())
             .thenReturn(workplace);
@@ -2047,6 +2236,14 @@ class ScheduleServiceTest {
             .thenReturn(userId);
 
         when(
+            userRepository.findByIdForUpdate(
+                userId
+            )
+        ).thenReturn(
+            Optional.of(user)
+        );
+
+        when(
             unavailableTimeRepository
                 .existsOverlappingUnavailableTime(
                     userId,
@@ -2084,6 +2281,32 @@ class ScheduleServiceTest {
 
         assertThat(result.publishedAt())
             .isEqualTo(publishedAt);
+
+        verify(scheduleRepository)
+            .findByIdForUpdate(
+                scheduleId
+            );
+
+        verify(userRepository)
+            .findByIdForUpdate(
+                userId
+            );
+
+        verify(shiftRepository)
+            .existsOverlappingOfficialShift(
+                userId,
+                ScheduleStatus.PUBLISHED,
+                startAt,
+                endAt,
+                null
+            );
+
+        verify(unavailableTimeRepository)
+            .existsOverlappingUnavailableTime(
+                userId,
+                startAt,
+                endAt
+            );
 
         verify(schedule)
             .publish(publishedAt);
@@ -2131,10 +2354,13 @@ class ScheduleServiceTest {
         User user =
             mock(User.class);
 
-        when(scheduleRepository.findById(scheduleId))
-            .thenReturn(
-                Optional.of(schedule)
-            );
+        when(
+            scheduleRepository.findByIdForUpdate(
+                scheduleId
+            )
+        ).thenReturn(
+            Optional.of(schedule)
+        );
 
         when(schedule.getWorkplace())
             .thenReturn(workplace);
@@ -2184,6 +2410,14 @@ class ScheduleServiceTest {
             .thenReturn(userId);
 
         when(
+            userRepository.findByIdForUpdate(
+                userId
+            )
+        ).thenReturn(
+            Optional.of(user)
+        );
+
+        when(
             shiftRepository.existsOverlappingOfficialShift(
                 userId,
                 ScheduleStatus.PUBLISHED,
@@ -2211,6 +2445,30 @@ class ScheduleServiceTest {
                 ScheduleErrorCode.OFFICIAL_SHIFT_CONFLICT
             );
 
+        verify(scheduleRepository)
+            .findByIdForUpdate(
+                scheduleId
+            );
+
+        verify(shiftRepository)
+            .findBySchedule_IdOrderByStartAtAscIdAsc(
+                scheduleId
+            );
+
+        verify(userRepository)
+            .findByIdForUpdate(
+                userId
+            );
+
+        verify(shiftRepository)
+            .existsOverlappingOfficialShift(
+                userId,
+                ScheduleStatus.PUBLISHED,
+                startAt,
+                endAt,
+                null
+            );
+
         verify(schedule, never())
             .publish(any());
 
@@ -2218,6 +2476,304 @@ class ScheduleServiceTest {
             unavailableTimeRepository,
             clock
         );
+    }
+
+    @Test
+    @DisplayName("SCH-06 - Shift 담당 User는 중복 없이 ID 오름차순으로 Lock한다")
+    void publishScheduleLocksShiftUsersInAscendingOrderWithoutDuplicates() {
+
+        // given
+        Long actorUserId = 1L;
+        Long workplaceId = 10L;
+        Long scheduleId = 20L;
+
+        LocalDate weekStartDate =
+            LocalDate.of(
+                2026, 9, 21
+            );
+
+        LocalDateTime publishedAt =
+            LocalDateTime.of(
+                2026, 9, 19,
+                18, 30
+            );
+
+        Schedule schedule =
+            mock(Schedule.class);
+
+        Workplace workplace =
+            mock(Workplace.class);
+
+        User user30 =
+            mock(User.class);
+
+        User user10 =
+            mock(User.class);
+
+        User user20 =
+            mock(User.class);
+
+        WorkplaceMember member30 =
+            mock(WorkplaceMember.class);
+
+        WorkplaceMember member10 =
+            mock(WorkplaceMember.class);
+
+        WorkplaceMember member20 =
+            mock(WorkplaceMember.class);
+
+        Shift firstShift =
+            mock(Shift.class);
+
+        Shift secondShift =
+            mock(Shift.class);
+
+        Shift thirdShift =
+            mock(Shift.class);
+
+        Shift fourthShift =
+            mock(Shift.class);
+
+        LocalDateTime firstStartAt =
+            LocalDateTime.of(
+                2026, 9, 21,
+                9, 0
+            );
+
+        LocalDateTime firstEndAt =
+            LocalDateTime.of(
+                2026, 9, 21,
+                10, 0
+            );
+
+        LocalDateTime secondStartAt =
+            LocalDateTime.of(
+                2026, 9, 21,
+                10, 0
+            );
+
+        LocalDateTime secondEndAt =
+            LocalDateTime.of(
+                2026, 9, 21,
+                11, 0
+            );
+
+        LocalDateTime thirdStartAt =
+            LocalDateTime.of(
+                2026, 9, 21,
+                11, 0
+            );
+
+        LocalDateTime thirdEndAt =
+            LocalDateTime.of(
+                2026, 9, 21,
+                12, 0
+            );
+
+        LocalDateTime fourthStartAt =
+            LocalDateTime.of(
+                2026, 9, 21,
+                12, 0
+            );
+
+        LocalDateTime fourthEndAt =
+            LocalDateTime.of(
+                2026, 9, 21,
+                13, 0
+            );
+
+        when(
+            scheduleRepository.findByIdForUpdate(
+                scheduleId
+            )
+        ).thenReturn(
+            Optional.of(schedule)
+        );
+
+        when(schedule.getId())
+            .thenReturn(scheduleId);
+
+        when(schedule.getWorkplace())
+            .thenReturn(workplace);
+
+        when(workplace.getId())
+            .thenReturn(workplaceId);
+
+        when(schedule.getStatus())
+            .thenReturn(
+                ScheduleStatus.DRAFT,
+                ScheduleStatus.PUBLISHED
+            );
+
+        when(schedule.getWeekStartDate())
+            .thenReturn(weekStartDate);
+
+        when(schedule.getPublishedAt())
+            .thenReturn(publishedAt);
+
+        when(user30.getId())
+            .thenReturn(30L);
+
+        when(user10.getId())
+            .thenReturn(10L);
+
+        when(user20.getId())
+            .thenReturn(20L);
+
+        when(member30.getId())
+            .thenReturn(300L);
+
+        when(member10.getId())
+            .thenReturn(100L);
+
+        when(member20.getId())
+            .thenReturn(200L);
+
+        when(member30.getWorkplace())
+            .thenReturn(workplace);
+
+        when(member10.getWorkplace())
+            .thenReturn(workplace);
+
+        when(member20.getWorkplace())
+            .thenReturn(workplace);
+
+        when(member30.getLeftAt())
+            .thenReturn(null);
+
+        when(member10.getLeftAt())
+            .thenReturn(null);
+
+        when(member20.getLeftAt())
+            .thenReturn(null);
+
+        when(member30.getUser())
+            .thenReturn(user30);
+
+        when(member10.getUser())
+            .thenReturn(user10);
+
+        when(member20.getUser())
+            .thenReturn(user20);
+
+        /*
+         * Shift에 연결된 User 순서는 일부러
+         *
+         * 30 → 10 → 30 → 20
+         *
+         * 으로 만든다.
+         */
+        when(firstShift.getMember())
+            .thenReturn(member30);
+
+        when(secondShift.getMember())
+            .thenReturn(member10);
+
+        when(thirdShift.getMember())
+            .thenReturn(member30);
+
+        when(fourthShift.getMember())
+            .thenReturn(member20);
+
+        when(firstShift.getStartAt())
+            .thenReturn(firstStartAt);
+
+        when(firstShift.getEndAt())
+            .thenReturn(firstEndAt);
+
+        when(secondShift.getStartAt())
+            .thenReturn(secondStartAt);
+
+        when(secondShift.getEndAt())
+            .thenReturn(secondEndAt);
+
+        when(thirdShift.getStartAt())
+            .thenReturn(thirdStartAt);
+
+        when(thirdShift.getEndAt())
+            .thenReturn(thirdEndAt);
+
+        when(fourthShift.getStartAt())
+            .thenReturn(fourthStartAt);
+
+        when(fourthShift.getEndAt())
+            .thenReturn(fourthEndAt);
+
+        when(
+            shiftRepository
+                .findBySchedule_IdOrderByStartAtAscIdAsc(
+                    scheduleId
+                )
+        ).thenReturn(
+            List.of(
+                firstShift,
+                secondShift,
+                thirdShift,
+                fourthShift
+            )
+        );
+
+        when(
+            userRepository.findByIdForUpdate(
+                10L
+            )
+        ).thenReturn(
+            Optional.of(user10)
+        );
+
+        when(
+            userRepository.findByIdForUpdate(
+                20L
+            )
+        ).thenReturn(
+            Optional.of(user20)
+        );
+
+        when(
+            userRepository.findByIdForUpdate(
+                30L
+            )
+        ).thenReturn(
+            Optional.of(user30)
+        );
+
+        when(clock.instant())
+            .thenReturn(
+                Instant.parse(
+                    "2026-09-19T09:30:00Z"
+                )
+            );
+
+        when(clock.getZone())
+            .thenReturn(
+                ZoneId.of("Asia/Seoul")
+            );
+
+        // when
+        scheduleService.publishSchedule(
+            actorUserId,
+            workplaceId,
+            scheduleId,
+            false
+        );
+
+        // then
+        InOrder userLockOrder =
+            inOrder(userRepository);
+
+        userLockOrder.verify(userRepository)
+            .findByIdForUpdate(10L);
+
+        userLockOrder.verify(userRepository)
+            .findByIdForUpdate(20L);
+
+        userLockOrder.verify(userRepository)
+            .findByIdForUpdate(30L);
+
+        userLockOrder.verifyNoMoreInteractions();
+
+        verify(schedule)
+            .publish(publishedAt);
     }
 
 }

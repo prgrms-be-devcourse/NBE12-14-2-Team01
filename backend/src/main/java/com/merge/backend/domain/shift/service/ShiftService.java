@@ -16,6 +16,7 @@ import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
 import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import com.merge.backend.domain.workplace.service.WorkplaceMemberService;
+import com.merge.backend.global.dto.ConfirmationRequiredResponse;
 import com.merge.backend.global.exception.BusinessException;
 import com.merge.backend.global.util.TimeRangeUtils;
 import java.time.DayOfWeek;
@@ -57,21 +58,22 @@ public class ShiftService {
                 new BusinessException(ShiftErrorCode.NOT_FOUND_SHIFT_ERROR));
 
         //조회할 근무가 PUBLISHED 되지 않았다면
-        if(shift.getSchedule().getStatus() != ScheduleStatus.PUBLISHED) {
+        if (shift.getSchedule().getStatus() != ScheduleStatus.PUBLISHED) {
             throw new BusinessException(ShiftErrorCode.NOT_PUBLISHED_SHIFT);
         }
         //취소된 근무를 조회하려 할 시
-        if(shift.getStatus() != ShiftStatus.SCHEDULED) {
+        if (shift.getStatus() != ShiftStatus.SCHEDULED) {
             throw new BusinessException(ShiftErrorCode.IS_CANCELED_SHIFT);
         }
 
         Long shiftUserId = shift.getMember().getUser().getId();
 
-        if(!shiftUserId.equals(currentUserId)){
+        if (!shiftUserId.equals(currentUserId)) {
             throw new BusinessException(ShiftErrorCode.FORBIDDEN_ACCESS);
         }
         return shift;
     }
+
     @Transactional
     public Shift create(ShiftRequest reqBody, Long workplaceId, Long scheduleId, Long actorId) {
 
@@ -90,7 +92,7 @@ public class ShiftService {
         validShiftTime(reqBody, schedule, member, scheduleId, userId, null);
 
         //불가능 시간 관련 예외 처리
-        validconfirmUnavailableConflict(reqBody, userId);
+        validateUnavailableConflictConfirmation(reqBody, userId);
 
         return saveShift(
             schedule,
@@ -102,10 +104,9 @@ public class ShiftService {
 
     /**
      * SCH-01 전용 Pattern 기반 초기 Shift 생성.
-     *
-     * ScheduleService에서 관리자 권한과 주차를 검증하고,
-     * 현재 구성원의 Pattern을 해당 주차의 날짜·시간으로 변환한 뒤 호출한다.
-     * 편집용 충돌 검증은 적용하지 않으며, 공개 시 SCH-06에서 최종 검증한다.
+     * <p>
+     * ScheduleService에서 관리자 권한과 주차를 검증하고, 현재 구성원의 Pattern을 해당 주차의 날짜·시간으로 변환한 뒤 호출한다. 편집용 충돌 검증은
+     * 적용하지 않으며, 공개 시 SCH-06에서 최종 검증한다.
      */
     @Transactional
     public Shift createFromValidatedPattern(
@@ -165,7 +166,7 @@ public class ShiftService {
         validShiftTime(reqBody, schedule, member, scheduleId, userId, shift.getId());
 
         //불가능 시간 관련 예외 처리
-        validconfirmUnavailableConflict(reqBody, userId);
+        validateUnavailableConflictConfirmation(reqBody, userId);
 
         return shift.update(
             member,
@@ -202,27 +203,29 @@ public class ShiftService {
                     ShiftErrorCode.NOT_FOUND_SCHEDULE_ERROR)
             );
         //스케줄이 해당 workplace 소속인지 확인
-        if(!schedule.getWorkplace().getId().equals(workplaceId)) {
+        if (!schedule.getWorkplace().getId().equals(workplaceId)) {
             throw new BusinessException(ShiftErrorCode.INVALID_WORKPLACE_VALUE);
         }
         //스케줄이 DRAFT인지 확인
-        if(schedule.getStatus() != ScheduleStatus.DRAFT) {
+        if (schedule.getStatus() != ScheduleStatus.DRAFT) {
             throw new BusinessException(ShiftErrorCode.INVALID_STATUS_VALUE);
         }
         return schedule;
     }
-    private Shift validShift(Long scheduleId, Long shiftId){
+
+    private Shift validShift(Long scheduleId, Long shiftId) {
         //shift 존재 확인
         Shift shift = shiftRepository.findById(shiftId)
             .orElseThrow(() -> new BusinessException(ShiftErrorCode.NOT_FOUND_ERROR)
             );
         //shift가 해당 schedule 소속인지
-        if(!shift.getSchedule().getId().equals(scheduleId)) {
+        if (!shift.getSchedule().getId().equals(scheduleId)) {
             throw new BusinessException(ShiftErrorCode.INVALID_SHIFT_VALUE);
         }
         return shift;
     }
-    private WorkplaceMember validWorkplaceMember(Long workplaceId, ShiftRequest reqBody){
+
+    private WorkplaceMember validWorkplaceMember(Long workplaceId, ShiftRequest reqBody) {
         //WorkplaceMember 존재 확인
         WorkplaceMember member = workplaceMemberRepository.findById(reqBody.memberId())
             .orElseThrow(() ->
@@ -231,16 +234,17 @@ public class ShiftService {
                 )
             );
         //member가 현 workplace의 일원인지 체크 && 퇴사하지 않았는지
-        if(!member.getWorkplace().getId().equals(workplaceId) || member.getLeftAt() != null) {
+        if (!member.getWorkplace().getId().equals(workplaceId) || member.getLeftAt() != null) {
             throw new BusinessException(ShiftErrorCode.INVALID_WORKPLACE_MEMBER_VALUE);
         }
         return member;
     }
+
     private void validShiftTime(
         ShiftRequest reqBody, Schedule schedule,
         WorkplaceMember member, Long scheduleId,
         Long userId, Long currentShiftId
-    ){
+    ) {
         //p0에서는 자정을 넘어가는 근무는 존재하지 않는다.
         if (!reqBody.startAt().toLocalDate().equals(reqBody.endAt().toLocalDate())) {
             throw new BusinessException(ShiftErrorCode.INVALID_SHIFT_SAME_DAY);
@@ -263,18 +267,21 @@ public class ShiftService {
             reqBody.startAt(), reqBody.endAt(), currentShiftId
         );
     }
-    //관리자가 불가능 시간에 근무를 넣으려 할 때
-    private void validconfirmUnavailableConflict(ShiftRequest reqBody, Long userId){
+
+    // UnavailableTime 충돌에 대한 관리자 확인 여부 검증
+    private void validateUnavailableConflictConfirmation(ShiftRequest reqBody, Long userId) {
         // confirmUnavailableConflict가 false일 때만 체크)
         if (!reqBody.confirmUnavailableConflict()) {
             if (unavailableTimeRepository.existsOverlappingUnavailableTime(
                 userId, reqBody.startAt(), reqBody.endAt())
             ) {
-                // Shift를 생성하지 않고, 관리자 확인 안내 예외/응답을 던짐
-                throw new BusinessException(ShiftErrorCode.UNAVAILABLE_TIME_CONFLICT);
+                // 변경을 적용하지 않고, 관리자 확인이 필요한 Warning을 발생시킨다.
+                throw new BusinessException(ShiftErrorCode.UNAVAILABLE_TIME_CONFLICT,
+                    new ConfirmationRequiredResponse(true));
             }
         }
     }
+
     /**
      * Shift의 근무 시간이 Schedule의 주차 범위 내에 들어오는지 검증
      */

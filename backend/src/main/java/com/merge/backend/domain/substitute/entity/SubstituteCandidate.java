@@ -49,4 +49,14 @@ public class SubstituteCandidate extends BaseEntity {
         this.status = CandidateStatus.REJECTED; // 대타 요청을 거절한 상태
         this.respondedAt = now;                 // 거절한 시간
     }
+    //1. 후보자 중 1명이 수락을 눌렀을 때
+    public void acceptRequest(LocalDateTime now) {
+
+        //본인 상태 업데이트
+        this.status = CandidateStatus.ACCEPTED;
+        this.respondedAt = now;
+
+        //연관된 대체근무 요청 상태 승인으로 변경
+        this.request.accept();
+    }
 }

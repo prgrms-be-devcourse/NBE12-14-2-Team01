@@ -89,9 +89,9 @@ public enum ShiftErrorCode implements ErrorCode {
         "잘못된 권한입니다."
     ),
     UNAVAILABLE_TIME_CONFLICT(
-            HttpStatus.BAD_REQUEST,
-            "SFT-015",
-            "해당 구성원이 이 시간에 근무 불가능 일정을 등록했습니다."
+        HttpStatus.CONFLICT,
+        "SFT-015",
+        "근무 불가능 일정과 충돌하는 Shift가 있습니다."
     ),
 
     NOT_FOUND_ERROR(
