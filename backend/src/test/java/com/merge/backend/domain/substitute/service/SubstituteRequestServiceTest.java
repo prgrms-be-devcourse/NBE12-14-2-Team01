@@ -11,7 +11,7 @@ import com.merge.backend.domain.shift.entity.Schedule;
 import com.merge.backend.domain.shift.entity.Shift;
 import com.merge.backend.domain.shift.entity.ShiftStatus;
 import com.merge.backend.domain.shift.repository.ShiftRepository;
-import com.merge.backend.domain.substitute.dto.SubstituteRequestCreateResponse;
+import com.merge.backend.domain.substitute.dto.response.SubstituteRequestCreateResponse;
 import com.merge.backend.domain.substitute.entity.RequestStatus;
 import com.merge.backend.domain.substitute.entity.SubstituteRequest;
 import com.merge.backend.domain.substitute.exception.SubstituteErrorCode;
