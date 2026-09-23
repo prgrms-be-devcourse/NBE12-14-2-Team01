@@ -12,6 +12,6 @@ public record UnavailableTimeRegisterReqBody(
         LocalDateTime endAt,
 
         @NotNull
-        boolean confirmOfficialShiftConflict
+        Boolean confirmOfficialShiftConflict
 ) {
 }
