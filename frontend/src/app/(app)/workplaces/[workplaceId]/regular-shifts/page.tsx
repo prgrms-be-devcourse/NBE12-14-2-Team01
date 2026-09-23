@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import Card from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 
@@ -10,6 +11,30 @@ type RegisteredShift = {
   day: string;
   startTime: string;
   endTime: string;
+};
+
+
+type RegularShiftPattern = {
+  patternId: number;
+  memberId: number;
+  memberName: string;
+  role: "MANAGER" | "EMPLOYEE";
+  dayOfWeek:
+    | "MONDAY"
+    | "TUESDAY"
+    | "WEDNESDAY"
+    | "THURSDAY"
+    | "FRIDAY"
+    | "SATURDAY"
+    | "SUNDAY";
+  startTime: string;
+  endTime: string;
+};
+
+type ApiResponse<T> = {
+  code: string;
+  message: string;
+  data: T;
 };
 
 const days: DayKey[] = ["월", "화", "수", "목", "금", "토", "일"];
@@ -54,11 +79,49 @@ const initialRegisteredShifts: RegisteredShift[] = [
 ];
 
 export default function RegularShiftsPage() {
+  const params = useParams();
+  const workplaceId = params.workplaceId as string;
+  const [patterns, setPatterns] = useState<RegularShiftPattern[]>([]);
+
   const [selectedDays, setSelectedDays] = useState<DayKey[]>([]);
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("18:00");
   const [registeredShifts, setRegisteredShifts] =
       useState<RegisteredShift[]>(initialRegisteredShifts);
+
+      useEffect(() => {
+        console.log("useEffect 실행됨", workplaceId);
+  const fetchRegularShiftPatterns = async () => {
+    try {
+      const response = await fetch(
+  `http://localhost:8080/api/v1/workplaces/${workplaceId}/regular-shift-patterns`,
+  {
+    headers: {
+      Authorization: "eyJhbGciOiJIUzI1NiJ9.eyJpZCI6NSwiZW1haWwiOiJtYW5hZ2VyMkB0ZXN0LmNvbSIsIm5hbWUiOiLthYzsiqTtirjrp6Tri4jsoIAyIiwiaWF0IjoxNzkwMTUwNjUyLCJleHAiOjE3OTAxNTEyNTJ9.60KhZiWgsNLfQXaQWzDeZUsobGv2D6935lloCN5M43g",
+    },
+  }
+);
+
+      if (!response.ok) {
+        throw new Error("정기 근무 조회에 실패했습니다.");
+      }
+
+      const result: ApiResponse<RegularShiftPattern[]> =
+        await response.json();
+
+      console.log("정기근무 응답:", result);
+      console.log("정기근무 목록:", result.data);
+
+      setPatterns(result.data);
+    } catch (error) {
+      console.error("정기근무 조회 오류:", error);
+    }
+  };
+
+  if (workplaceId) {
+    fetchRegularShiftPatterns();
+  }
+}, [workplaceId]);
 
   const handleDayClick = (day: DayKey) => {
     if (selectedDays.includes(day)) {
