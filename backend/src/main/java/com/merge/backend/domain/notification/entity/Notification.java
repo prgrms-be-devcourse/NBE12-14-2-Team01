@@ -24,4 +24,22 @@ public class Notification extends BaseEntity {
     private String message;
 
     private LocalDateTime readAt;
+
+    public Notification(
+        WorkplaceMember recipientMember,
+        NotificationType type,
+        String message
+    ) {
+        this.recipientMember = recipientMember;
+        this.type = type;
+        this.message = message;
+        this.readAt = null;
+    }
+
+    public void markAsRead(LocalDateTime readAt) {
+        if (this.readAt == null) {
+            this.readAt = readAt;
+        }
+    }
+
 }
