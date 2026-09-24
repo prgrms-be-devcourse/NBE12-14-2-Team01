@@ -19,6 +19,7 @@ import com.merge.backend.domain.shift.entity.Schedule;
 import com.merge.backend.domain.shift.entity.ScheduleStatus;
 import com.merge.backend.domain.shift.entity.Shift;
 import com.merge.backend.domain.shift.entity.ShiftStatus;
+import com.merge.backend.domain.shift.event.SchedulePublishedEvent;
 import com.merge.backend.domain.shift.exception.ScheduleErrorCode;
 import com.merge.backend.domain.shift.exception.ShiftErrorCode;
 import com.merge.backend.domain.shift.repository.RegularShiftPatternRepository;
@@ -46,10 +47,12 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class ScheduleServiceTest {
@@ -77,6 +80,9 @@ class ScheduleServiceTest {
 
     @Mock
     private UnavailableTimeRepository unavailableTimeRepository;
+
+    @Mock
+    private ApplicationEventPublisher applicationEventPublisher;
 
     @Mock
     private Clock clock;
@@ -869,6 +875,7 @@ class ScheduleServiceTest {
         Long workplaceId = 10L;
         Long scheduleId = 20L;
         Long userId = 30L;
+        Long memberId = 40L;
 
         LocalDate weekStartDate =
             LocalDate.of(
@@ -966,6 +973,9 @@ class ScheduleServiceTest {
         when(member.getUser())
             .thenReturn(user);
 
+        when(member.getId())
+            .thenReturn(memberId);
+
         when(user.getId())
             .thenReturn(userId);
 
@@ -1020,8 +1030,33 @@ class ScheduleServiceTest {
         verify(userRepository)
             .findByIdForUpdate(userId);
 
-        verify(schedule)
+        ArgumentCaptor<SchedulePublishedEvent> eventCaptor =
+            ArgumentCaptor.forClass(
+                SchedulePublishedEvent.class
+            );
+
+        InOrder publishOrder =
+            inOrder(
+                schedule,
+                applicationEventPublisher
+            );
+
+        publishOrder.verify(schedule)
             .publish(publishedAt);
+
+        publishOrder.verify(applicationEventPublisher)
+            .publishEvent(
+                eventCaptor.capture()
+            );
+
+        SchedulePublishedEvent event =
+            eventCaptor.getValue();
+
+        assertThat(event.scheduleId())
+            .isEqualTo(scheduleId);
+
+        assertThat(event.recipientMemberIds())
+            .containsExactly(memberId);
     }
 
     @Test
@@ -2127,7 +2162,10 @@ class ScheduleServiceTest {
         verify(schedule, never())
             .publish(any());
 
-        verifyNoInteractions(clock);
+        verifyNoInteractions(
+            clock,
+            applicationEventPublisher
+        );
     }
 
     @Test
@@ -2139,6 +2177,7 @@ class ScheduleServiceTest {
         Long workplaceId = 10L;
         Long scheduleId = 20L;
         Long userId = 30L;
+        Long memberId = 40L;
 
         LocalDate weekStartDate =
             LocalDate.of(2026, 9, 21);
@@ -2231,6 +2270,9 @@ class ScheduleServiceTest {
 
         when(member.getUser())
             .thenReturn(user);
+
+        when(member.getId())
+            .thenReturn(memberId);
 
         when(user.getId())
             .thenReturn(userId);
@@ -2774,6 +2816,25 @@ class ScheduleServiceTest {
 
         verify(schedule)
             .publish(publishedAt);
-    }
 
+        ArgumentCaptor<SchedulePublishedEvent> eventCaptor =
+            ArgumentCaptor.forClass(
+                SchedulePublishedEvent.class
+            );
+
+        verify(applicationEventPublisher)
+            .publishEvent(
+                eventCaptor.capture()
+            );
+
+        SchedulePublishedEvent event =
+            eventCaptor.getValue();
+
+        assertThat(event.recipientMemberIds())
+            .containsExactly(
+                100L,
+                200L,
+                300L
+            );
+    }
 }

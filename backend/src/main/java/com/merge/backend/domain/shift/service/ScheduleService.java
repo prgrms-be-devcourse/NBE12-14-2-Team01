@@ -7,6 +7,7 @@ import com.merge.backend.domain.shift.entity.RegularShiftPattern;
 import com.merge.backend.domain.shift.entity.Schedule;
 import com.merge.backend.domain.shift.entity.ScheduleStatus;
 import com.merge.backend.domain.shift.entity.Shift;
+import com.merge.backend.domain.shift.event.SchedulePublishedEvent;
 import com.merge.backend.domain.shift.exception.ScheduleErrorCode;
 import com.merge.backend.domain.shift.exception.ShiftErrorCode;
 import com.merge.backend.domain.shift.repository.RegularShiftPatternRepository;
@@ -26,6 +27,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +43,8 @@ public class ScheduleService {
     private final ShiftService shiftService;
     private final WorkplaceMemberService workplaceMemberService;
     private final UnavailableTimeRepository unavailableTimeRepository;
+
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     private final Clock clock;
 
@@ -210,6 +214,11 @@ public class ScheduleService {
 
         publishScheduleState(
             schedule
+        );
+
+        publishSchedulePublishedEvent(
+            schedule,
+            shifts
         );
 
         return SchedulePublishResponse.from(
@@ -571,6 +580,39 @@ public class ScheduleService {
                     )
                 );
         }
+    }
+
+    private List<Long> getNotificationRecipientMemberIds(
+        List<Shift> shifts
+    ) {
+        return shifts.stream()
+            .map(shift ->
+                shift.getMember()
+                    .getId()
+            )
+            .distinct()
+            .sorted()
+            .toList();
+    }
+
+    private void publishSchedulePublishedEvent(
+        Schedule schedule,
+        List<Shift> shifts
+    ) {
+        List<Long> recipientMemberIds =
+            getNotificationRecipientMemberIds(
+                shifts
+            );
+
+        SchedulePublishedEvent event =
+            new SchedulePublishedEvent(
+                schedule.getId(),
+                recipientMemberIds
+            );
+
+        applicationEventPublisher.publishEvent(
+            event
+        );
     }
 
 }
