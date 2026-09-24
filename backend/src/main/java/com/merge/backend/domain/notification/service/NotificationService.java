@@ -7,12 +7,14 @@ import com.merge.backend.domain.notification.entity.NotificationType;
 import com.merge.backend.domain.notification.exception.NotificationErrorCode;
 import com.merge.backend.domain.notification.repository.NotificationRepository;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
+import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
 import com.merge.backend.global.exception.BusinessException;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -20,7 +22,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final WorkplaceMemberRepository workplaceMemberRepository;
+
     private final Clock clock;
+
+    private static final String SCHEDULE_PUBLISHED_MESSAGE =
+        "새로운 주간 근무표가 공개되었습니다.";
 
     public Notification create(
         WorkplaceMember recipientMember,
@@ -34,6 +41,34 @@ public class NotificationService {
         );
 
         return notificationRepository.save(notification);
+    }
+
+    @Transactional(
+        propagation = Propagation.REQUIRES_NEW
+    )
+    public void createSchedulePublishedNotifications(
+        List<Long> recipientMemberIds
+    ) {
+        List<WorkplaceMember> recipientMembers =
+            workplaceMemberRepository.findAllById(
+                recipientMemberIds
+            );
+
+        if (recipientMembers.size()
+            != recipientMemberIds.size()) {
+
+            throw new IllegalStateException(
+                "Schedule 공개 알림 수신자를 찾을 수 없습니다."
+            );
+        }
+
+        for (WorkplaceMember recipientMember : recipientMembers) {
+            create(
+                recipientMember,
+                NotificationType.SCHEDULE_PUBLISHED,
+                SCHEDULE_PUBLISHED_MESSAGE
+            );
+        }
     }
 
     @Transactional
@@ -76,5 +111,7 @@ public class NotificationService {
             .map(NotificationResponse::from)
             .toList();
     }
+
+
 
 }
