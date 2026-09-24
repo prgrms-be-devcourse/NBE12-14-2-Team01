@@ -75,7 +75,11 @@ export async function apiFetch<T>(
   let json: ApiEnvelope<T>;
   try {
     json = await response.json();
-  } catch {
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) {
+      throw error;
+    }
+
     throw new UnexpectedResponseError(
         response.status,
         "서버 응답을 해석할 수 없습니다."
