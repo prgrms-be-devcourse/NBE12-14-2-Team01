@@ -97,7 +97,7 @@ export default function RegularShiftsPage() {
   `http://localhost:8080/api/v1/workplaces/${workplaceId}/regular-shift-patterns`,
   {
     headers: {
-      Authorization: "eyJhbGciOiJIUzI1NiJ9.eyJpZCI6NSwiZW1haWwiOiJtYW5hZ2VyMkB0ZXN0LmNvbSIsIm5hbWUiOiLthYzsiqTtirjrp6Tri4jsoIAyIiwiaWF0IjoxNzkwMTUwNjUyLCJleHAiOjE3OTAxNTEyNTJ9.60KhZiWgsNLfQXaQWzDeZUsobGv2D6935lloCN5M43g",
+      Authorization: "eyJhbGciOiJIUzI1NiJ9.eyJpZCI6NSwiZW1haWwiOiJtYW5hZ2VyMkB0ZXN0LmNvbSIsIm5hbWUiOiLthYzsiqTtirjrp6Tri4jsoIAyIiwiaWF0IjoxNzkwMTUzMzE1LCJleHAiOjE3OTAxNTM5MTV9.jcrMMSKeP-2HDgud8AtrDIh9unDDHW3wZ1cSPQCyILs",
     },
   }
 );
