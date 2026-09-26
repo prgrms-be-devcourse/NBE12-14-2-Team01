@@ -201,8 +201,7 @@ class SubstituteCandidateServiceTest {
         // then
         assertThat(result).isEqualTo(candidate);
 
-        verify(candidate).accept(any(LocalDateTime.class));
-        verify(substituteRequest).accept();
+        verify(candidate).acceptRequest(any(LocalDateTime.class));
     }
 
     @Test
@@ -392,7 +391,7 @@ class SubstituteCandidateServiceTest {
 
         // 이미 응답했으므로 다시 accept 처리되면 안 됨
         verify(candidate, never())
-            .accept(any(LocalDateTime.class));
+            .acceptRequest(any(LocalDateTime.class));
     }
 
     @Test
@@ -464,7 +463,7 @@ class SubstituteCandidateServiceTest {
 
         // 충돌이 있으므로 상태 변경이 일어나면 안 됨
         verify(candidate, never())
-            .accept(any(LocalDateTime.class));
+            .acceptRequest(any(LocalDateTime.class));
 
         verify(substituteRequest, never())
             .accept();

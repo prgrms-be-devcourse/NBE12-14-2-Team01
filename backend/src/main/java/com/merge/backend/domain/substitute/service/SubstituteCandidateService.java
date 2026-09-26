@@ -193,10 +193,8 @@ public class SubstituteCandidateService {
         }
 
         // Candidate: PENDING → ACCEPTED
-        candidate.accept(now);
-
         // Request: OPEN → ACCEPTED
-        candidate.getRequest().accept();
+        candidate.acceptRequest(now);
 
         return candidate;
     }

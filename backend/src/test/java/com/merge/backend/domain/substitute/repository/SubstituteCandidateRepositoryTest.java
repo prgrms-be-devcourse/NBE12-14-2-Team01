@@ -338,23 +338,13 @@ class SubstituteCandidateRepositoryTest {
             )
         );
 
-        SubstituteRequest request = new SubstituteRequest();
-
-        // SubstituteRequest에 아직 생성자가 없어서
-        // 테스트에서만 값을 넣어주는 코드
-        ReflectionTestUtils.setField(request, "shift", shift);
-        ReflectionTestUtils.setField(
-            request,
-            "requesterMember",
-            requesterMember
+        SubstituteRequest request = entityManager.persist(
+            new SubstituteRequest(
+                shift,
+                requesterMember,
+                requestStatus
+            )
         );
-        ReflectionTestUtils.setField(
-            request,
-            "status",
-            requestStatus
-        );
-
-        entityManager.persist(request);
 
         SubstituteCandidate candidate =
             new SubstituteCandidate(request, candidateMember);
