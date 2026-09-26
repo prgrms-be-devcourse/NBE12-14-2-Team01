@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -16,6 +17,7 @@ import com.merge.backend.domain.notification.repository.NotificationRepository;
 import com.merge.backend.domain.user.entity.User;
 import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
+import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
 import com.merge.backend.global.config.TestClock;
 import com.merge.backend.global.exception.BusinessException;
 import java.time.Instant;
@@ -26,10 +28,12 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class NotificationServiceTest {
 
     private NotificationRepository notificationRepository;
+    private WorkplaceMemberRepository workplaceMemberRepository;
     private NotificationService notificationService;
     private TestClock testClock;
 
@@ -38,6 +42,9 @@ class NotificationServiceTest {
         notificationRepository =
             mock(NotificationRepository.class);
 
+        workplaceMemberRepository =
+            mock(WorkplaceMemberRepository.class);
+
         testClock = new TestClock(
             Instant.parse("2026-09-15T01:00:00Z"),
             ZoneId.of("Asia/Seoul")
@@ -45,6 +52,7 @@ class NotificationServiceTest {
 
         notificationService = new NotificationService(
             notificationRepository,
+            workplaceMemberRepository,
             testClock
         );
     }
@@ -429,6 +437,86 @@ class NotificationServiceTest {
 
         assertThat(result.get(1).readAt())
             .isEqualTo(readAt);
+    }
+
+    @Test
+    void createSchedulePublishedNotifications() {
+
+        // given
+        List<Long> recipientMemberIds =
+            List.of(
+                100L,
+                200L
+            );
+
+        WorkplaceMember firstMember =
+            mock(WorkplaceMember.class);
+
+        WorkplaceMember secondMember =
+            mock(WorkplaceMember.class);
+
+        when(
+            workplaceMemberRepository.findAllById(
+                recipientMemberIds
+            )
+        ).thenReturn(
+            List.of(
+                firstMember,
+                secondMember
+            )
+        );
+
+        when(
+            notificationRepository.save(
+                any(Notification.class)
+            )
+        ).thenAnswer(
+            invocation ->
+                invocation.getArgument(0)
+        );
+
+        // when
+        notificationService.createSchedulePublishedNotifications(
+            recipientMemberIds
+        );
+
+        // then
+        verify(workplaceMemberRepository)
+            .findAllById(
+                recipientMemberIds
+            );
+
+        ArgumentCaptor<Notification> notificationCaptor =
+            ArgumentCaptor.forClass(
+                Notification.class
+            );
+
+        verify(notificationRepository, times(2))
+            .save(
+                notificationCaptor.capture()
+            );
+
+        List<Notification> savedNotifications =
+            notificationCaptor.getAllValues();
+
+        assertThat(savedNotifications)
+            .extracting(Notification::getRecipientMember)
+            .containsExactlyInAnyOrder(
+                firstMember,
+                secondMember
+            );
+
+        assertThat(savedNotifications)
+            .extracting(Notification::getType)
+            .containsOnly(
+                NotificationType.SCHEDULE_PUBLISHED
+            );
+
+        assertThat(savedNotifications)
+            .extracting(Notification::getMessage)
+            .containsOnly(
+                "새로운 주간 근무표가 공개되었습니다."
+            );
     }
 
 }

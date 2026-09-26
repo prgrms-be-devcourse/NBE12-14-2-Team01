@@ -9,7 +9,7 @@ import com.merge.backend.domain.substitute.entity.CandidateStatus;
 import com.merge.backend.domain.substitute.entity.RequestStatus;
 import com.merge.backend.domain.substitute.entity.SubstituteCandidate;
 import com.merge.backend.domain.substitute.entity.SubstituteRequest;
-import com.merge.backend.domain.substitute.exception.SubstituteErrorCode;
+import com.merge.backend.domain.substitute.exception.SubstituteRequestErrorCode;
 import com.merge.backend.domain.substitute.repository.SubstituteCandidateRepository;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
@@ -96,48 +96,48 @@ public class SubstituteCandidateService {
     ) {
         SubstituteCandidate candidate = substituteCandidateRepository.findById(candidateId)
             .orElseThrow(() ->
-                new BusinessException(SubstituteErrorCode.CANDIDATE_NOT_FOUND)
+                new BusinessException(SubstituteRequestErrorCode.CANDIDATE_NOT_FOUND)
             );
 
         WorkplaceMember member = candidate.getMember();
 
         // 이 Candidate가 현재 로그인한 사용자의 것인지 확인
         if (!member.getUser().getId().equals(userId)) {
-            throw new BusinessException(SubstituteErrorCode.NOT_OWN_CANDIDATE);
+            throw new BusinessException(SubstituteRequestErrorCode.NOT_OWN_CANDIDATE);
         }
 
         // 현재도 이 Workplace에 소속된 EMPLOYEE인지 확인
         if (member.getLeftAt() != null || member.getRole() != WorkplaceRole.EMPLOYEE) {
-            throw new BusinessException(SubstituteErrorCode.INVALID_CANDIDATE_MEMBER);
+            throw new BusinessException(SubstituteRequestErrorCode.INVALID_CANDIDATE_MEMBER);
         }
 
         // 아직 응답하지 않은 Candidate인지 확인
         if (candidate.getStatus() != CandidateStatus.PENDING) {
-            throw new BusinessException(SubstituteErrorCode.CANDIDATE_ALREADY_RESPONDED);
+            throw new BusinessException(SubstituteRequestErrorCode.CANDIDATE_ALREADY_RESPONDED);
         }
 
         SubstituteRequest request = candidate.getRequest();
 
         // 다른 Candidate가 먼저 수락했거나 이미 요청이 종료됐는지 확인
         if (request.getStatus() != RequestStatus.OPEN) {
-            throw new BusinessException(SubstituteErrorCode.REQUEST_NOT_OPEN);
+            throw new BusinessException(SubstituteRequestErrorCode.REQUEST_NOT_OPEN);
         }
 
         Shift shift = request.getShift();
 
         // 공개된 근무표의 Shift인지 확인
         if (shift.getSchedule().getStatus() != ScheduleStatus.PUBLISHED) {
-            throw new BusinessException(SubstituteErrorCode.SHIFT_NOT_PUBLISHED);
+            throw new BusinessException(SubstituteRequestErrorCode.SHIFT_NOT_PUBLISHED);
         }
 
         // 취소되지 않은 정상 Shift인지 확인
         if (shift.getStatus() != ShiftStatus.SCHEDULED) {
-            throw new BusinessException(SubstituteErrorCode.SHIFT_CANCELLED);
+            throw new BusinessException(SubstituteRequestErrorCode.SHIFT_CANCELLED);
         }
 
         // 이미 시작된 Shift에는 응답할 수 없음
         if (!shift.getStartAt().isAfter(now)) {
-            throw new BusinessException(SubstituteErrorCode.SHIFT_ALREADY_STARTED);
+            throw new BusinessException(SubstituteRequestErrorCode.SHIFT_ALREADY_STARTED);
         }
 
         return candidate;
@@ -166,7 +166,7 @@ public class SubstituteCandidateService {
             targetShift.getId()
         )) {
             throw new BusinessException(
-                SubstituteErrorCode.SHIFT_CONFLICT
+                SubstituteRequestErrorCode.CONFLICT_SHIFT
             );
         }
 
@@ -177,7 +177,7 @@ public class SubstituteCandidateService {
             targetShift.getEndAt()
         )) {
             throw new BusinessException(
-                SubstituteErrorCode.UNAVAILABLE_TIME_CONFLICT
+                SubstituteRequestErrorCode.CONFLICT_UNAVAILABLE_TIME
             );
         }
 
@@ -188,7 +188,7 @@ public class SubstituteCandidateService {
             targetShift.getEndAt()
         )) {
             throw new BusinessException(
-                SubstituteErrorCode.ACCEPTED_SUBSTITUTE_CONFLICT
+                SubstituteRequestErrorCode.CONFLICT_ACTIVE_SUBSTITUTE
             );
         }
 
