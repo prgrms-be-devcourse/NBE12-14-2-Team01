@@ -98,6 +98,31 @@ public enum SubstituteRequestErrorCode implements ErrorCode {
         HttpStatus.BAD_REQUEST,
         "SUB-018",
         "근무 시작 이후에는 요청을 종료할 수 없습니다."
+    ),
+    CANDIDATE_NOT_FOUND(
+        HttpStatus.NOT_FOUND,
+        "SUB-019",
+        "해당 대타 후보를 찾을 수 없습니다."
+    ),
+    NOT_OWN_CANDIDATE(
+        HttpStatus.FORBIDDEN,
+        "SUB-020",
+        "본인의 대타 요청에만 응답할 수 있습니다."
+    ),
+    INVALID_CANDIDATE_MEMBER(
+        HttpStatus.FORBIDDEN,
+        "SUB-021",
+        "현재 유효한 직원만 대타 요청에 응답할 수 있습니다."
+    ),
+    CANDIDATE_ALREADY_RESPONDED(
+        HttpStatus.CONFLICT,
+        "SUB-022",
+        "이미 응답한 대타 요청입니다."
+    ),
+    REQUEST_NOT_OPEN(
+        HttpStatus.CONFLICT,
+        "SUB-023",
+        "더 이상 응답할 수 없는 대타 요청입니다."
     );
     private final HttpStatus httpStatus;
     private final String code;

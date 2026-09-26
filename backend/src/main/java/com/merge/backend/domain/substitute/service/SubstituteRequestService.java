@@ -48,19 +48,49 @@ public class SubstituteRequestService {
     private final UnavailableTimeRepository unavailableTimeRepository;
     private final WorkplaceMemberService workplaceMemberService;
     private final Clock clock;
+    private final SubstituteCandidateService substituteCandidateService;
 
     @Transactional
     public SubstituteRequestCreateResponse create(Long shiftId, Long actorUserId) {
         Shift shift = validateSubstituteRequest(shiftId, actorUserId);
 
+        // 조건에 맞는 대타 후보들을 먼저 찾음
+        List<WorkplaceMember> candidates =
+            substituteCandidateService.findCandidates(
+                shift.getSchedule().getWorkplace().getId(), // 대상 근무지 ID
+                shift.getMember().getId(),                  // 대타를 요청한 멤버 ID
+                shift                                       // 대타가 필요한 Shift
+            );
+
+        // 후보가 한 명도 없으면 Request 자체를 만들지 않음
+        if (candidates.isEmpty()) {
+            return new SubstituteRequestCreateResponse(
+                false,   // requestCreated: Request 생성 안 됨
+                null,    // requestId: 생성된 Request가 없으므로 null
+                shiftId, // 요청 대상 Shift ID
+                null,    // status: Request가 없으므로 null
+                0        // candidateCount: 후보 0명
+            );
+        }
+
         SubstituteRequest request = substituteRequestRepository.save(
             new SubstituteRequest(shift, shift.getMember(), RequestStatus.OPEN)
         );
 
-        // TODO: 후보 계산 연결
+        // 찾은 후보들로 SubstituteCandidate 생성
+        List<SubstituteCandidate> createdCandidates =
+            substituteCandidateService.createCandidates(
+                request,    // 방금 생성한 대타 요청
+                candidates  // 앞에서 찾은 대타 후보 목록
+            );
 
-        return new SubstituteRequestCreateResponse(true, request.getId(), shiftId,
-            request.getStatus(), 0);
+        return new SubstituteRequestCreateResponse(
+            true,                     // Request 생성 성공
+            request.getId(),          // 생성된 Request ID
+            shiftId,                  // 대상 Shift ID
+            request.getStatus(),      // OPEN
+            createdCandidates.size()  // 실제 생성된 Candidate 수
+        );
     }
 
     @Transactional(readOnly = true)
@@ -102,6 +132,7 @@ public class SubstituteRequestService {
             shiftId, List.of(RequestStatus.OPEN, RequestStatus.ACCEPTED))) {
             throw new BusinessException(SubstituteRequestErrorCode.ACTIVE_REQUEST_EXISTS);
         }
+
         return shift;
     }
 
