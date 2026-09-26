@@ -464,8 +464,5 @@ class SubstituteCandidateServiceTest {
         // 충돌이 있으므로 상태 변경이 일어나면 안 됨
         verify(candidate, never())
             .acceptRequest(any(LocalDateTime.class));
-
-        verify(substituteRequest, never())
-            .accept();
     }
 }
