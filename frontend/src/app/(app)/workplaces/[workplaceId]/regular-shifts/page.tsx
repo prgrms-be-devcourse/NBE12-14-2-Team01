@@ -2,16 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { apiFetch } from "@/lib/api";
 import Card from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 
 type DayKey = "월" | "화" | "수" | "목" | "금" | "토" | "일";
-
-type RegisteredShift = {
-  day: string;
-  startTime: string;
-  endTime: string;
-};
 
 
 type RegularShiftPattern = {
@@ -31,99 +26,99 @@ type RegularShiftPattern = {
   endTime: string;
 };
 
-type ApiResponse<T> = {
-  code: string;
-  message: string;
-  data: T;
+type WorkplaceMember = {
+  memberId: number;
+  name: string;
+  role: "MANAGER" | "EMPLOYEE";
+};
+
+type RegularShiftPatternRequest = {
+  memberId: number;
+  dayOfWeek: RegularShiftPattern["dayOfWeek"];
+  startTime: string;
+  endTime: string;
 };
 
 const days: DayKey[] = ["월", "화", "수", "목", "금", "토", "일"];
 
-const dayNames: Record<DayKey, string> = {
-  월: "월요일",
-  화: "화요일",
-  수: "수요일",
-  목: "목요일",
-  금: "금요일",
-  토: "토요일",
-  일: "일요일",
+const dayToApi: Record<DayKey, RegularShiftPattern["dayOfWeek"]> = {
+  월: "MONDAY",
+  화: "TUESDAY",
+  수: "WEDNESDAY",
+  목: "THURSDAY",
+  금: "FRIDAY",
+  토: "SATURDAY",
+  일: "SUNDAY",
 };
 
-const dayOrder = [
-  "월요일",
-  "화요일",
-  "수요일",
-  "목요일",
-  "금요일",
-  "토요일",
-  "일요일",
-];
+const apiToDay: Record<RegularShiftPattern["dayOfWeek"], DayKey> = {
+  MONDAY: "월",
+  TUESDAY: "화",
+  WEDNESDAY: "수",
+  THURSDAY: "목",
+  FRIDAY: "금",
+  SATURDAY: "토",
+  SUNDAY: "일",
+};
 
-// API 연동 후 선택한 직원의 정기 근무 목록으로 변경
-const initialRegisteredShifts: RegisteredShift[] = [
-  {
-    day: "월요일",
-    startTime: "09:00",
-    endTime: "18:00",
-  },
-  {
-    day: "수요일",
-    startTime: "09:00",
-    endTime: "18:00",
-  },
-  {
-    day: "금요일",
-    startTime: "09:00",
-    endTime: "18:00",
-  },
-];
+const apiToKorean: Record<RegularShiftPattern["dayOfWeek"], string> = {
+  MONDAY: "월요일",
+  TUESDAY: "화요일",
+  WEDNESDAY: "수요일",
+  THURSDAY: "목요일",
+  FRIDAY: "금요일",
+  SATURDAY: "토요일",
+  SUNDAY: "일요일",
+};
+
+
 
 export default function RegularShiftsPage() {
   const params = useParams();
   const workplaceId = params.workplaceId as string;
+  const [members, setMembers] = useState<WorkplaceMember[]>([]);
+  const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
   const [patterns, setPatterns] = useState<RegularShiftPattern[]>([]);
+  const [editingPatternId, setEditingPatternId] = useState<number | null>(null);
 
   const [selectedDays, setSelectedDays] = useState<DayKey[]>([]);
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("18:00");
-  const [registeredShifts, setRegisteredShifts] =
-      useState<RegisteredShift[]>(initialRegisteredShifts);
 
-      useEffect(() => {
-        console.log("useEffect 실행됨", workplaceId);
-  const fetchRegularShiftPatterns = async () => {
+useEffect(() => {
+  const fetchData = async () => {
     try {
-      const response = await fetch(
-  `http://localhost:8080/api/v1/workplaces/${workplaceId}/regular-shift-patterns`,
-  {
-    headers: {
-      Authorization: "eyJhbGciOiJIUzI1NiJ9.eyJpZCI6NSwiZW1haWwiOiJtYW5hZ2VyMkB0ZXN0LmNvbSIsIm5hbWUiOiLthYzsiqTtirjrp6Tri4jsoIAyIiwiaWF0IjoxNzkwMTUzMzE1LCJleHAiOjE3OTAxNTM5MTV9.jcrMMSKeP-2HDgud8AtrDIh9unDDHW3wZ1cSPQCyILs",
-    },
-  }
-);
+      // 전체 직원 조회
+      const memberData = await apiFetch<WorkplaceMember[]>(
+        `/workplaces/${workplaceId}/members`
+      );
 
-      if (!response.ok) {
-        throw new Error("정기 근무 조회에 실패했습니다.");
-      }
+      // 전체 정기근무 조회
+      const patternData = await apiFetch<RegularShiftPattern[]>(
+        `/workplaces/${workplaceId}/regular-shift-patterns`
+      );
 
-      const result: ApiResponse<RegularShiftPattern[]> =
-        await response.json();
+      console.log("직원 목록:", memberData);
+      console.log("정기근무 목록:", patternData);
 
-      console.log("정기근무 응답:", result);
-      console.log("정기근무 목록:", result.data);
-
-      setPatterns(result.data);
+      setMembers(memberData);
+      setPatterns(patternData);
     } catch (error) {
-      console.error("정기근무 조회 오류:", error);
+      console.error("조회 오류:", error);
     }
   };
 
   if (workplaceId) {
-    fetchRegularShiftPatterns();
+    fetchData();
   }
 }, [workplaceId]);
 
   const handleDayClick = (day: DayKey) => {
+    if (editingPatternId !== null) {
+    setSelectedDays([day]);
+    return;
+  }
+
     if (selectedDays.includes(day)) {
       setSelectedDays(
           selectedDays.filter((selectedDay) => selectedDay !== day)
@@ -134,44 +129,119 @@ export default function RegularShiftsPage() {
     setSelectedDays([...selectedDays, day]);
   };
 
-  const handleRegister = () => {
-    if (selectedDays.length === 0) {
-      return;
-    }
+const handleRegister = async () => {
+  if (selectedMemberId === null || selectedDays.length === 0) {
+    return;
+  }
 
-    if (startTime >= endTime) {
-      alert("종료 시간은 시작 시간보다 늦어야 합니다.");
-      return;
-    }
+  if (startTime >= endTime) {
+    alert("종료 시간은 시작 시간보다 늦어야 합니다.");
+    return;
+  }
 
-    const updatedShifts = [...registeredShifts];
+  try {
+    // 수정 모드
+    if (editingPatternId !== null) {
+      const day = selectedDays[0];
 
-    selectedDays.forEach((day) => {
-      const fullDay = dayNames[day];
-      const existingIndex = updatedShifts.findIndex(
-          (shift) => shift.day === fullDay
+      const updated = await apiFetch<RegularShiftPattern>(
+        `/workplaces/${workplaceId}/regular-shift-patterns/${editingPatternId}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            memberId: selectedMemberId,
+            dayOfWeek: dayToApi[day],
+            startTime,
+            endTime,
+          }),
+        }
       );
 
-      const newShift: RegisteredShift = {
-        day: fullDay,
-        startTime,
-        endTime,
-      };
+      setPatterns((prev) =>
+        prev.map((pattern) =>
+          pattern.patternId === editingPatternId
+            ? {
+                ...pattern,
+                ...updated,
+              }
+            : pattern
+        )
+      );
 
-      if (existingIndex >= 0) {
-        updatedShifts[existingIndex] = newShift;
-      } else {
-        updatedShifts.push(newShift);
+      setEditingPatternId(null);
+      setSelectedDays([]);
+
+      alert("정기 근무가 수정되었습니다.");
+      return;
+    }
+
+    // 등록 모드
+    for (const day of selectedDays) {
+      const created = await apiFetch<RegularShiftPattern>(
+        `/workplaces/${workplaceId}/regular-shift-patterns`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            memberId: selectedMemberId,
+            dayOfWeek: dayToApi[day],
+            startTime,
+            endTime,
+          }),
+        }
+      );
+
+      setPatterns((prev) => [...prev, created]);
+    }
+
+    setSelectedDays([]);
+    alert("정기 근무가 등록되었습니다.");
+  } catch (error) {
+    console.error(
+      editingPatternId !== null
+        ? "정기근무 수정 오류:"
+        : "정기근무 등록 오류:",
+      error
+    );
+  }
+};
+
+const handleDelete = async (patternId: number) => {
+  const confirmed = confirm("이 정기 근무를 삭제하시겠습니까?");
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    await apiFetch<void>(
+      `/workplaces/${workplaceId}/regular-shift-patterns/${patternId}`,
+      {
+        method: "DELETE",
       }
-    });
-
-    updatedShifts.sort(
-        (a, b) => dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day)
     );
 
-    setRegisteredShifts(updatedShifts);
-    setSelectedDays([]);
-  };
+    setPatterns((prev) =>
+      prev.filter((pattern) => pattern.patternId !== patternId)
+    );
+
+    alert("정기 근무가 삭제되었습니다.");
+  } catch (error) {
+    console.error("정기근무 삭제 오류:", error);
+    alert("정기 근무 삭제에 실패했습니다.");
+  }
+};
+
+const selectedMemberShifts = patterns.filter(
+  (pattern) => pattern.memberId === selectedMemberId
+);
+
+const handleEdit = (shift: RegularShiftPattern) => {
+  setEditingPatternId(shift.patternId);
+  setSelectedMemberId(shift.memberId);
+  setSelectedDays([apiToDay[shift.dayOfWeek]]);
+  setStartTime(shift.startTime);
+  setEndTime(shift.endTime);
+};
 
   return (
       <>
@@ -194,11 +264,25 @@ export default function RegularShiftsPage() {
                 <label className="mb-2 block text-sm font-bold">직원 선택</label>
 
                 <div className="relative">
-                  <select className="w-full appearance-none rounded-xl border border-[#dce8e2] bg-white py-3 pl-4 pr-12 outline-none transition focus:border-[#14956c]">
-                    <option>김지연</option>
-                    <option>이서연</option>
-                    <option>박민수</option>
-                    <option>최하은</option>
+                  <select
+                    value={selectedMemberId ?? ""}
+                    onChange={(e) =>
+                      setSelectedMemberId(
+                        e.target.value === "" ? null : Number(e.target.value)
+                      )
+                    }
+                    className="w-full appearance-none rounded-xl border border-[#dce8e2] bg-white py-3 pl-4 pr-12 outline-none transition focus:border-[#14956c]"
+                  >
+                    <option value="">직원을 선택하세요</option>
+
+                    {members.map((member) => (
+                      <option
+                        key={member.memberId}
+                        value={member.memberId}
+                      >
+                        {member.name}
+                      </option>
+                    ))}
                   </select>
 
                   <svg
@@ -269,31 +353,35 @@ export default function RegularShiftsPage() {
               <button
                   type="button"
                   onClick={handleRegister}
-                  disabled={selectedDays.length === 0}
+                  disabled={selectedDays.length === 0 || selectedMemberId === null}
                   className="w-full rounded-xl bg-[#005642] px-4 py-3 font-bold text-white transition hover:bg-[#0b6b52] disabled:cursor-not-allowed disabled:bg-[#b8c4be]"
               >
-                정기 근무 등록
+                {editingPatternId !== null ? "정기 근무 수정" : "정기 근무 등록"}
               </button>
             </div>
           </Card>
 
           <Card>
-            <div>
-              <h2 className="text-lg font-black">등록된 정기 근무</h2>
-
-              <p className="mt-1 text-sm text-[#78847f]">
-                현재 선택한 직원의 반복 근무입니다.
-              </p>
-            </div>
-
             <div className="mt-6 space-y-3">
-              {registeredShifts.map((shift) => (
+              {selectedMemberId === null ? (
+                <p className="text-sm text-[#78847f]">
+                  직원을 선택해주세요.
+                </p>
+              ) : selectedMemberShifts.length === 0 ? (
+                <p className="text-sm text-[#78847f]">
+                  등록된 정기 근무가 없습니다.
+                </p>
+              ) : (
+                selectedMemberShifts.map((shift) => (
                   <div
-                      key={shift.day}
-                      className="flex items-center justify-between rounded-xl border border-[#dce8e2] p-4"
+                    key={shift.patternId}
+                    className="flex items-center justify-between rounded-xl border border-[#dce8e2] p-4"
                   >
                     <div>
-                      <p className="font-bold">{shift.day}</p>
+                      <p className="font-bold">
+                        {apiToKorean[shift.dayOfWeek]}
+                      </p>
+
                       <p className="mt-1 text-sm text-[#78847f]">
                         {shift.startTime} - {shift.endTime}
                       </p>
@@ -301,21 +389,24 @@ export default function RegularShiftsPage() {
 
                     <div className="flex gap-2">
                       <button
-                          type="button"
-                          className="rounded-lg border border-[#dce8e2] px-3 py-2 text-sm font-semibold text-[#66736d] hover:bg-[#f3fbf7]"
+                        type="button"
+                        onClick={() => handleEdit(shift)}
+                        className="rounded-lg border border-[#dce8e2] px-3 py-2 text-sm font-semibold text-[#66736d] hover:bg-[#f3fbf7]"
                       >
                         수정
                       </button>
 
                       <button
-                          type="button"
-                          className="rounded-lg border border-[#f1cccc] px-3 py-2 text-sm font-semibold text-[#d95555] hover:bg-[#fff5f5]"
+                        type="button"
+                        onClick={() => handleDelete(shift.patternId)}
+                        className="rounded-lg border border-[#f1cccc] px-3 py-2 text-sm font-semibold text-[#d95555] hover:bg-[#fff5f5]"
                       >
                         삭제
                       </button>
                     </div>
                   </div>
-              ))}
+                ))
+              )}
             </div>
           </Card>
         </div>
