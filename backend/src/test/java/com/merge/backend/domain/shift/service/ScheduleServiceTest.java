@@ -32,6 +32,7 @@ import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import com.merge.backend.domain.workplace.exception.WorkplaceErrorCode;
+import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import com.merge.backend.domain.workplace.service.WorkplaceMemberService;
 import com.merge.backend.global.dto.ConfirmationRequiredResponse;
 import com.merge.backend.global.exception.BusinessException;
@@ -74,6 +75,9 @@ class ScheduleServiceTest {
 
     @Mock
     private WorkplaceMemberService workplaceMemberService;
+
+    @Mock
+    private WorkplaceRepository workplaceRepository;
 
     @InjectMocks
     private ScheduleService scheduleService;
@@ -126,16 +130,32 @@ class ScheduleServiceTest {
         // given
         Long actorUserId = 1L;
         Long workplaceId = 1L;
+
         LocalDate weekStartDate =
-            LocalDate.of(2026, 9, 21); // 월요일
+            LocalDate.of(2026, 9, 21);
+
+        Workplace workplace =
+            mock(Workplace.class);
+
+        Schedule existingSchedule =
+            mock(Schedule.class);
+
+        when(
+            workplaceRepository
+                .findByIdForUpdate(workplaceId)
+        ).thenReturn(
+            Optional.of(workplace)
+        );
 
         when(
             scheduleRepository
-                .existsByWorkplace_IdAndWeekStartDate(
+                .findByWorkplaceAndWeekStartDateForUpdate(
                     workplaceId,
                     weekStartDate
                 )
-        ).thenReturn(true);
+        ).thenReturn(
+            Optional.of(existingSchedule)
+        );
 
         // when
         BusinessException exception =
@@ -160,8 +180,19 @@ class ScheduleServiceTest {
                 workplaceId
             );
 
-        verify(scheduleRepository)
-            .existsByWorkplace_IdAndWeekStartDate(
+        InOrder lockOrder =
+            inOrder(
+                workplaceRepository,
+                scheduleRepository
+            );
+
+        lockOrder.verify(workplaceRepository)
+            .findByIdForUpdate(
+                workplaceId
+            );
+
+        lockOrder.verify(scheduleRepository)
+            .findByWorkplaceAndWeekStartDateForUpdate(
                 workplaceId,
                 weekStartDate
             );
@@ -179,32 +210,28 @@ class ScheduleServiceTest {
         LocalDate weekStartDate =
             LocalDate.of(2026, 9, 21);
 
-        WorkplaceMember manager =
-            mock(WorkplaceMember.class);
-
         Workplace workplace =
             mock(Workplace.class);
 
         when(
-            workplaceMemberService.requireManager(
-                actorUserId,
-                workplaceId
-            )
-        ).thenReturn(manager);
-
-        when(manager.getWorkplace())
-            .thenReturn(workplace);
+            workplaceRepository
+                .findByIdForUpdate(workplaceId)
+        ).thenReturn(
+            Optional.of(workplace)
+        );
 
         when(workplace.getId())
             .thenReturn(workplaceId);
 
         when(
             scheduleRepository
-                .existsByWorkplace_IdAndWeekStartDate(
+                .findByWorkplaceAndWeekStartDateForUpdate(
                     workplaceId,
                     weekStartDate
                 )
-        ).thenReturn(false);
+        ).thenReturn(
+            Optional.empty()
+        );
 
         Schedule savedSchedule =
             new Schedule(
@@ -261,9 +288,6 @@ class ScheduleServiceTest {
         LocalDate weekStartDate =
             LocalDate.of(2026, 9, 21);
 
-        WorkplaceMember manager =
-            mock(WorkplaceMember.class);
-
         Workplace workplace =
             mock(Workplace.class);
 
@@ -274,27 +298,25 @@ class ScheduleServiceTest {
             mock(RegularShiftPattern.class);
 
         when(
-            workplaceMemberService.requireManager(
-                actorUserId,
-                workplaceId
-            )
-        ).thenReturn(manager);
-
-        when(manager.getWorkplace())
-            .thenReturn(workplace);
+            workplaceRepository
+                .findByIdForUpdate(workplaceId)
+        ).thenReturn(
+            Optional.of(workplace)
+        );
 
         when(workplace.getId())
             .thenReturn(workplaceId);
 
         when(
             scheduleRepository
-                .existsByWorkplace_IdAndWeekStartDate(
+                .findByWorkplaceAndWeekStartDateForUpdate(
                     workplaceId,
                     weekStartDate
                 )
-        ).thenReturn(false);
+        ).thenReturn(
+            Optional.empty()
+        );
 
-        // 저장된 Schedule을 미리 준비
         Schedule savedSchedule =
             new Schedule(
                 workplace,
