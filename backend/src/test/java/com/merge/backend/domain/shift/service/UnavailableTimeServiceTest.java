@@ -3,6 +3,7 @@ package com.merge.backend.domain.shift.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -30,6 +31,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -98,7 +100,7 @@ class UnavailableTimeServiceTest {
         when(rq.getActorId())
             .thenReturn(USER_ID);
 
-        when(userService.getById(USER_ID))
+        when(userService.getByIdForUpdate(USER_ID))
             .thenReturn(user);
 
         when(unavailableTimeRepository.findByUserId(USER_ID))
@@ -131,7 +133,29 @@ class UnavailableTimeServiceTest {
         assertThat(result.getStartAt()).isEqualTo(startAt);
         assertThat(result.getEndAt()).isEqualTo(endAt);
 
-        verify(unavailableTimeRepository)
+        InOrder callOrder =
+            inOrder(
+                userService,
+                unavailableTimeRepository,
+                shiftRepository
+            );
+
+        callOrder.verify(userService)
+            .getByIdForUpdate(USER_ID);
+
+        callOrder.verify(unavailableTimeRepository)
+            .findByUserId(USER_ID);
+
+        callOrder.verify(shiftRepository)
+            .existsOverlappingOfficialShift(
+                USER_ID,
+                ScheduleStatus.PUBLISHED,
+                startAt,
+                endAt,
+                null
+            );
+
+        callOrder.verify(unavailableTimeRepository)
             .save(any(UnavailableTime.class));
     }
 
@@ -675,6 +699,37 @@ class UnavailableTimeServiceTest {
         assertThat(result).isEqualTo(unavailableTime);
 
         verify(unavailableTime)
+            .update(
+                newStartAt,
+                newEndAt
+            );
+        InOrder callOrder =
+            inOrder(
+                userService,
+                unavailableTimeRepository,
+                shiftRepository,
+                unavailableTime
+            );
+
+        callOrder.verify(userService)
+            .getByIdForUpdate(USER_ID);
+
+        callOrder.verify(unavailableTimeRepository)
+            .findById(unavailableTimeId);
+
+        callOrder.verify(unavailableTimeRepository)
+            .findByUserId(USER_ID);
+
+        callOrder.verify(shiftRepository)
+            .existsOverlappingOfficialShift(
+                USER_ID,
+                ScheduleStatus.PUBLISHED,
+                newStartAt,
+                newEndAt,
+                null
+            );
+
+        callOrder.verify(unavailableTime)
             .update(
                 newStartAt,
                 newEndAt
@@ -1385,7 +1440,7 @@ class UnavailableTimeServiceTest {
         when(rq.getActorId())
             .thenReturn(USER_ID);
 
-        when(userService.getById(USER_ID))
+        when(userService.getByIdForUpdate(USER_ID))
             .thenReturn(user);
 
         return user;
@@ -1528,7 +1583,7 @@ class UnavailableTimeServiceTest {
         when(rq.getActorId())
             .thenReturn(USER_ID);
 
-        when(userService.getById(USER_ID))
+        when(userService.getByIdForUpdate(USER_ID))
             .thenReturn(user);
 
         when(unavailableTimeRepository.findByUserId(USER_ID))
@@ -1581,7 +1636,7 @@ class UnavailableTimeServiceTest {
         when(rq.getActorId())
             .thenReturn(USER_ID);
 
-        when(userService.getById(USER_ID))
+        when(userService.getByIdForUpdate(USER_ID))
             .thenReturn(user);
 
         when(unavailableTimeRepository.findByUserId(USER_ID))
