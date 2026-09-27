@@ -552,6 +552,145 @@ class ShiftScheduleConcurrencyTest {
         }
     }
 
+    @Test
+    @DisplayName(
+        "같은 Workplace와 주차의 Schedule을 동시에 생성해도 하나만 생성된다"
+    )
+    void concurrentScheduleCreateAllowsOnlyOneSchedule()
+        throws Exception {
+
+        // given
+        ScheduleCreationFixture fixture =
+            createScheduleCreationFixture(
+                "same-week-create"
+            );
+
+        LocalDate weekStartDate =
+            LocalDate.of(
+                2026, 9, 21
+            );
+
+        ExecutorService executor =
+            Executors.newFixedThreadPool(2);
+
+        CountDownLatch ready =
+            new CountDownLatch(2);
+
+        CountDownLatch start =
+            new CountDownLatch(1);
+
+        try {
+
+            Future<Throwable> firstFuture =
+                executor.submit(() -> {
+
+                    ready.countDown();
+                    start.await();
+
+                    try {
+                        scheduleService.createDraftSchedule(
+                            fixture.managerUserId(),
+                            fixture.workplaceId(),
+                            weekStartDate
+                        );
+
+                        return null;
+
+                    } catch (Throwable throwable) {
+                        return throwable;
+                    }
+                });
+
+            Future<Throwable> secondFuture =
+                executor.submit(() -> {
+
+                    ready.countDown();
+                    start.await();
+
+                    try {
+                        scheduleService.createDraftSchedule(
+                            fixture.managerUserId(),
+                            fixture.workplaceId(),
+                            weekStartDate
+                        );
+
+                        return null;
+
+                    } catch (Throwable throwable) {
+                        return throwable;
+                    }
+                });
+
+            assertThat(
+                ready.await(
+                    3,
+                    TimeUnit.SECONDS
+                )
+            ).isTrue();
+
+            start.countDown();
+
+            Throwable firstError =
+                firstFuture.get(
+                    5,
+                    TimeUnit.SECONDS
+                );
+
+            Throwable secondError =
+                secondFuture.get(
+                    5,
+                    TimeUnit.SECONDS
+                );
+
+            boolean firstSucceeded =
+                firstError == null;
+
+            boolean secondSucceeded =
+                secondError == null;
+
+            assertThat(
+                firstSucceeded ^ secondSucceeded
+            ).isTrue();
+
+            Throwable failedError =
+                firstError != null
+                    ? firstError
+                    : secondError;
+
+            assertThat(failedError)
+                .isInstanceOf(BusinessException.class);
+
+            BusinessException businessException =
+                (BusinessException) failedError;
+
+            assertThat(
+                businessException.getErrorCode()
+            ).isEqualTo(
+                ScheduleErrorCode.SCHEDULE_ALREADY_EXISTS
+            );
+
+            Schedule finalSchedule =
+                scheduleRepository
+                    .findByWorkplace_IdAndWeekStartDate(
+                        fixture.workplaceId(),
+                        weekStartDate
+                    )
+                    .orElseThrow();
+
+            assertThat(finalSchedule.getId())
+                .isNotNull();
+
+            assertThat(finalSchedule.getWeekStartDate())
+                .isEqualTo(weekStartDate);
+
+            assertThat(finalSchedule.getStatus())
+                .isEqualTo(ScheduleStatus.DRAFT);
+
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
     private Fixture createFixture(String suffix) {
 
         TransactionTemplate transactionTemplate =
@@ -667,6 +806,54 @@ class ShiftScheduleConcurrencyTest {
         });
     }
 
+    private ScheduleCreationFixture createScheduleCreationFixture(
+        String suffix
+    ) {
+
+        TransactionTemplate transactionTemplate =
+            new TransactionTemplate(transactionManager);
+
+        return transactionTemplate.execute(status -> {
+
+            User managerUser =
+                userRepository.save(
+                    new User(
+                        "schedule-manager-" + suffix + "@test.com",
+                        "password-hash",
+                        "manager"
+                    )
+                );
+
+            Workplace workplace =
+                workplaceRepository.save(
+                    new Workplace(
+                        "Schedule 생성 동시성 매장 " + suffix,
+                        "SCHEDULE-" + suffix
+                    )
+                );
+
+            LocalDateTime joinedAt =
+                LocalDateTime.of(
+                    2026, 9, 1,
+                    9, 0
+                );
+
+            workplaceMemberRepository.save(
+                new WorkplaceMember(
+                    workplace,
+                    managerUser,
+                    WorkplaceRole.MANAGER,
+                    joinedAt
+                )
+            );
+
+            return new ScheduleCreationFixture(
+                workplace.getId(),
+                managerUser.getId()
+            );
+        });
+    }
+
     private record Fixture(
         Long workplaceId,
         Long managerUserId,
@@ -676,6 +863,12 @@ class ShiftScheduleConcurrencyTest {
         Long replacementMemberId,
         Long scheduleId,
         Long shiftId
+    ) {
+    }
+
+    private record ScheduleCreationFixture(
+        Long workplaceId,
+        Long managerUserId
     ) {
     }
 

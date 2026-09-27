@@ -15,7 +15,10 @@ import com.merge.backend.domain.shift.repository.ScheduleRepository;
 import com.merge.backend.domain.shift.repository.ShiftRepository;
 import com.merge.backend.domain.shift.repository.UnavailableTimeRepository;
 import com.merge.backend.domain.user.repository.UserRepository;
+import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
+import com.merge.backend.domain.workplace.exception.WorkplaceErrorCode;
+import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import com.merge.backend.domain.workplace.service.WorkplaceMemberService;
 import com.merge.backend.global.dto.ConfirmationRequiredResponse;
 import com.merge.backend.global.exception.BusinessException;
@@ -43,6 +46,7 @@ public class ScheduleService {
     private final ShiftService shiftService;
     private final WorkplaceMemberService workplaceMemberService;
     private final UnavailableTimeRepository unavailableTimeRepository;
+    private final WorkplaceRepository workplaceRepository;
 
     private final ApplicationEventPublisher applicationEventPublisher;
 
@@ -56,40 +60,49 @@ public class ScheduleService {
     ) {
 
         // 1. 관리자 확인
-        WorkplaceMember manager =
-            workplaceMemberService.requireManager(
-                actorUserId,
-                workplaceId
-            );
+        workplaceMemberService.requireManager(
+            actorUserId,
+            workplaceId
+        );
 
         // 2. 월요일 검증
         validateWeekStartDate(weekStartDate);
 
-        // 3. 중복 Schedule 검증
+        // 3. Workplace Lock 획득
+        Workplace workplace =
+            workplaceRepository
+                .findByIdForUpdate(workplaceId)
+                .orElseThrow(() ->
+                    new BusinessException(
+                        WorkplaceErrorCode.WORKPLACE_NOT_FOUND
+                    )
+                );
+
+        // 4. 중복 Schedule 검증
         validateScheduleNotExists(
             workplaceId,
             weekStartDate
         );
 
-        // 4. DRAFT Schedule 생성
+        // 5. DRAFT Schedule 생성
         Schedule schedule =
             new Schedule(
-                manager.getWorkplace(),
+                workplace,
                 weekStartDate
             );
 
-        // 5. Schedule 저장
+        // 6. Schedule 저장
         Schedule savedSchedule =
             scheduleRepository.save(schedule);
 
-        // 6. 해당 Workplace에 적용할 Pattern 목록 조회
+        // 7. 해당 Workplace에 적용할 Pattern 목록 조회
         List<RegularShiftPattern> patterns =
             regularShiftPatternRepository
                 .findByMemberWorkplaceIdAndMemberLeftAtIsNull(
                     workplaceId
                 );
 
-        // 7. Pattern → 실제 Shift
+        // 8. Pattern → 실제 Shift
         for (RegularShiftPattern pattern : patterns) {
 
             LocalDate shiftDate =
@@ -240,14 +253,14 @@ public class ScheduleService {
         Long workplaceId,
         LocalDate weekStartDate
     ) {
-        boolean exists =
+        Optional<Schedule> existingSchedule =
             scheduleRepository
-                .existsByWorkplace_IdAndWeekStartDate(
+                .findByWorkplaceAndWeekStartDateForUpdate(
                     workplaceId,
                     weekStartDate
                 );
 
-        if (exists) {
+        if (existingSchedule.isPresent()) {
             throw new BusinessException(
                 ScheduleErrorCode.SCHEDULE_ALREADY_EXISTS
             );
