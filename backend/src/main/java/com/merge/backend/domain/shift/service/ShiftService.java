@@ -197,7 +197,7 @@ public class ShiftService {
     //스케줄 관련 예외 검사 메서드
     private Schedule validSchedule(Long scheduleId, Long workplaceId) {
         //스케줄 존재 확인
-        Schedule schedule = scheduleRepository.findById(scheduleId)
+        Schedule schedule = scheduleRepository.findByIdForUpdate(scheduleId)
             .orElseThrow(() ->
                 new BusinessException(
                     ShiftErrorCode.NOT_FOUND_SCHEDULE_ERROR)
