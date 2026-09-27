@@ -23,11 +23,13 @@ public interface SubstituteCandidateRepository
             AND c.request.status = 'ACCEPTED'
             AND c.request.shift.startAt < :endAt
             AND c.request.shift.endAt > :startAt
+            AND c.request.shift.startAt > :now
         """)
     boolean existsOverlappingAcceptedSubstitute(
         @Param("userId") Long userId,
         @Param("startAt") LocalDateTime startAt,
-        @Param("endAt") LocalDateTime endAt
+        @Param("endAt") LocalDateTime endAt,
+        @Param("now") LocalDateTime now
     );
 
     // SUB-02

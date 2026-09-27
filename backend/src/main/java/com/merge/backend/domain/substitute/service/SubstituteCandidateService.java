@@ -35,6 +35,7 @@ public class SubstituteCandidateService {
     @Transactional(readOnly = true)
     public List<WorkplaceMember> findCandidates(Long workplaceId, Long requestMemberId,
         Shift targetShift) {
+        LocalDateTime now = LocalDateTime.now(clock);
         return workplaceMemberRepository.findAllByWorkplace_IdAndLeftAtIsNull(workplaceId)
             .stream()
             .filter(member -> member.getRole() == WorkplaceRole.EMPLOYEE)
@@ -53,7 +54,8 @@ public class SubstituteCandidateService {
             .filter(member -> !substituteCandidateRepository.existsOverlappingAcceptedSubstitute(
                 member.getUser().getId(),
                 targetShift.getStartAt(),
-                targetShift.getEndAt()))
+                targetShift.getEndAt(),
+                now))
             .toList();
     }
 
@@ -185,7 +187,8 @@ public class SubstituteCandidateService {
         if (substituteCandidateRepository.existsOverlappingAcceptedSubstitute(
             candidateUserId,
             targetShift.getStartAt(),
-            targetShift.getEndAt()
+            targetShift.getEndAt(),
+            now
         )) {
             throw new BusinessException(
                 SubstituteRequestErrorCode.CONFLICT_ACTIVE_SUBSTITUTE

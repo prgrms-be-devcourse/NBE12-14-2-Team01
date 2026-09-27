@@ -189,9 +189,10 @@ class SubstituteCandidateServiceTest {
         )).thenReturn(false);
 
         when(substituteCandidateRepository.existsOverlappingAcceptedSubstitute(
-            userId,
-            startAt,
-            endAt
+            eq(userId),
+            eq(startAt),
+            eq(endAt),
+            any(LocalDateTime.class)
         )).thenReturn(false);
 
         // when
