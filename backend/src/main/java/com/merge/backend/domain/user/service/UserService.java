@@ -44,6 +44,16 @@ public class UserService {
                 BusinessException(UserErrorCode.AUTHENTICATION_REQUIRED));
     }
 
+    @Transactional
+    public User getByIdForUpdate(Long id) {
+        return userRepository.findByIdForUpdate(id)
+            .orElseThrow(() ->
+                new BusinessException(
+                    UserErrorCode.AUTHENTICATION_REQUIRED
+                )
+            );
+    }
+
     public String genAccessToken(User user) {
         return authTokenService.genAccessToken(user);
     }

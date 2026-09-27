@@ -48,9 +48,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -64,7 +62,6 @@ class SubstituteRequestServiceTest {
     private static final List<RequestStatus> ACTIVE_STATUSES =
         List.of(RequestStatus.OPEN, RequestStatus.ACCEPTED);
 
-    @InjectMocks
     private SubstituteRequestService substituteRequestService;
 
     @Mock
@@ -77,6 +74,9 @@ class SubstituteRequestServiceTest {
     private ShiftRepository shiftRepository;
 
     @Mock
+    private SubstituteCandidateService substituteCandidateService;
+
+    @Mock
     private WorkplaceRepository workplaceRepository;
 
     @Mock
@@ -85,8 +85,7 @@ class SubstituteRequestServiceTest {
     @Mock
     private WorkplaceMemberService workplaceMemberService;
 
-    @Spy
-    private Clock clock = Clock.fixed(
+    private final Clock clock = Clock.fixed(
         Instant.parse("2026-09-22T12:00:00Z"),
         ZoneId.of("Asia/Seoul")
     );
@@ -110,6 +109,17 @@ class SubstituteRequestServiceTest {
 
     @BeforeEach
     void setUp() {
+        substituteRequestService = new SubstituteRequestService(
+            substituteRequestRepository,
+            substituteCandidateRepository,
+            shiftRepository,
+            workplaceRepository,
+            unavailableTimeRepository,
+            workplaceMemberService,
+            clock,
+            substituteCandidateService
+        );
+
         requestId = 1L;
         actorId = 10L;
         workplaceId = 100L;
@@ -701,16 +711,30 @@ class SubstituteRequestServiceTest {
             Shift newShift = createShift(
                 publishedSchedule(), REQUESTER_USER_ID, futureStartAt(), ShiftStatus.SCHEDULED
             );
+
+            WorkplaceMember newCandidateMember = mock(WorkplaceMember.class);
+
             given(shiftRepository.findById(SHIFT_ID)).willReturn(Optional.of(newShift));
             given(substituteRequestRepository
                 .existsByShift_IdAndStatusIn(SHIFT_ID, ACTIVE_STATUSES))
                 .willReturn(false);
+
+            given(substituteCandidateService.findCandidates(
+                newShift.getSchedule().getWorkplace().getId(),
+                newShift.getMember().getId(),
+                newShift
+            )).willReturn(List.of(newCandidateMember));
+
             given(substituteRequestRepository.save(any(SubstituteRequest.class)))
                 .willAnswer(invocation -> {
                     SubstituteRequest saved = invocation.getArgument(0);
                     ReflectionTestUtils.setField(saved, "id", SAVED_REQUEST_ID);
                     return saved;
                 });
+
+            given(substituteCandidateService.createCandidates(
+                any(SubstituteRequest.class), any()))
+                .willReturn(List.of(mock(SubstituteCandidate.class)));
 
             SubstituteRequestCreateResponse response =
                 substituteRequestService.create(SHIFT_ID, REQUESTER_USER_ID);
@@ -727,7 +751,39 @@ class SubstituteRequestServiceTest {
             assertThat(response.requestId()).isEqualTo(SAVED_REQUEST_ID);
             assertThat(response.shiftId()).isEqualTo(SHIFT_ID);
             assertThat(response.status()).isEqualTo(RequestStatus.OPEN);
+            assertThat(response.candidateCount()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("SUB-01 - 대타 후보가 없으면 Request를 생성하지 않는다")
+        void create_NoCandidate_DoesNotCreateRequest() {
+            Shift newShift = createShift(
+                publishedSchedule(), REQUESTER_USER_ID, futureStartAt(), ShiftStatus.SCHEDULED
+            );
+
+            given(shiftRepository.findById(SHIFT_ID)).willReturn(Optional.of(newShift));
+            given(substituteRequestRepository
+                .existsByShift_IdAndStatusIn(SHIFT_ID, ACTIVE_STATUSES))
+                .willReturn(false);
+
+            given(substituteCandidateService.findCandidates(
+                newShift.getSchedule().getWorkplace().getId(),
+                newShift.getMember().getId(),
+                newShift
+            )).willReturn(List.of());
+
+            SubstituteRequestCreateResponse response =
+                substituteRequestService.create(SHIFT_ID, REQUESTER_USER_ID);
+
+            assertThat(response.requestCreated()).isFalse();
+            assertThat(response.requestId()).isNull();
+            assertThat(response.shiftId()).isEqualTo(SHIFT_ID);
+            assertThat(response.status()).isNull();
             assertThat(response.candidateCount()).isZero();
+
+            verify(substituteRequestRepository, never()).save(any(SubstituteRequest.class));
+            verify(substituteCandidateService, never())
+                .createCandidates(any(SubstituteRequest.class), any());
         }
 
         @Test
@@ -882,6 +938,7 @@ class SubstituteRequestServiceTest {
             now.minusDays(30),
             null
         );
+
         return new Shift(scheduleFixture, owner, startAt, startAt.plusHours(4), status);
     }
 

@@ -253,7 +253,8 @@ class ShiftServiceTest {
         when(workplaceMemberService.requireManager(actorId, workplaceId)).thenReturn(managerMember);
 
         // Schedule 검증
-        when(scheduleRepository.findById(scheduleId)).thenReturn(Optional.of(schedule));
+        when(scheduleRepository.findByIdForUpdate(scheduleId))
+            .thenReturn(Optional.of(schedule));
         when(schedule.getWorkplace()).thenReturn(workplace);
         when(workplace.getId()).thenReturn(workplaceId);
         when(schedule.getStatus()).thenReturn(ScheduleStatus.DRAFT);
@@ -308,7 +309,8 @@ class ShiftServiceTest {
         when(workplaceRepository.findById(workplaceId)).thenReturn(Optional.of(workplace));
         when(workplaceMemberService.requireManager(actorId, workplaceId)).thenReturn(managerMember);
 
-        when(scheduleRepository.findById(scheduleId)).thenReturn(Optional.of(schedule));
+        when(scheduleRepository.findByIdForUpdate(scheduleId))
+            .thenReturn(Optional.of(schedule));
         when(schedule.getWorkplace()).thenReturn(workplace);
         when(workplace.getId()).thenReturn(workplaceId);
         when(schedule.getStatus()).thenReturn(ScheduleStatus.PUBLISHED);
@@ -342,7 +344,8 @@ class ShiftServiceTest {
         when(workplaceRepository.findById(workplaceId)).thenReturn(Optional.of(workplace));
         when(workplaceMemberService.requireManager(actorId, workplaceId)).thenReturn(managerMember);
 
-        when(scheduleRepository.findById(scheduleId)).thenReturn(Optional.of(schedule));
+        when(scheduleRepository.findByIdForUpdate(scheduleId))
+            .thenReturn(Optional.of(schedule));
         when(schedule.getWorkplace()).thenReturn(workplace);
         when(workplace.getId()).thenReturn(workplaceId);
         when(schedule.getStatus()).thenReturn(ScheduleStatus.DRAFT);
@@ -431,7 +434,7 @@ class ShiftServiceTest {
         when(reqBody.endAt()).thenReturn(endAt);
         when(reqBody.confirmUnavailableConflict()).thenReturn(false);
 
-        when(scheduleRepository.findById(scheduleId))
+        when(scheduleRepository.findByIdForUpdate(scheduleId))
             .thenReturn(Optional.of(schedule));
         when(schedule.getWorkplace()).thenReturn(workplace);
         when(schedule.getStatus()).thenReturn(ScheduleStatus.DRAFT);
@@ -478,6 +481,9 @@ class ShiftServiceTest {
             (ConfirmationRequiredResponse) exception.getData();
 
         assertThat(data.requiresConfirmation()).isTrue();
+
+        verify(scheduleRepository)
+            .findByIdForUpdate(scheduleId);
 
         verify(shiftRepository, never())
             .save(any(Shift.class));
@@ -543,7 +549,7 @@ class ShiftServiceTest {
             .thenReturn(false);
 
         // Schedule 검증
-        when(scheduleRepository.findById(scheduleId))
+        when(scheduleRepository.findByIdForUpdate(scheduleId))
             .thenReturn(
                 Optional.of(schedule)
             );
@@ -646,6 +652,9 @@ class ShiftServiceTest {
             startAt,
             endAt
         );
+
+        verify(scheduleRepository)
+            .findByIdForUpdate(scheduleId);
 
         verify(shift, never())
             .update(

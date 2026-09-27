@@ -50,26 +50,38 @@ public class SubstituteRequest extends BaseEntity {
         this.status = status;
     }
 
-    //3. 요청이 이미 수락, 승인 상태라면 예외 던짐
+    // Request가 아직 OPEN 상태인지 확인
     public void validateOpening() {
         if (this.status != RequestStatus.OPEN) {
-            throw new BusinessException(SubstituteRequestErrorCode.VALIDATE_STATUS_CLOSED);
+            throw new BusinessException(
+                SubstituteRequestErrorCode.VALIDATE_STATUS_CLOSED
+            );
         }
     }
-    //2. 요청이 수락상태로 변하게 하는 메서드
+
+    // Candidate가 대타 요청을 수락하면 Request도 ACCEPTED로 변경
     public void accept() {
         validateOpening();
-        //후보자 중 1명이 수락을 누름과 동시에 요청도 수락 상태도 바뀜.
-        // ACCEPTED Candidate가 정확히 1명 존재해야 한다는 조건 만족, 추후 동시성 문제 보완 필요)
+
         this.status = RequestStatus.ACCEPTED;
     }
 
-    //실제로 근무를 바꿈
-    public void approveRequest(WorkplaceMember acceptedMember, LocalDateTime now) {
-        //Shift 담당자를 대체 근무자로 변경
+    // 모든 Candidate가 거절한 경우 Request 종료
+    public void closeAllCandidatesRejected(LocalDateTime now) {
+        this.status = RequestStatus.CLOSED;
+        this.closeReason = RequestCloseReason.ALL_CANDIDATES_REJECTED;
+        this.closedAt = now;
+    }
+
+    // MANAGER가 최종 승인하면 실제 Shift 담당자 변경
+    public void approveRequest(
+        WorkplaceMember acceptedMember,
+        LocalDateTime now
+    ) {
+        // Shift 담당자를 대타 근무자로 변경
         this.shift.changeMember(acceptedMember);
 
-        //Request 최종 상태 및 승인/마감 시각 변경
+        // Request 최종 상태 및 승인/마감 시각 변경
         this.status = RequestStatus.APPROVED;
         this.approvedAt = now;
         this.closedAt = now;

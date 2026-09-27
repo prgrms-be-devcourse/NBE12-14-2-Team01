@@ -74,10 +74,13 @@ public class UnavailableTimeService {
     public UnavailableTime register(LocalDateTime startAt,
                                     LocalDateTime endAt,
                                     Boolean confirmOfficialShiftConflict) {
-        LocalDateTime now = LocalDateTime.now(clock);
-
         Long userId = rq.getActorId();
-        User user = userService.getById(userId);
+
+        User user =
+            userService.getByIdForUpdate(userId);
+
+        LocalDateTime now =
+            LocalDateTime.now(clock);
 
         validateTimeRange(startAt, endAt);
         validateFutureTime(startAt, now);
@@ -104,9 +107,15 @@ public class UnavailableTimeService {
                                   LocalDateTime startAt,
                                   LocalDateTime endAt,
                                   Boolean confirmOfficialShiftConflict) {
-        LocalDateTime now = LocalDateTime.now(clock);
+        Long userId =
+            rq.getActorId();
 
-        Long userId = rq.getActorId();
+        userService.getByIdForUpdate(
+            userId
+        );
+
+        LocalDateTime now =
+            LocalDateTime.now(clock);
 
         UnavailableTime unavailableTime =
             unavailableTimeRepository.findById(unavailableTimeId)
@@ -147,7 +156,12 @@ public class UnavailableTimeService {
 
     public void delete(Long unavailableTimeId) {
 
-        Long userId = rq.getActorId();
+        Long userId =
+            rq.getActorId();
+
+        userService.getByIdForUpdate(
+            userId
+        );
 
         UnavailableTime unavailableTime =
                 unavailableTimeRepository.findById(unavailableTimeId).orElseThrow(
