@@ -11,6 +11,7 @@ import com.merge.backend.domain.substitute.entity.SubstituteCandidate;
 import com.merge.backend.domain.substitute.entity.SubstituteRequest;
 import com.merge.backend.domain.substitute.exception.SubstituteRequestErrorCode;
 import com.merge.backend.domain.substitute.repository.SubstituteCandidateRepository;
+import com.merge.backend.domain.substitute.repository.SubstituteRequestRepository;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
@@ -30,6 +31,7 @@ public class SubstituteCandidateService {
     private final ShiftRepository shiftRepository;
     private final UnavailableTimeRepository unavailableTimeRepository;
     private final SubstituteCandidateRepository substituteCandidateRepository;
+    private final SubstituteRequestRepository substituteRequestRepository;
     private final Clock clock;
 
     @Transactional(readOnly = true)
@@ -96,6 +98,22 @@ public class SubstituteCandidateService {
         Long userId,      // 현재 로그인한 User ID
         LocalDateTime now // Clock으로 구한 현재 시간
     ) {
+        Long requestId =
+            substituteCandidateRepository.findRequestIdById(candidateId)
+                .orElseThrow(() ->
+                    new BusinessException(
+                        SubstituteRequestErrorCode.CANDIDATE_NOT_FOUND
+                    )
+                );
+
+        SubstituteRequest request =
+            substituteRequestRepository.findByIdForUpdate(requestId)
+                .orElseThrow(() ->
+                    new BusinessException(
+                        SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND
+                    )
+                );
+
         SubstituteCandidate candidate = substituteCandidateRepository.findById(candidateId)
             .orElseThrow(() ->
                 new BusinessException(SubstituteRequestErrorCode.CANDIDATE_NOT_FOUND)
@@ -117,8 +135,6 @@ public class SubstituteCandidateService {
         if (candidate.getStatus() != CandidateStatus.PENDING) {
             throw new BusinessException(SubstituteRequestErrorCode.CANDIDATE_ALREADY_RESPONDED);
         }
-
-        SubstituteRequest request = candidate.getRequest();
 
         // 다른 Candidate가 먼저 수락했거나 이미 요청이 종료됐는지 확인
         if (request.getStatus() != RequestStatus.OPEN) {

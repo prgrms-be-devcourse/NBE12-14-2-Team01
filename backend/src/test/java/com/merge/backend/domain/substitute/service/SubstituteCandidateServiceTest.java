@@ -20,17 +20,18 @@ import com.merge.backend.domain.substitute.entity.RequestStatus;
 import com.merge.backend.domain.substitute.entity.SubstituteCandidate;
 import com.merge.backend.domain.substitute.entity.SubstituteRequest;
 import com.merge.backend.domain.substitute.repository.SubstituteCandidateRepository;
+import com.merge.backend.domain.substitute.repository.SubstituteRequestRepository;
 import com.merge.backend.domain.user.entity.User;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
 import com.merge.backend.global.exception.BusinessException;
 import java.time.Clock;
-import java.util.Optional;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,6 +53,9 @@ class SubstituteCandidateServiceTest {
 
     @Mock
     private SubstituteCandidateRepository substituteCandidateRepository;
+
+    @Mock
+    private SubstituteRequestRepository substituteRequestRepository;
 
     @InjectMocks
     private SubstituteCandidateService substituteCandidateService;
@@ -128,6 +132,7 @@ class SubstituteCandidateServiceTest {
 
         // given
         Long candidateId = 1L;
+        Long requestId = 50L;
         Long userId = 10L;
 
         LocalDateTime startAt =
@@ -142,7 +147,15 @@ class SubstituteCandidateServiceTest {
         when(clock.getZone())
             .thenReturn(ZoneId.of("Asia/Seoul"));
 
-        // Candidate 조회
+        // Candidate가 어느 Request에 속하는지 ID만 먼저 조회
+        when(substituteCandidateRepository.findRequestIdById(candidateId))
+            .thenReturn(Optional.of(requestId));
+
+        // 같은 Request의 상태 전이를 직렬화하기 위해 Request Lock 획득
+        when(substituteRequestRepository.findByIdForUpdate(requestId))
+            .thenReturn(Optional.of(substituteRequest));
+
+        // Lock 획득 후 Candidate 최신 조회
         when(substituteCandidateRepository.findById(candidateId))
             .thenReturn(Optional.of(candidate));
 
@@ -202,7 +215,14 @@ class SubstituteCandidateServiceTest {
         // then
         assertThat(result).isEqualTo(candidate);
 
-        verify(candidate).acceptRequest(any(LocalDateTime.class));
+        verify(substituteCandidateRepository)
+            .findRequestIdById(candidateId);
+
+        verify(substituteRequestRepository)
+            .findByIdForUpdate(requestId);
+
+        verify(candidate)
+            .acceptRequest(any(LocalDateTime.class));
     }
 
     @Test
@@ -224,7 +244,15 @@ class SubstituteCandidateServiceTest {
         when(clock.getZone())
             .thenReturn(ZoneId.of("Asia/Seoul"));
 
-        // Candidate 조회
+        // Candidate가 어느 Request에 속하는지 ID만 먼저 조회
+        when(substituteCandidateRepository.findRequestIdById(candidateId))
+            .thenReturn(Optional.of(requestId));
+
+        // 같은 Request의 상태 전이를 직렬화하기 위해 Request Lock 획득
+        when(substituteRequestRepository.findByIdForUpdate(requestId))
+            .thenReturn(Optional.of(substituteRequest));
+
+        // Lock 획득 후 Candidate 최신 조회
         when(substituteCandidateRepository.findById(candidateId))
             .thenReturn(Optional.of(candidate));
 
@@ -272,6 +300,12 @@ class SubstituteCandidateServiceTest {
         // then
         assertThat(result).isEqualTo(candidate);
 
+        verify(substituteCandidateRepository)
+            .findRequestIdById(candidateId);
+
+        verify(substituteRequestRepository)
+            .findByIdForUpdate(requestId);
+
         // 현재 Candidate는 거절 처리됨
         verify(candidate).reject(any(LocalDateTime.class));
 
@@ -298,7 +332,15 @@ class SubstituteCandidateServiceTest {
         when(clock.getZone())
             .thenReturn(ZoneId.of("Asia/Seoul"));
 
-        // Candidate 조회
+        // Candidate가 어느 Request에 속하는지 ID만 먼저 조회
+        when(substituteCandidateRepository.findRequestIdById(candidateId))
+            .thenReturn(Optional.of(requestId));
+
+        // 같은 Request의 상태 전이를 직렬화하기 위해 Request Lock 획득
+        when(substituteRequestRepository.findByIdForUpdate(requestId))
+            .thenReturn(Optional.of(substituteRequest));
+
+        // Lock 획득 후 Candidate 최신 조회
         when(substituteCandidateRepository.findById(candidateId))
             .thenReturn(Optional.of(candidate));
 
@@ -346,6 +388,12 @@ class SubstituteCandidateServiceTest {
         // then
         assertThat(result).isEqualTo(candidate);
 
+        verify(substituteCandidateRepository)
+            .findRequestIdById(candidateId);
+
+        verify(substituteRequestRepository)
+            .findByIdForUpdate(requestId);
+
         // Candidate는 거절 처리
         verify(candidate).reject(any(LocalDateTime.class));
 
@@ -360,6 +408,7 @@ class SubstituteCandidateServiceTest {
 
         // given
         Long candidateId = 1L;
+        Long requestId = 50L;
         Long userId = 10L;
 
         when(clock.instant())
@@ -367,6 +416,12 @@ class SubstituteCandidateServiceTest {
 
         when(clock.getZone())
             .thenReturn(ZoneId.of("Asia/Seoul"));
+
+        when(substituteCandidateRepository.findRequestIdById(candidateId))
+            .thenReturn(Optional.of(requestId));
+
+        when(substituteRequestRepository.findByIdForUpdate(requestId))
+            .thenReturn(Optional.of(substituteRequest));
 
         // Candidate 조회
         when(substituteCandidateRepository.findById(candidateId))
@@ -390,6 +445,12 @@ class SubstituteCandidateServiceTest {
             () -> substituteCandidateService.acceptCandidate(candidateId, userId)
         );
 
+        verify(substituteCandidateRepository)
+            .findRequestIdById(candidateId);
+
+        verify(substituteRequestRepository)
+            .findByIdForUpdate(requestId);
+
         // 이미 응답했으므로 다시 accept 처리되면 안 됨
         verify(candidate, never())
             .acceptRequest(any(LocalDateTime.class));
@@ -401,6 +462,7 @@ class SubstituteCandidateServiceTest {
 
         // given
         Long candidateId = 1L;
+        Long requestId = 50L;
         Long userId = 10L;
         Long shiftId = 100L;
 
@@ -415,6 +477,12 @@ class SubstituteCandidateServiceTest {
 
         when(clock.getZone())
             .thenReturn(ZoneId.of("Asia/Seoul"));
+
+        when(substituteCandidateRepository.findRequestIdById(candidateId))
+            .thenReturn(Optional.of(requestId));
+
+        when(substituteRequestRepository.findByIdForUpdate(requestId))
+            .thenReturn(Optional.of(substituteRequest));
 
         // Candidate 조회
         when(substituteCandidateRepository.findById(candidateId))
@@ -461,6 +529,12 @@ class SubstituteCandidateServiceTest {
             BusinessException.class,
             () -> substituteCandidateService.acceptCandidate(candidateId, userId)
         );
+
+        verify(substituteCandidateRepository)
+            .findRequestIdById(candidateId);
+
+        verify(substituteRequestRepository)
+            .findByIdForUpdate(requestId);
 
         // 충돌이 있으므로 상태 변경이 일어나면 안 됨
         verify(candidate, never())

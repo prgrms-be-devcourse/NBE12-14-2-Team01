@@ -7,9 +7,12 @@ import com.merge.backend.domain.shift.entity.Shift;
 import com.merge.backend.domain.shift.entity.ShiftStatus;
 import com.merge.backend.domain.shift.repository.ScheduleRepository;
 import com.merge.backend.domain.shift.repository.ShiftRepository;
+import com.merge.backend.domain.substitute.entity.CandidateStatus;
 import com.merge.backend.domain.substitute.entity.RequestStatus;
+import com.merge.backend.domain.substitute.entity.SubstituteCandidate;
 import com.merge.backend.domain.substitute.entity.SubstituteRequest;
 import com.merge.backend.domain.substitute.exception.SubstituteRequestErrorCode;
+import com.merge.backend.domain.substitute.repository.SubstituteCandidateRepository;
 import com.merge.backend.domain.substitute.repository.SubstituteRequestRepository;
 import com.merge.backend.domain.user.entity.User;
 import com.merge.backend.domain.user.repository.UserRepository;
@@ -47,6 +50,12 @@ class SubstituteRequestConcurrencyTest {
 
     @Autowired
     private SubstituteRequestRepository substituteRequestRepository;
+
+    @Autowired
+    private SubstituteCandidateService substituteCandidateService;
+
+    @Autowired
+    private SubstituteCandidateRepository substituteCandidateRepository;
 
     @Autowired
     private ShiftRepository shiftRepository;
@@ -212,6 +221,275 @@ class SubstituteRequestConcurrencyTest {
         }
     }
 
+    @Test
+    @DisplayName(
+        "같은 Request의 두 Candidate가 동시에 수락해도 한 명만 ACCEPTED 된다"
+    )
+    void concurrentAcceptAllowsOnlyOneCandidate()
+        throws Exception {
+
+        // given
+        TransitionFixture fixture =
+            createTransitionFixture("accept-accept");
+
+        ExecutorService executor =
+            Executors.newFixedThreadPool(2);
+
+        CountDownLatch ready =
+            new CountDownLatch(2);
+
+        CountDownLatch start =
+            new CountDownLatch(1);
+
+        try {
+
+            Future<Throwable> firstFuture =
+                executor.submit(() -> {
+
+                    ready.countDown();
+                    start.await();
+
+                    try {
+                        substituteCandidateService.acceptCandidate(
+                            fixture.firstCandidateId(),
+                            fixture.firstCandidateUserId()
+                        );
+
+                        return null;
+
+                    } catch (Throwable throwable) {
+                        return throwable;
+                    }
+                });
+
+            Future<Throwable> secondFuture =
+                executor.submit(() -> {
+
+                    ready.countDown();
+                    start.await();
+
+                    try {
+                        substituteCandidateService.acceptCandidate(
+                            fixture.secondCandidateId(),
+                            fixture.secondCandidateUserId()
+                        );
+
+                        return null;
+
+                    } catch (Throwable throwable) {
+                        return throwable;
+                    }
+                });
+
+            assertThat(
+                ready.await(
+                    3,
+                    TimeUnit.SECONDS
+                )
+            ).isTrue();
+
+            start.countDown();
+
+            Throwable firstError =
+                firstFuture.get(
+                    5,
+                    TimeUnit.SECONDS
+                );
+
+            Throwable secondError =
+                secondFuture.get(
+                    5,
+                    TimeUnit.SECONDS
+                );
+
+            boolean firstSucceeded =
+                firstError == null;
+
+            boolean secondSucceeded =
+                secondError == null;
+
+            assertThat(
+                firstSucceeded ^ secondSucceeded
+            ).isTrue();
+
+            Throwable failedError =
+                firstError != null
+                    ? firstError
+                    : secondError;
+
+            assertThat(failedError)
+                .isInstanceOf(BusinessException.class);
+
+            BusinessException businessException =
+                (BusinessException) failedError;
+
+            assertThat(
+                businessException.getErrorCode()
+            ).isEqualTo(
+                SubstituteRequestErrorCode.REQUEST_NOT_OPEN
+            );
+
+            TransactionTemplate transactionTemplate =
+                new TransactionTemplate(transactionManager);
+
+            transactionTemplate.executeWithoutResult(status -> {
+
+                SubstituteRequest request =
+                    substituteRequestRepository
+                        .findById(fixture.requestId())
+                        .orElseThrow();
+
+                SubstituteCandidate firstCandidate =
+                    substituteCandidateRepository
+                        .findById(fixture.firstCandidateId())
+                        .orElseThrow();
+
+                SubstituteCandidate secondCandidate =
+                    substituteCandidateRepository
+                        .findById(fixture.secondCandidateId())
+                        .orElseThrow();
+
+                assertThat(request.getStatus())
+                    .isEqualTo(RequestStatus.ACCEPTED);
+
+                assertThat(
+                    List.of(
+                        firstCandidate.getStatus(),
+                        secondCandidate.getStatus()
+                    )
+                ).containsExactlyInAnyOrder(
+                    CandidateStatus.ACCEPTED,
+                    CandidateStatus.PENDING
+                );
+            });
+
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName(
+        "같은 Request의 마지막 두 Candidate가 동시에 거절해도 Request는 CLOSED 된다"
+    )
+    void concurrentRejectClosesRequestWhenNoPendingCandidateRemains()
+        throws Exception {
+
+        // given
+        TransitionFixture fixture =
+            createTransitionFixture("reject-reject");
+
+        ExecutorService executor =
+            Executors.newFixedThreadPool(2);
+
+        CountDownLatch ready =
+            new CountDownLatch(2);
+
+        CountDownLatch start =
+            new CountDownLatch(1);
+
+        try {
+
+            Future<Throwable> firstFuture =
+                executor.submit(() -> {
+
+                    ready.countDown();
+                    start.await();
+
+                    try {
+                        substituteCandidateService.rejectCandidate(
+                            fixture.firstCandidateId(),
+                            fixture.firstCandidateUserId()
+                        );
+
+                        return null;
+
+                    } catch (Throwable throwable) {
+                        return throwable;
+                    }
+                });
+
+            Future<Throwable> secondFuture =
+                executor.submit(() -> {
+
+                    ready.countDown();
+                    start.await();
+
+                    try {
+                        substituteCandidateService.rejectCandidate(
+                            fixture.secondCandidateId(),
+                            fixture.secondCandidateUserId()
+                        );
+
+                        return null;
+
+                    } catch (Throwable throwable) {
+                        return throwable;
+                    }
+                });
+
+            assertThat(
+                ready.await(
+                    3,
+                    TimeUnit.SECONDS
+                )
+            ).isTrue();
+
+            start.countDown();
+
+            Throwable firstError =
+                firstFuture.get(
+                    5,
+                    TimeUnit.SECONDS
+                );
+
+            Throwable secondError =
+                secondFuture.get(
+                    5,
+                    TimeUnit.SECONDS
+                );
+
+            assertThat(firstError)
+                .isNull();
+
+            assertThat(secondError)
+                .isNull();
+
+            TransactionTemplate transactionTemplate =
+                new TransactionTemplate(transactionManager);
+
+            transactionTemplate.executeWithoutResult(status -> {
+
+                SubstituteRequest request =
+                    substituteRequestRepository
+                        .findById(fixture.requestId())
+                        .orElseThrow();
+
+                SubstituteCandidate firstCandidate =
+                    substituteCandidateRepository
+                        .findById(fixture.firstCandidateId())
+                        .orElseThrow();
+
+                SubstituteCandidate secondCandidate =
+                    substituteCandidateRepository
+                        .findById(fixture.secondCandidateId())
+                        .orElseThrow();
+
+                assertThat(request.getStatus())
+                    .isEqualTo(RequestStatus.CLOSED);
+
+                assertThat(firstCandidate.getStatus())
+                    .isEqualTo(CandidateStatus.REJECTED);
+
+                assertThat(secondCandidate.getStatus())
+                    .isEqualTo(CandidateStatus.REJECTED);
+            });
+
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
     private Fixture createFixture(String suffix) {
 
         TransactionTemplate transactionTemplate =
@@ -317,9 +595,171 @@ class SubstituteRequestConcurrencyTest {
         });
     }
 
+    private TransitionFixture createTransitionFixture(String suffix) {
+
+        TransactionTemplate transactionTemplate =
+            new TransactionTemplate(transactionManager);
+
+        return transactionTemplate.execute(status -> {
+
+            LocalDateTime now =
+                LocalDateTime.now(clock);
+
+            LocalDateTime startAt =
+                now.plusDays(7)
+                    .withHour(10)
+                    .withMinute(0)
+                    .withSecond(0)
+                    .withNano(0);
+
+            LocalDateTime endAt =
+                startAt.plusHours(4);
+
+            LocalDate weekStartDate =
+                startAt.toLocalDate()
+                    .with(
+                        TemporalAdjusters.previousOrSame(
+                            DayOfWeek.MONDAY
+                        )
+                    );
+
+            User requesterUser =
+                userRepository.save(
+                    new User(
+                        "transition-requester-" + suffix + "@test.com",
+                        "password-hash",
+                        "requester"
+                    )
+                );
+
+            User firstCandidateUser =
+                userRepository.save(
+                    new User(
+                        "transition-first-" + suffix + "@test.com",
+                        "password-hash",
+                        "first-candidate"
+                    )
+                );
+
+            User secondCandidateUser =
+                userRepository.save(
+                    new User(
+                        "transition-second-" + suffix + "@test.com",
+                        "password-hash",
+                        "second-candidate"
+                    )
+                );
+
+            Workplace workplace =
+                workplaceRepository.save(
+                    new Workplace(
+                        "대타 상태 전이 동시성 테스트 매장 " + suffix,
+                        "TR-" + suffix
+                    )
+                );
+
+            LocalDateTime joinedAt =
+                now.minusDays(30);
+
+            WorkplaceMember requesterMember =
+                workplaceMemberRepository.save(
+                    new WorkplaceMember(
+                        workplace,
+                        requesterUser,
+                        WorkplaceRole.EMPLOYEE,
+                        joinedAt
+                    )
+                );
+
+            WorkplaceMember firstCandidateMember =
+                workplaceMemberRepository.save(
+                    new WorkplaceMember(
+                        workplace,
+                        firstCandidateUser,
+                        WorkplaceRole.EMPLOYEE,
+                        joinedAt
+                    )
+                );
+
+            WorkplaceMember secondCandidateMember =
+                workplaceMemberRepository.save(
+                    new WorkplaceMember(
+                        workplace,
+                        secondCandidateUser,
+                        WorkplaceRole.EMPLOYEE,
+                        joinedAt
+                    )
+                );
+
+            Schedule schedule =
+                new Schedule(
+                    workplace,
+                    weekStartDate
+                );
+
+            schedule.publish(now);
+
+            schedule =
+                scheduleRepository.save(schedule);
+
+            Shift shift =
+                shiftRepository.save(
+                    new Shift(
+                        schedule,
+                        requesterMember,
+                        startAt,
+                        endAt,
+                        ShiftStatus.SCHEDULED
+                    )
+                );
+
+            SubstituteRequest request =
+                substituteRequestRepository.save(
+                    new SubstituteRequest(
+                        shift,
+                        requesterMember,
+                        RequestStatus.OPEN
+                    )
+                );
+
+            SubstituteCandidate firstCandidate =
+                substituteCandidateRepository.save(
+                    new SubstituteCandidate(
+                        request,
+                        firstCandidateMember
+                    )
+                );
+
+            SubstituteCandidate secondCandidate =
+                substituteCandidateRepository.save(
+                    new SubstituteCandidate(
+                        request,
+                        secondCandidateMember
+                    )
+                );
+
+            return new TransitionFixture(
+                request.getId(),
+                firstCandidate.getId(),
+                firstCandidateUser.getId(),
+                secondCandidate.getId(),
+                secondCandidateUser.getId()
+            );
+        });
+    }
+
     private record Fixture(
         Long requesterUserId,
         Long shiftId
+    ) {
+    }
+
+    private record TransitionFixture(
+        Long requestId,
+        Long firstCandidateId,
+        Long firstCandidateUserId,
+        Long secondCandidateId,
+        Long secondCandidateUserId
     ) {
     }
 

@@ -179,7 +179,7 @@ class SubstituteRequestServiceTest {
             given(shift.getStartAt()).willReturn(now.plusDays(1));
             given(shift.getEndAt()).willReturn(now.plusDays(1).plusHours(8));
 
-            given(substituteRequestRepository.findById(requestId))
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
                 .willReturn(Optional.of(request));
             given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
             given(substituteCandidateRepository.findByRequestIdAndStatus(
@@ -199,6 +199,8 @@ class SubstituteRequestServiceTest {
 
             // then
             assertThat(result).isNotNull();
+            verify(substituteRequestRepository)
+                .findByIdForUpdate(requestId);
             verify(workplaceMemberService).requireManager(actorId, workplaceId);
             verify(request).approveRequest(eq(candidateMember), any(LocalDateTime.class));
         }
@@ -208,7 +210,7 @@ class SubstituteRequestServiceTest {
         void approve_fail_invalid_request_status() {
             // given
             given(request.getStatus()).willReturn(RequestStatus.OPEN);
-            given(substituteRequestRepository.findById(requestId))
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
                 .willReturn(Optional.of(request));
 
             // when & then
@@ -226,7 +228,7 @@ class SubstituteRequestServiceTest {
 
             given(shift.getStartAt()).willReturn(now.minusHours(1));
 
-            given(substituteRequestRepository.findById(requestId))
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
                 .willReturn(Optional.of(request));
             given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
             given(substituteCandidateRepository.findByRequestIdAndStatus(
@@ -244,7 +246,7 @@ class SubstituteRequestServiceTest {
         void approve_fail_actor_not_in_workplace() {
             // given
             setupValidRequestBasicInfo();
-            given(substituteRequestRepository.findById(requestId))
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
                 .willReturn(Optional.of(request));
 
             given(workplaceMemberService.requireManager(actorId, workplaceId))
@@ -266,7 +268,7 @@ class SubstituteRequestServiceTest {
             given(shift.getStartAt()).willReturn(now.plusDays(1));
             given(shift.getEndAt()).willReturn(now.plusDays(1).plusHours(8));
 
-            given(substituteRequestRepository.findById(requestId))
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
                 .willReturn(Optional.of(request));
             given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
             given(substituteCandidateRepository.findByRequestIdAndStatus(
@@ -292,7 +294,7 @@ class SubstituteRequestServiceTest {
             given(shift.getStartAt()).willReturn(now.plusDays(1));
             given(shift.getEndAt()).willReturn(now.plusDays(1).plusHours(8));
 
-            given(substituteRequestRepository.findById(requestId))
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
                 .willReturn(Optional.of(request));
             given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
             given(substituteCandidateRepository.findByRequestIdAndStatus(
@@ -321,7 +323,7 @@ class SubstituteRequestServiceTest {
             given(shift.getStartAt()).willReturn(now.plusDays(1));
             given(shift.getEndAt()).willReturn(now.plusDays(1).plusHours(8));
 
-            given(substituteRequestRepository.findById(requestId))
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
                 .willReturn(Optional.of(request));
             given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
             given(substituteCandidateRepository.findByRequestIdAndStatus(
@@ -499,7 +501,7 @@ class SubstituteRequestServiceTest {
         @Test
         @DisplayName("성공: OPEN 상태의 요청을 MANAGER가 종료하면 CLOSED로 변경된다.")
         void close_OpenRequest_Success() {
-            given(substituteRequestRepository.findById(requestId))
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
                 .willReturn(Optional.of(request));
             given(request.getShift()).willReturn(shift);
             given(shift.getSchedule()).willReturn(schedule);
@@ -514,6 +516,8 @@ class SubstituteRequestServiceTest {
             SubstituteRequest result = substituteRequestService.close(requestId, actorId);
 
             assertThat(result).isEqualTo(request);
+            verify(substituteRequestRepository)
+                .findByIdForUpdate(requestId);
             verify(workplaceMemberService).requireManager(actorId, workplaceId);
             verify(request).closeByManager(any(LocalDateTime.class));
         }
@@ -521,7 +525,7 @@ class SubstituteRequestServiceTest {
         @Test
         @DisplayName("성공: ACCEPTED 상태의 요청도 MANAGER가 종료할 수 있다.")
         void close_AcceptedRequest_Success() {
-            given(substituteRequestRepository.findById(requestId))
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
                 .willReturn(Optional.of(request));
             given(request.getShift()).willReturn(shift);
             given(shift.getSchedule()).willReturn(schedule);
@@ -542,7 +546,8 @@ class SubstituteRequestServiceTest {
         @Test
         @DisplayName("실패: 존재하지 않는 요청이면 예외가 발생한다.")
         void close_RequestNotFound_ThrowsException() {
-            given(substituteRequestRepository.findById(requestId)).willReturn(Optional.empty());
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
+                .willReturn(Optional.empty());
 
             assertThatThrownBy(() -> substituteRequestService.close(requestId, actorId))
                 .isInstanceOf(BusinessException.class);
@@ -551,7 +556,7 @@ class SubstituteRequestServiceTest {
         @Test
         @DisplayName("실패: 실제 Workplace의 MANAGER가 아니면 예외가 발생한다.")
         void close_NotManager_ThrowsException() {
-            given(substituteRequestRepository.findById(requestId))
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
                 .willReturn(Optional.of(request));
             given(request.getShift()).willReturn(shift);
             given(shift.getSchedule()).willReturn(schedule);
@@ -569,7 +574,7 @@ class SubstituteRequestServiceTest {
         @Test
         @DisplayName("실패: 요청이 이미 APPROVED 상태면 예외가 발생한다.")
         void close_AlreadyApproved_ThrowsException() {
-            given(substituteRequestRepository.findById(requestId))
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
                 .willReturn(Optional.of(request));
             given(request.getShift()).willReturn(shift);
             given(shift.getSchedule()).willReturn(schedule);
@@ -586,7 +591,7 @@ class SubstituteRequestServiceTest {
         @Test
         @DisplayName("실패: 요청이 이미 CLOSED 상태면 예외가 발생한다.")
         void close_AlreadyClosed_ThrowsException() {
-            given(substituteRequestRepository.findById(requestId))
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
                 .willReturn(Optional.of(request));
             given(request.getShift()).willReturn(shift);
             given(shift.getSchedule()).willReturn(schedule);
@@ -603,7 +608,7 @@ class SubstituteRequestServiceTest {
         @Test
         @DisplayName("실패: Schedule이 PUBLISHED 상태가 아니면 예외가 발생한다.")
         void close_ScheduleNotPublished_ThrowsException() {
-            given(substituteRequestRepository.findById(requestId))
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
                 .willReturn(Optional.of(request));
             given(request.getShift()).willReturn(shift);
             given(shift.getSchedule()).willReturn(schedule);
@@ -620,7 +625,7 @@ class SubstituteRequestServiceTest {
         @Test
         @DisplayName("실패: Shift가 SCHEDULED 상태가 아니면 예외가 발생한다.")
         void close_ShiftNotScheduled_ThrowsException() {
-            given(substituteRequestRepository.findById(requestId))
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
                 .willReturn(Optional.of(request));
             given(request.getShift()).willReturn(shift);
             given(shift.getSchedule()).willReturn(schedule);
@@ -638,7 +643,7 @@ class SubstituteRequestServiceTest {
         @Test
         @DisplayName("실패: Shift가 이미 시작된 경우(now >= startAt) 예외가 발생한다.")
         void close_ShiftAlreadyStarted_ThrowsException() {
-            given(substituteRequestRepository.findById(requestId))
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
                 .willReturn(Optional.of(request));
             given(request.getShift()).willReturn(shift);
             given(shift.getSchedule()).willReturn(schedule);
@@ -659,7 +664,7 @@ class SubstituteRequestServiceTest {
         @Test
         @DisplayName("실패: Shift 시작 시각이 정확히 now와 같으면(경계값) 예외가 발생한다.")
         void close_ShiftStartsExactlyNow_ThrowsException() {
-            given(substituteRequestRepository.findById(requestId))
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
                 .willReturn(Optional.of(request));
             given(request.getShift()).willReturn(shift);
             given(shift.getSchedule()).willReturn(schedule);
@@ -680,7 +685,7 @@ class SubstituteRequestServiceTest {
         @Test
         @DisplayName("성공: Candidate 상태는 변경되지 않는다 (요청만 CLOSED 처리).")
         void close_DoesNotModifyCandidateStatus() {
-            given(substituteRequestRepository.findById(requestId))
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
                 .willReturn(Optional.of(request));
             given(request.getShift()).willReturn(shift);
             given(shift.getSchedule()).willReturn(schedule);
