@@ -2,10 +2,13 @@ package com.merge.backend.domain.shift.repository;
 
 import com.merge.backend.domain.shift.entity.ScheduleStatus;
 import com.merge.backend.domain.shift.entity.Shift;
+import jakarta.persistence.LockModeType;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -14,6 +17,17 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
     List<Shift> findBySchedule_IdOrderByStartAtAscIdAsc(
         Long scheduleId
     );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        SELECT s
+        FROM Shift s
+        WHERE s.id = :shiftId
+        """)
+    Optional<Shift> findByIdForUpdate(
+        @Param("shiftId") Long shiftId
+    );
+
 
     //동일 Schedule 내 동일 WorkplaceMember의 다른 Shift 중복 검증
     @Query("""

@@ -714,7 +714,7 @@ class SubstituteRequestServiceTest {
 
             WorkplaceMember newCandidateMember = mock(WorkplaceMember.class);
 
-            given(shiftRepository.findById(SHIFT_ID)).willReturn(Optional.of(newShift));
+            given(shiftRepository.findByIdForUpdate(SHIFT_ID)).willReturn(Optional.of(newShift));
             given(substituteRequestRepository
                 .existsByShift_IdAndStatusIn(SHIFT_ID, ACTIVE_STATUSES))
                 .willReturn(false);
@@ -741,6 +741,7 @@ class SubstituteRequestServiceTest {
 
             ArgumentCaptor<SubstituteRequest> captor =
                 ArgumentCaptor.forClass(SubstituteRequest.class);
+            verify(shiftRepository).findByIdForUpdate(SHIFT_ID);
             verify(substituteRequestRepository).save(captor.capture());
             SubstituteRequest saved = captor.getValue();
             assertThat(saved.getShift()).isSameAs(newShift);
@@ -761,7 +762,7 @@ class SubstituteRequestServiceTest {
                 publishedSchedule(), REQUESTER_USER_ID, futureStartAt(), ShiftStatus.SCHEDULED
             );
 
-            given(shiftRepository.findById(SHIFT_ID)).willReturn(Optional.of(newShift));
+            given(shiftRepository.findByIdForUpdate(SHIFT_ID)).willReturn(Optional.of(newShift));
             given(substituteRequestRepository
                 .existsByShift_IdAndStatusIn(SHIFT_ID, ACTIVE_STATUSES))
                 .willReturn(false);
@@ -789,7 +790,7 @@ class SubstituteRequestServiceTest {
         @Test
         @DisplayName("SUB-01 실패 - 존재하지 않는 Shift")
         void create_Fail_ShiftNotFound() {
-            given(shiftRepository.findById(SHIFT_ID)).willReturn(Optional.empty());
+            given(shiftRepository.findByIdForUpdate(SHIFT_ID)).willReturn(Optional.empty());
 
             assertCreateFails(SubstituteRequestErrorCode.SHIFT_NOT_FOUND);
         }
@@ -800,7 +801,7 @@ class SubstituteRequestServiceTest {
             Shift newShift = createShift(
                 draftSchedule(), REQUESTER_USER_ID, futureStartAt(), ShiftStatus.SCHEDULED
             );
-            given(shiftRepository.findById(SHIFT_ID)).willReturn(Optional.of(newShift));
+            given(shiftRepository.findByIdForUpdate(SHIFT_ID)).willReturn(Optional.of(newShift));
 
             assertCreateFails(SubstituteRequestErrorCode.SHIFT_NOT_PUBLISHED);
         }
@@ -811,7 +812,7 @@ class SubstituteRequestServiceTest {
             Shift newShift = createShift(
                 publishedSchedule(), REQUESTER_USER_ID, futureStartAt(), ShiftStatus.CANCELLED
             );
-            given(shiftRepository.findById(SHIFT_ID)).willReturn(Optional.of(newShift));
+            given(shiftRepository.findByIdForUpdate(SHIFT_ID)).willReturn(Optional.of(newShift));
 
             assertCreateFails(SubstituteRequestErrorCode.SHIFT_CANCELLED);
         }
@@ -822,7 +823,7 @@ class SubstituteRequestServiceTest {
             Shift newShift = createShift(
                 publishedSchedule(), OTHER_USER_ID, futureStartAt(), ShiftStatus.SCHEDULED
             );
-            given(shiftRepository.findById(SHIFT_ID)).willReturn(Optional.of(newShift));
+            given(shiftRepository.findByIdForUpdate(SHIFT_ID)).willReturn(Optional.of(newShift));
 
             assertCreateFails(SubstituteRequestErrorCode.NOT_OWN_SHIFT);
         }
@@ -836,7 +837,7 @@ class SubstituteRequestServiceTest {
                 now.minusMinutes(1),
                 ShiftStatus.SCHEDULED
             );
-            given(shiftRepository.findById(SHIFT_ID)).willReturn(Optional.of(newShift));
+            given(shiftRepository.findByIdForUpdate(SHIFT_ID)).willReturn(Optional.of(newShift));
 
             assertCreateFails(SubstituteRequestErrorCode.SHIFT_ALREADY_STARTED);
         }
@@ -847,7 +848,7 @@ class SubstituteRequestServiceTest {
             Shift newShift = createShift(
                 publishedSchedule(), REQUESTER_USER_ID, futureStartAt(), ShiftStatus.SCHEDULED
             );
-            given(shiftRepository.findById(SHIFT_ID)).willReturn(Optional.of(newShift));
+            given(shiftRepository.findByIdForUpdate(SHIFT_ID)).willReturn(Optional.of(newShift));
             given(substituteRequestRepository
                 .existsByShift_IdAndStatusIn(SHIFT_ID, ACTIVE_STATUSES))
                 .willReturn(true);

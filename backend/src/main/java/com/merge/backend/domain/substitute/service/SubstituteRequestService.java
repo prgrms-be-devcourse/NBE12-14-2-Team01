@@ -108,7 +108,7 @@ public class SubstituteRequestService {
 
 
     private Shift validateSubstituteRequest(Long shiftId, Long actorUserId) {
-        Shift shift = shiftRepository.findById(shiftId)
+        Shift shift = shiftRepository.findByIdForUpdate(shiftId)
             .orElseThrow(() -> new
                 BusinessException(SubstituteRequestErrorCode.SHIFT_NOT_FOUND));
 
