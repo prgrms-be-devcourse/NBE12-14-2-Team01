@@ -103,8 +103,14 @@ class UnavailableTimeServiceTest {
         when(userService.getByIdForUpdate(USER_ID))
             .thenReturn(user);
 
-        when(unavailableTimeRepository.findByUserId(USER_ID))
-            .thenReturn(List.of());
+        when(
+            unavailableTimeRepository
+                .existsOverlappingUnavailableTime(
+                    USER_ID,
+                    startAt,
+                    endAt
+                )
+        ).thenReturn(false);
 
         when(
             shiftRepository.existsOverlappingOfficialShift(
@@ -144,7 +150,11 @@ class UnavailableTimeServiceTest {
             .getByIdForUpdate(USER_ID);
 
         callOrder.verify(unavailableTimeRepository)
-            .findByUserId(USER_ID);
+            .existsOverlappingUnavailableTime(
+                USER_ID,
+                startAt,
+                endAt
+            );
 
         callOrder.verify(shiftRepository)
             .existsOverlappingOfficialShift(
@@ -285,8 +295,6 @@ class UnavailableTimeServiceTest {
     void registerThrowsExceptionWhenFrontPartOverlaps() {
 
         assertRegisterOverlap(
-            LocalDateTime.of(2026, 9, 22, 10, 0),
-            LocalDateTime.of(2026, 9, 22, 12, 0),
             LocalDateTime.of(2026, 9, 22, 9, 0),
             LocalDateTime.of(2026, 9, 22, 11, 0)
         );
@@ -297,10 +305,8 @@ class UnavailableTimeServiceTest {
     void registerThrowsExceptionWhenBackPartOverlaps() {
 
         assertRegisterOverlap(
-            LocalDateTime.of(2026, 9, 22, 10, 0),
-            LocalDateTime.of(2026, 9, 22, 12, 0),
-            LocalDateTime.of(2026, 9, 22, 11, 0),
-            LocalDateTime.of(2026, 9, 22, 13, 0)
+            LocalDateTime.of(2026, 9, 22, 9, 0),
+            LocalDateTime.of(2026, 9, 22, 11, 0)
         );
     }
 
@@ -309,10 +315,8 @@ class UnavailableTimeServiceTest {
     void registerThrowsExceptionWhenNewTimeIsInsideExistingTime() {
 
         assertRegisterOverlap(
-            LocalDateTime.of(2026, 9, 22, 10, 0),
-            LocalDateTime.of(2026, 9, 22, 14, 0),
-            LocalDateTime.of(2026, 9, 22, 11, 0),
-            LocalDateTime.of(2026, 9, 22, 12, 0)
+            LocalDateTime.of(2026, 9, 22, 9, 0),
+            LocalDateTime.of(2026, 9, 22, 11, 0)
         );
     }
 
@@ -321,10 +325,8 @@ class UnavailableTimeServiceTest {
     void registerThrowsExceptionWhenNewTimeContainsExistingTime() {
 
         assertRegisterOverlap(
-            LocalDateTime.of(2026, 9, 22, 10, 0),
-            LocalDateTime.of(2026, 9, 22, 12, 0),
             LocalDateTime.of(2026, 9, 22, 9, 0),
-            LocalDateTime.of(2026, 9, 22, 13, 0)
+            LocalDateTime.of(2026, 9, 22, 11, 0)
         );
     }
 
@@ -333,12 +335,6 @@ class UnavailableTimeServiceTest {
     void registerSucceedsWhenNewEndEqualsExistingStart() {
 
         // given
-        LocalDateTime existingStartAt =
-            LocalDateTime.of(2026, 9, 22, 12, 0);
-
-        LocalDateTime existingEndAt =
-            LocalDateTime.of(2026, 9, 22, 14, 0);
-
         LocalDateTime newStartAt =
             LocalDateTime.of(2026, 9, 22, 10, 0);
 
@@ -346,8 +342,6 @@ class UnavailableTimeServiceTest {
             LocalDateTime.of(2026, 9, 22, 12, 0);
 
         assertRegisterAdjacentSuccess(
-            existingStartAt,
-            existingEndAt,
             newStartAt,
             newEndAt
         );
@@ -358,12 +352,6 @@ class UnavailableTimeServiceTest {
     void registerSucceedsWhenNewStartEqualsExistingEnd() {
 
         // given
-        LocalDateTime existingStartAt =
-            LocalDateTime.of(2026, 9, 22, 10, 0);
-
-        LocalDateTime existingEndAt =
-            LocalDateTime.of(2026, 9, 22, 12, 0);
-
         LocalDateTime newStartAt =
             LocalDateTime.of(2026, 9, 22, 12, 0);
 
@@ -371,8 +359,6 @@ class UnavailableTimeServiceTest {
             LocalDateTime.of(2026, 9, 22, 14, 0);
 
         assertRegisterAdjacentSuccess(
-            existingStartAt,
-            existingEndAt,
             newStartAt,
             newEndAt
         );
@@ -391,8 +377,14 @@ class UnavailableTimeServiceTest {
 
         User user = mockRegisterUser();
 
-        when(unavailableTimeRepository.findByUserId(USER_ID))
-            .thenReturn(List.of());
+        when(
+            unavailableTimeRepository
+                .existsOverlappingUnavailableTime(
+                    USER_ID,
+                    startAt,
+                    endAt
+                )
+        ).thenReturn(false);
 
         when(
             shiftRepository.existsOverlappingOfficialShift(
@@ -438,8 +430,14 @@ class UnavailableTimeServiceTest {
 
         User user = mockRegisterUser();
 
-        when(unavailableTimeRepository.findByUserId(USER_ID))
-            .thenReturn(List.of());
+        when(
+            unavailableTimeRepository
+                .existsOverlappingUnavailableTime(
+                    USER_ID,
+                    startAt,
+                    endAt
+                )
+        ).thenReturn(false);
 
         when(
             shiftRepository.existsOverlappingOfficialShift(
@@ -510,14 +508,12 @@ class UnavailableTimeServiceTest {
             .thenReturn(endAt);
 
         when(
-            shiftRepository.existsOverlappingOfficialShift(
-                USER_ID,
-                ScheduleStatus.PUBLISHED,
-                startAt,
-                endAt,
-                null
-            )
-        ).thenReturn(false);
+            unavailableTimeRepository
+                .findIdsWithOfficialShiftConflict(
+                    USER_ID,
+                    NOW
+                )
+        ).thenReturn(List.of());
 
         // when
         List<UnavailableTimeService.UnavailableTimeResult> result =
@@ -539,10 +535,22 @@ class UnavailableTimeServiceTest {
             .isFalse();
 
         verify(unavailableTimeRepository)
-            .findByUserIdAndEndAtAfterOrderByStartAtAsc(
+            .findIdsWithOfficialShiftConflict(
                 USER_ID,
                 NOW
             );
+
+        verify(
+            shiftRepository,
+            never()
+        ).existsOverlappingOfficialShift(
+            any(),
+            any(),
+            any(),
+            any(),
+            any()
+        );
+
     }
 
     @Test
@@ -580,14 +588,14 @@ class UnavailableTimeServiceTest {
             .thenReturn(endAt);
 
         when(
-            shiftRepository.existsOverlappingOfficialShift(
-                USER_ID,
-                ScheduleStatus.PUBLISHED,
-                startAt,
-                endAt,
-                null
-            )
-        ).thenReturn(true);
+            unavailableTimeRepository
+                .findIdsWithOfficialShiftConflict(
+                    USER_ID,
+                    NOW
+                )
+        ).thenReturn(
+            List.of(10L)
+        );
 
         // when
         List<UnavailableTimeService.UnavailableTimeResult> result =
@@ -598,6 +606,13 @@ class UnavailableTimeServiceTest {
 
         assertThat(result.get(0).officialShiftConflict())
             .isTrue();
+
+        verify(unavailableTimeRepository)
+            .findIdsWithOfficialShiftConflict(
+                USER_ID,
+                NOW
+            );
+
     }
 
     @Test
@@ -623,14 +638,19 @@ class UnavailableTimeServiceTest {
         // then
         assertThat(result).isEmpty();
 
-        verify(shiftRepository, never())
-            .existsOverlappingOfficialShift(
-                any(),
-                any(),
-                any(),
-                any(),
-                any()
+        verify(unavailableTimeRepository)
+            .findByUserIdAndEndAtAfterOrderByStartAtAsc(
+                USER_ID,
+                NOW
             );
+
+        verify(
+            unavailableTimeRepository,
+            never()
+        ).findIdsWithOfficialShiftConflict(
+            any(),
+            any()
+        );
     }
 
     // =========================================================
@@ -664,17 +684,21 @@ class UnavailableTimeServiceTest {
         when(unavailableTime.getStartAt())
             .thenReturn(oldStartAt);
 
-        when(unavailableTime.getId())
-            .thenReturn(unavailableTimeId);
-
         when(rq.getActorId())
             .thenReturn(USER_ID);
 
         when(unavailableTimeRepository.findById(unavailableTimeId))
             .thenReturn(Optional.of(unavailableTime));
 
-        when(unavailableTimeRepository.findByUserId(USER_ID))
-            .thenReturn(List.of(unavailableTime));
+        when(
+            unavailableTimeRepository
+                .existsOverlappingUnavailableTimeExcludingId(
+                    USER_ID,
+                    unavailableTimeId,
+                    newStartAt,
+                    newEndAt
+                )
+        ).thenReturn(false);
 
         when(
             shiftRepository.existsOverlappingOfficialShift(
@@ -718,7 +742,12 @@ class UnavailableTimeServiceTest {
             .findById(unavailableTimeId);
 
         callOrder.verify(unavailableTimeRepository)
-            .findByUserId(USER_ID);
+            .existsOverlappingUnavailableTimeExcludingId(
+                USER_ID,
+                unavailableTimeId,
+                newStartAt,
+                newEndAt
+            );
 
         callOrder.verify(shiftRepository)
             .existsOverlappingOfficialShift(
@@ -1067,8 +1096,15 @@ class UnavailableTimeServiceTest {
                 )
             );
 
-        when(unavailableTimeRepository.findByUserId(USER_ID))
-            .thenReturn(List.of(unavailableTime));
+        when(
+            unavailableTimeRepository
+                .existsOverlappingUnavailableTimeExcludingId(
+                    USER_ID,
+                    unavailableTimeId,
+                    newStartAt,
+                    newEndAt
+                )
+        ).thenReturn(false);
 
         when(
             shiftRepository.existsOverlappingOfficialShift(
@@ -1091,6 +1127,14 @@ class UnavailableTimeServiceTest {
 
         // then
         assertThat(result).isEqualTo(unavailableTime);
+
+        verify(unavailableTimeRepository)
+            .existsOverlappingUnavailableTimeExcludingId(
+                USER_ID,
+                unavailableTimeId,
+                newStartAt,
+                newEndAt
+            );
 
         verify(unavailableTime)
             .update(
@@ -1120,33 +1164,15 @@ class UnavailableTimeServiceTest {
                 )
             );
 
-        UnavailableTime another =
-            org.mockito.Mockito.mock(UnavailableTime.class);
-
-        when(another.getId())
-            .thenReturn(20L);
-
-        when(another.getStartAt())
-            .thenReturn(
-                LocalDateTime.of(
-                    2026, 9, 22, 10, 0
+        when(
+            unavailableTimeRepository
+                .existsOverlappingUnavailableTimeExcludingId(
+                    USER_ID,
+                    unavailableTimeId,
+                    newStartAt,
+                    newEndAt
                 )
-            );
-
-        when(another.getEndAt())
-            .thenReturn(
-                LocalDateTime.of(
-                    2026, 9, 22, 12, 0
-                )
-            );
-
-        when(unavailableTimeRepository.findByUserId(USER_ID))
-            .thenReturn(
-                List.of(
-                    target,
-                    another
-                )
-            );
+        ).thenReturn(true);
 
         // when
         BusinessException exception =
@@ -1164,6 +1190,14 @@ class UnavailableTimeServiceTest {
         assertThat(exception.getErrorCode())
             .isEqualTo(
                 UnavailableTimeErrorCode.TIME_OVERLAP
+            );
+
+        verify(unavailableTimeRepository)
+            .existsOverlappingUnavailableTimeExcludingId(
+                USER_ID,
+                unavailableTimeId,
+                newStartAt,
+                newEndAt
             );
 
         verify(target, never())
@@ -1191,8 +1225,15 @@ class UnavailableTimeServiceTest {
                 )
             );
 
-        when(unavailableTimeRepository.findByUserId(USER_ID))
-            .thenReturn(List.of(unavailableTime));
+        when(
+            unavailableTimeRepository
+                .existsOverlappingUnavailableTimeExcludingId(
+                    USER_ID,
+                    unavailableTimeId,
+                    newStartAt,
+                    newEndAt
+                )
+        ).thenReturn(false);
 
         when(
             shiftRepository.existsOverlappingOfficialShift(
@@ -1222,6 +1263,14 @@ class UnavailableTimeServiceTest {
                 UnavailableTimeErrorCode.OFFICIAL_SHIFT_CONFLICT
             );
 
+        verify(unavailableTimeRepository)
+            .existsOverlappingUnavailableTimeExcludingId(
+                USER_ID,
+                unavailableTimeId,
+                newStartAt,
+                newEndAt
+            );
+
         verify(unavailableTime, never())
             .update(any(), any());
     }
@@ -1247,8 +1296,15 @@ class UnavailableTimeServiceTest {
                 )
             );
 
-        when(unavailableTimeRepository.findByUserId(USER_ID))
-            .thenReturn(List.of(unavailableTime));
+        when(
+            unavailableTimeRepository
+                .existsOverlappingUnavailableTimeExcludingId(
+                    USER_ID,
+                    unavailableTimeId,
+                    newStartAt,
+                    newEndAt
+                )
+        ).thenReturn(false);
 
         when(
             shiftRepository.existsOverlappingOfficialShift(
@@ -1487,23 +1543,20 @@ class UnavailableTimeServiceTest {
     }
 
     private void assertRegisterOverlap(
-        LocalDateTime existingStartAt,
-        LocalDateTime existingEndAt,
         LocalDateTime newStartAt,
         LocalDateTime newEndAt
     ) {
 
-        User user = mockRegisterUser();
+        mockRegisterUser();
 
-        UnavailableTime existing =
-            new UnavailableTime(
-                user,
-                existingStartAt,
-                existingEndAt
-            );
-
-        when(unavailableTimeRepository.findByUserId(USER_ID))
-            .thenReturn(List.of(existing));
+        when(
+            unavailableTimeRepository
+                .existsOverlappingUnavailableTime(
+                    USER_ID,
+                    newStartAt,
+                    newEndAt
+                )
+        ).thenReturn(true);
 
         BusinessException exception =
             assertThrows(
@@ -1520,28 +1573,35 @@ class UnavailableTimeServiceTest {
                 UnavailableTimeErrorCode.TIME_OVERLAP
             );
 
-        verify(unavailableTimeRepository, never())
-            .save(any());
+        verify(
+            unavailableTimeRepository
+        ).existsOverlappingUnavailableTime(
+            USER_ID,
+            newStartAt,
+            newEndAt
+        );
+
+        verify(
+            unavailableTimeRepository,
+            never()
+        ).save(any());
     }
 
     private void assertRegisterAdjacentSuccess(
-        LocalDateTime existingStartAt,
-        LocalDateTime existingEndAt,
         LocalDateTime newStartAt,
         LocalDateTime newEndAt
     ) {
 
         User user = mockRegisterUser();
 
-        UnavailableTime existing =
-            new UnavailableTime(
-                user,
-                existingStartAt,
-                existingEndAt
-            );
-
-        when(unavailableTimeRepository.findByUserId(USER_ID))
-            .thenReturn(List.of(existing));
+        when(
+            unavailableTimeRepository
+                .existsOverlappingUnavailableTime(
+                    USER_ID,
+                    newStartAt,
+                    newEndAt
+                )
+        ).thenReturn(false);
 
         when(
             shiftRepository.existsOverlappingOfficialShift(
@@ -1553,8 +1613,13 @@ class UnavailableTimeServiceTest {
             )
         ).thenReturn(false);
 
-        when(unavailableTimeRepository.save(any(UnavailableTime.class)))
-            .thenAnswer(invocation -> invocation.getArgument(0));
+        when(
+            unavailableTimeRepository.save(
+                any(UnavailableTime.class)
+            )
+        ).thenAnswer(
+            invocation -> invocation.getArgument(0)
+        );
 
         UnavailableTime result =
             unavailableTimeService.register(
@@ -1568,6 +1633,14 @@ class UnavailableTimeServiceTest {
 
         assertThat(result.getEndAt())
             .isEqualTo(newEndAt);
+
+        verify(
+            unavailableTimeRepository
+        ).existsOverlappingUnavailableTime(
+            USER_ID,
+            newStartAt,
+            newEndAt
+        );
 
         verify(unavailableTimeRepository)
             .save(any(UnavailableTime.class));
@@ -1586,8 +1659,14 @@ class UnavailableTimeServiceTest {
         when(userService.getByIdForUpdate(USER_ID))
             .thenReturn(user);
 
-        when(unavailableTimeRepository.findByUserId(USER_ID))
-            .thenReturn(List.of());
+        when(
+            unavailableTimeRepository
+                .existsOverlappingUnavailableTime(
+                    USER_ID,
+                    startAt,
+                    endAt
+                )
+        ).thenReturn(false);
 
         when(shiftRepository.existsOverlappingOfficialShift(
             USER_ID,
@@ -1639,8 +1718,14 @@ class UnavailableTimeServiceTest {
         when(userService.getByIdForUpdate(USER_ID))
             .thenReturn(user);
 
-        when(unavailableTimeRepository.findByUserId(USER_ID))
-            .thenReturn(List.of());
+        when(
+            unavailableTimeRepository
+                .existsOverlappingUnavailableTime(
+                    USER_ID,
+                    startAt,
+                    endAt
+                )
+        ).thenReturn(false);
 
         when(shiftRepository.existsOverlappingOfficialShift(
             USER_ID,
@@ -1705,8 +1790,15 @@ class UnavailableTimeServiceTest {
         when(unavailableTimeRepository.findById(unavailableTimeId))
             .thenReturn(Optional.of(unavailableTime));
 
-        when(unavailableTimeRepository.findByUserId(USER_ID))
-            .thenReturn(List.of());
+        when(
+            unavailableTimeRepository
+                .existsOverlappingUnavailableTimeExcludingId(
+                    USER_ID,
+                    unavailableTimeId,
+                    newStartAt,
+                    newEndAt
+                )
+        ).thenReturn(false);
 
         when(shiftRepository.existsOverlappingOfficialShift(
             USER_ID,
@@ -1783,8 +1875,15 @@ class UnavailableTimeServiceTest {
         when(unavailableTimeRepository.findById(unavailableTimeId))
             .thenReturn(Optional.of(unavailableTime));
 
-        when(unavailableTimeRepository.findByUserId(USER_ID))
-            .thenReturn(List.of());
+        when(
+            unavailableTimeRepository
+                .existsOverlappingUnavailableTimeExcludingId(
+                    USER_ID,
+                    unavailableTimeId,
+                    newStartAt,
+                    newEndAt
+                )
+        ).thenReturn(false);
 
         when(shiftRepository.existsOverlappingOfficialShift(
             USER_ID,

@@ -11,13 +11,14 @@ import com.merge.backend.global.dto.ConfirmationRequiredResponse;
 import com.merge.backend.global.exception.BusinessException;
 import com.merge.backend.global.rq.Rq;
 import com.merge.backend.global.util.TimeRangeUtils;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Clock;
-import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -42,33 +43,41 @@ public class UnavailableTimeService {
 
         Long userId = rq.getActorId();
 
+        LocalDateTime now =
+            LocalDateTime.now(clock);
+
         List<UnavailableTime> unavailableTimes =
+            unavailableTimeRepository
+                .findByUserIdAndEndAtAfterOrderByStartAtAsc(
+                    userId,
+                    now
+                );
+
+        if (unavailableTimes.isEmpty()) {
+            return List.of();
+        }
+
+        Set<Long> officialShiftConflictIds =
+            new HashSet<>(
                 unavailableTimeRepository
-                        .findByUserIdAndEndAtAfterOrderByStartAtAsc(
-                                userId,
-                                LocalDateTime.now(clock)
-                        );
+                    .findIdsWithOfficialShiftConflict(
+                        userId,
+                        now
+                    )
+            );
 
         return unavailableTimes.stream()
-                .map(unavailableTime ->{
-                    boolean officialShiftConflict =
-                            shiftRepository.existsOverlappingOfficialShift(
-                                     userId,
-                                     ScheduleStatus.PUBLISHED,
-                                     unavailableTime.getStartAt(),
-                                     unavailableTime.getEndAt(),
-                                     null
-                            );
-
-                    return new UnavailableTimeResult(
-                            unavailableTime.getId(),
-                            unavailableTime.getStartAt(),
-                            unavailableTime.getEndAt(),
-                            officialShiftConflict
-                    );
-                })
-                .toList();
-
+            .map(unavailableTime ->
+                new UnavailableTimeResult(
+                    unavailableTime.getId(),
+                    unavailableTime.getStartAt(),
+                    unavailableTime.getEndAt(),
+                    officialShiftConflictIds.contains(
+                        unavailableTime.getId()
+                    )
+                )
+            )
+            .toList();
     }
 
     public UnavailableTime register(LocalDateTime startAt,
@@ -227,30 +236,39 @@ public class UnavailableTimeService {
 
     //본인 불가능 일정이랑 겹치는가
     private void validateUnavailableTimeOverlap(
-            Long userId,
-            Long excludeUnavailableTimeId,
-            LocalDateTime startAt,
-            LocalDateTime endAt
+        Long userId,
+        Long excludeUnavailableTimeId,
+        LocalDateTime startAt,
+        LocalDateTime endAt
     ) {
-        List<UnavailableTime> unavailableTimes =
-                unavailableTimeRepository.findByUserId(userId);
 
-        boolean overlaps = unavailableTimes.stream()
-                .filter(unavailableTime ->
-                        excludeUnavailableTimeId == null || !unavailableTime.getId()
-                                .equals(excludeUnavailableTimeId))
-                .anyMatch(unavailableTime ->
-                        TimeRangeUtils.overlaps(
-                                startAt,
-                                endAt,
-                                unavailableTime.getStartAt(),
-                                unavailableTime.getEndAt()
-                        )
-                );
+        boolean overlaps;
 
-        if(overlaps) {
+        if (excludeUnavailableTimeId == null) {
+
+            overlaps =
+                unavailableTimeRepository
+                    .existsOverlappingUnavailableTime(
+                        userId,
+                        startAt,
+                        endAt
+                    );
+
+        } else {
+
+            overlaps =
+                unavailableTimeRepository
+                    .existsOverlappingUnavailableTimeExcludingId(
+                        userId,
+                        excludeUnavailableTimeId,
+                        startAt,
+                        endAt
+                    );
+        }
+
+        if (overlaps) {
             throw new BusinessException(
-                    UnavailableTimeErrorCode.TIME_OVERLAP
+                UnavailableTimeErrorCode.TIME_OVERLAP
             );
         }
     }

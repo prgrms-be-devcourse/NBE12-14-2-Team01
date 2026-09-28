@@ -24,6 +24,41 @@ public interface UnavailableTimeRepository extends JpaRepository<UnavailableTime
         @Param("endAt") LocalDateTime endAt
     );
 
+    @Query("""
+        SELECT COUNT(u) > 0
+        FROM UnavailableTime u
+        WHERE u.user.id = :userId
+          AND u.id <> :excludeUnavailableTimeId
+          AND u.startAt < :endAt
+          AND u.endAt > :startAt
+        """)
+    boolean existsOverlappingUnavailableTimeExcludingId(
+        @Param("userId") Long userId,
+        @Param("excludeUnavailableTimeId") Long excludeUnavailableTimeId,
+        @Param("startAt") LocalDateTime startAt,
+        @Param("endAt") LocalDateTime endAt
+    );
+
+    @Query("""
+        SELECT u.id
+        FROM UnavailableTime u
+        WHERE u.user.id = :userId
+          AND u.endAt > :now
+          AND EXISTS (
+              SELECT s.id
+              FROM Shift s
+              WHERE s.member.user.id = :userId
+                AND s.schedule.status = ScheduleStatus.PUBLISHED
+                AND s.status = ShiftStatus.SCHEDULED
+                AND s.startAt < u.endAt
+                AND s.endAt > u.startAt
+          )
+        """)
+    List<Long> findIdsWithOfficialShiftConflict(
+        @Param("userId") Long userId,
+        @Param("now") LocalDateTime now
+    );
+
     List<UnavailableTime> findByUserId(Long userId);
     List<UnavailableTime> findByUserIdAndEndAtAfterOrderByStartAtAsc(
             Long userId,
