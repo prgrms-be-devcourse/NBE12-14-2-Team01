@@ -232,7 +232,7 @@ async function updateShift(
   return await apiFetch<{ shiftId: number; memberName: string }>(
       `/workplaces/${workplaceId}/schedules/${scheduleId}/shifts/${shiftId}`,
       {
-        method: "PUT",
+        method: "PATCH",
         body: JSON.stringify(payload),
       }
   );
