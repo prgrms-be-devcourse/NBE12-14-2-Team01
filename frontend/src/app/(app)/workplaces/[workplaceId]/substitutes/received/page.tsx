@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
+import { apiFetch } from "@/lib/api";
 
 type RequestStatus = "PENDING" | "ACCEPTED" | "REJECTED";
 
@@ -16,57 +18,98 @@ type SubstituteRequest = {
   status: RequestStatus;
 };
 
-const initialRequests: SubstituteRequest[] = [
-  {
-    id: 1,
-    requesterName: "김지연",
-    workplaceName: "카페 스위치",
-    date: "9월 21일",
-    day: "월",
-    startTime: "09:00",
-    endTime: "18:00",
-    status: "PENDING",
-  },
-  {
-    id: 2,
-    requesterName: "박민수",
-    workplaceName: "카페 스위치",
-    date: "9월 23일",
-    day: "수",
-    startTime: "09:00",
-    endTime: "15:00",
-    status: "PENDING",
-  },
-];
+type ReceivedSubstituteRequestResponse = {
+  candidateId: number;
+  requestId: number;
+  shiftId: number;
+  workplaceId: number;
+  workplaceName: string;
+  requesterMemberId: number;
+  requesterName: string;
+  startAt: string;
+  endAt: string;
+  requestStatus: "OPEN";
+  candidateStatus: "PENDING";
+  createdAt: string;
+};
+
 
 type Tab = "PENDING" | "ACCEPTED" | "REJECTED";
 
 export default function ReceivedRequestsPage() {
-  const [requests, setRequests] =
-      useState<SubstituteRequest[]>(initialRequests);
+  const params = useParams();
+  const workplaceId = Number(params.workplaceId);
+
+  const [requests, setRequests] = useState<SubstituteRequest[]>([]);
   const [tab, setTab] = useState<Tab>("PENDING");
 
-  const handleAccept = (requestId: number) => {
+  useEffect(() => {
+    const fetchRequests = async () => {
+      const data = await apiFetch<ReceivedSubstituteRequestResponse[]>(
+          "/substitute-requests/received"
+      );
+
+      const receivedRequests: SubstituteRequest[] = data
+      .filter((request) => request.workplaceId === workplaceId)
+      .map((request) => {
+        const start = new Date(request.startAt);
+        const end = new Date(request.endAt);
+
+        const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
+
+        return {
+          id: request.candidateId,
+          requesterName: request.requesterName,
+          workplaceName: request.workplaceName,
+          date: `${start.getMonth() + 1}월 ${start.getDate()}일`,
+          day: dayNames[start.getDay()],
+          startTime: start.toTimeString().slice(0, 5),
+          endTime: end.toTimeString().slice(0, 5),
+          status: "PENDING",
+        };
+      });
+
+      setRequests(receivedRequests);
+    };
+
+    fetchRequests();
+  }, [workplaceId]);
+
+  const handleAccept = async (candidateId: number) => {
+    await apiFetch(
+        `/substitute-candidates/${candidateId}/response`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            decision: "ACCEPT",
+          }),
+        }
+    );
+
     setRequests((prevRequests) =>
         prevRequests.map((request) =>
-            request.id === requestId
-                ? {
-                  ...request,
-                  status: "ACCEPTED",
-                }
+            request.id === candidateId
+                ? { ...request, status: "ACCEPTED" }
                 : request
         )
     );
   };
 
-  const handleReject = (requestId: number) => {
+  const handleReject = async (candidateId: number) => {
+    await apiFetch(
+        `/substitute-candidates/${candidateId}/response`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            decision: "REJECT",
+          }),
+        }
+    );
+
     setRequests((prevRequests) =>
         prevRequests.map((request) =>
-            request.id === requestId
-                ? {
-                  ...request,
-                  status: "REJECTED",
-                }
+            request.id === candidateId
+                ? { ...request, status: "REJECTED" }
                 : request
         )
     );
