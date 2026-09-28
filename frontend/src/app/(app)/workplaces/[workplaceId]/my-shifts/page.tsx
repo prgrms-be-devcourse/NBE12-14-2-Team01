@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import Card from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 import { apiFetch, ApiError } from "@/lib/api";
 
-// DTO용 type
+// 목록용 DTO
 type ShiftItemDto = {
   shiftId: number;
   scheduleId: number;
@@ -23,6 +23,20 @@ type ShiftListResponse = {
   shifts: ShiftItemDto[];
 };
 
+// 상세 조회용 DTO
+type ShiftDetailResponse = {
+  shiftId: number;
+  scheduleId: number;
+  workplaceId: number;
+  workplaceName: string;
+  weekStartDate: string;
+  startAt: string;
+  endAt: string;
+  status: "SCHEDULED" | "CANCELED" | string;
+  publishedAt: string | null;
+};
+
+// UI 전용 타입
 type MyShift = {
   id: number;
   date: string;
@@ -35,6 +49,20 @@ type MyShift = {
 
 // 요일 변환용 배열
 const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
+
+// 오늘 날짜 기준 '월요일' YYYY-MM-DD 반환 유틸
+function getMondayOfCurrentWeek(d = new Date()): string {
+  const date = new Date(d);
+  const day = date.getDay();
+  // 일요일(0)이면 -6일, 월~토(1~6)이면 1-day 만큼 이동
+  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+  date.setDate(diff);
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const dayStr = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${dayStr}`;
+}
 
 function parseShiftDto(dto: ShiftItemDto): MyShift {
   const startDate = new Date(dto.startAt);
@@ -60,16 +88,23 @@ function parseShiftDto(dto: ShiftItemDto): MyShift {
   };
 }
 
+// 근무 시간 계산 (자정 넘어가는 밤샘 근무 예외 처리 보장)
 function getWorkHours(startTime: string, endTime: string) {
   const [startHour, startMinute] = startTime.split(":").map(Number);
   const [endHour, endMinute] = endTime.split(":").map(Number);
 
-  const start = startHour * 60 + startMinute;
-  const end = endHour * 60 + endMinute;
+  const startMins = startHour * 60 + startMinute;
+  let endMins = endHour * 60 + endMinute;
 
-  return (end - start) / 60;
+  // 익일 종료 근무인 경우 (예: 22:00 ~ 06:00)
+  if (endMins < startMins) {
+    endMins += 24 * 60;
+  }
+
+  return (endMins - startMins) / 60;
 }
-// YYYY-MM-DD 날짜에 days(일수)를 더하거나 빼주는 유틸 함수
+
+// YYYY-MM-DD 날짜 계산 유틸
 function addDays(dateStr: string, days: number): string {
   const date = new Date(dateStr);
   date.setDate(date.getDate() + days);
@@ -79,7 +114,7 @@ function addDays(dateStr: string, days: number): string {
   return `${year}-${month}-${day}`;
 }
 
-// YYYY-MM-DD 포맷을 "YYYY년 M월 N주차" 텍스트로 전환해 주는 함수
+// YYYY-MM-DD -> "YYYY년 M월 N주차" 포맷 변환
 function formatWeekTitle(dateStr: string): string {
   const date = new Date(dateStr);
   const year = date.getFullYear();
@@ -89,33 +124,93 @@ function formatWeekTitle(dateStr: string): string {
   return `${year}년 ${month}월 ${weekNum}주차`;
 }
 
+// 날짜/시간 포맷팅 유틸 (ISO -> YYYY.MM.DD HH:mm)
+function formatDateTime(isoString: string | null) {
+  if (!isoString) return "-";
+  const date = new Date(isoString);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}.${month}.${day} ${hours}:${minutes}`;
+}
+
 export default function MyShiftsPage() {
   const params = useParams();
   const workplaceId = params.workplaceId as string;
 
-  // 현재 조회 기준이 되는 월요일 날짜 (기본값: 2026-09-21)
-  const [currentWeekStart, setCurrentWeekStart] = useState<string>("2026-09-21");
+  // 현재 주 월요일 날짜를 기본값으로 설정
+  const [currentWeekStart, setCurrentWeekStart] = useState<string>(() =>
+      getMondayOfCurrentWeek()
+  );
   const [shifts, setShifts] = useState<MyShift[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // 이전 주 / 다음 주 이동 핸들러
+  // 상세조회 모달 State
+  const [selectedShiftDetail, setSelectedShiftDetail] =
+      useState<ShiftDetailResponse | null>(null);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
+
+  // 주 이동 핸들러
   const handlePrevWeek = () => {
-    const prevWeek = addDays(currentWeekStart, -7);
-    setIsLoading(true);
-    setCurrentWeekStart(prevWeek);
+    setCurrentWeekStart((prev) => addDays(prev, -7));
   };
 
   const handleNextWeek = () => {
-    const nextWeek = addDays(currentWeekStart, 7);
-    setIsLoading(true);
-    setCurrentWeekStart(nextWeek);
+    setCurrentWeekStart((prev) => addDays(prev, 7));
   };
 
-  useEffect(() => {
-    // SSR 환경(Node.js 서버 렌더링 시점)에서는 실행 방지
-    if (typeof window === "undefined") return;
+  // 상세 데이터 조회 핸들러
+  const handleOpenDetail = async (shiftId: number) => {
+    setIsDetailLoading(true);
+    setDetailError("");
 
+    try {
+      const detailData = await apiFetch<ShiftDetailResponse>(
+          `/workplaces/${workplaceId}/shifts/${shiftId}`
+      );
+      setSelectedShiftDetail(detailData);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setDetailError(err.message);
+      } else if (err instanceof Error) {
+        setDetailError(err.message);
+      } else {
+        setDetailError("근무 상세 정보를 불러오는 중 오류가 발생했습니다.");
+      }
+    } finally {
+      setIsDetailLoading(false);
+    }
+  };
+
+  const handleCloseDetail = useCallback(() => {
+    setSelectedShiftDetail(null);
+    setDetailError("");
+  }, []);
+
+  // 모달 열림 상태일 때 키보드 ESC 누르면 닫기 & 스크롤 방지
+  useEffect(() => {
+    const isModalOpen = Boolean(selectedShiftDetail || isDetailLoading || detailError);
+    if (!isModalOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") handleCloseDetail();
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = "unset";
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [selectedShiftDetail, isDetailLoading, detailError, handleCloseDetail]);
+
+  // 근무 목록 조회 API
+  useEffect(() => {
     let isCancelled = false;
 
     const loadMyShifts = async () => {
@@ -173,6 +268,7 @@ export default function MyShiftsPage() {
               <button
                   type="button"
                   onClick={handlePrevWeek}
+                  aria-label="이전 주"
                   className="grid h-9 w-9 place-items-center rounded-lg border border-[#dce8e2] text-[#66736d] transition hover:bg-[#f3fbf7]"
               >
                 <span className="block -translate-y-px text-xl leading-none">‹</span>
@@ -183,6 +279,7 @@ export default function MyShiftsPage() {
               <button
                   type="button"
                   onClick={handleNextWeek}
+                  aria-label="다음 주"
                   className="grid h-9 w-9 place-items-center rounded-lg border border-[#dce8e2] text-[#66736d] transition hover:bg-[#f3fbf7]"
               >
                 <span className="block -translate-y-px text-xl leading-none">›</span>
@@ -203,12 +300,13 @@ export default function MyShiftsPage() {
               <div className="flex min-h-[180px] items-center justify-center text-sm text-[#d95555]">
                 {error}
               </div>
-          ) : (
+          ) : shifts.length > 0 ? (
               <div className="space-y-3">
                 {shifts.map((shift) => (
                     <div
                         key={shift.id}
-                        className="flex items-center justify-between gap-4 rounded-xl border border-[#dce8e2] p-5"
+                        onClick={() => handleOpenDetail(shift.id)}
+                        className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-[#dce8e2] p-5 transition hover:border-[#005642] hover:bg-[#fcfdfc]"
                     >
                       <div className="flex items-center gap-4">
                         <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-[#f3fbf7]">
@@ -238,9 +336,7 @@ export default function MyShiftsPage() {
                     </div>
                 ))}
               </div>
-          )}
-
-          {!isLoading && !error && shifts.length === 0 && (
+          ) : (
               <div className="flex min-h-[180px] items-center justify-center rounded-xl border border-dashed border-[#dce8e2] text-sm text-[#78847f]">
                 이번 주 예정된 근무가 없습니다.
               </div>
@@ -290,6 +386,108 @@ export default function MyShiftsPage() {
             </Link>
           </div>
         </Card>
+
+        {/* 상세조회 모달 UI */}
+        {(selectedShiftDetail || isDetailLoading || detailError) && (
+            <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+                onClick={handleCloseDetail}
+            >
+              <div
+                  className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+                  onClick={(e) => e.stopPropagation()}
+              >
+                {isDetailLoading ? (
+                    <div className="py-12 text-center text-sm text-[#78847f]">
+                      상세 정보를 불러오는 중입니다...
+                    </div>
+                ) : detailError ? (
+                    <div className="space-y-4 py-4 text-center">
+                      <p className="text-sm text-[#d95555]">{detailError}</p>
+                      <button
+                          type="button"
+                          onClick={handleCloseDetail}
+                          className="rounded-xl bg-[#f3fbf7] px-4 py-2 text-sm font-bold text-[#005642]"
+                      >
+                        닫기
+                      </button>
+                    </div>
+                ) : selectedShiftDetail ? (
+                    <div>
+                      <div className="flex items-center justify-between border-b border-[#edf2ef] pb-4">
+                        <h3 className="text-lg font-black text-[#005642]">
+                          근무 상세 정보
+                        </h3>
+                        <button
+                            type="button"
+                            onClick={handleCloseDetail}
+                            className="text-gray-400 transition hover:text-gray-600"
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      <div className="mt-4 space-y-3 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-[#78847f]">사업장</span>
+                          <span className="font-bold text-[#005642]">
+                      {selectedShiftDetail.workplaceName}
+                    </span>
+                        </div>
+
+                        <div className="flex justify-between">
+                          <span className="text-[#78847f]">근무 시작</span>
+                          <span className="font-bold">
+                      {formatDateTime(selectedShiftDetail.startAt)}
+                    </span>
+                        </div>
+
+                        <div className="flex justify-between">
+                          <span className="text-[#78847f]">근무 종료</span>
+                          <span className="font-bold">
+                      {formatDateTime(selectedShiftDetail.endAt)}
+                    </span>
+                        </div>
+
+                        <div className="flex justify-between">
+                          <span className="text-[#78847f]">상태</span>
+                          <span className="rounded-full bg-[#dff7ec] px-2.5 py-0.5 text-xs font-bold text-[#14956c]">
+                      {selectedShiftDetail.status}
+                    </span>
+                        </div>
+
+                        <div className="flex justify-between">
+                          <span className="text-[#78847f]">주 시작일</span>
+                          <span className="font-medium">
+                      {selectedShiftDetail.weekStartDate}
+                    </span>
+                        </div>
+
+                        <div className="flex justify-between">
+                          <span className="text-[#78847f]">게시 일시</span>
+                          <span className="font-medium">
+                      {formatDateTime(selectedShiftDetail.publishedAt)}
+                    </span>
+                        </div>
+
+                        <div className="flex justify-between border-t border-[#edf2ef] pt-2 text-xs text-gray-400">
+                          <span>Shift ID: {selectedShiftDetail.shiftId}</span>
+                          <span>Schedule ID: {selectedShiftDetail.scheduleId}</span>
+                        </div>
+                      </div>
+
+                      <button
+                          type="button"
+                          onClick={handleCloseDetail}
+                          className="mt-6 w-full rounded-xl bg-[#005642] py-3 text-sm font-bold text-white transition hover:bg-[#0b6b52]"
+                      >
+                        확인
+                      </button>
+                    </div>
+                ) : null}
+              </div>
+            </div>
+        )}
       </>
   );
 }
