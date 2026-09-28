@@ -210,13 +210,46 @@ async function createShift(
       confirmUnavailableConflict: boolean;
     }
 ) {
-  return await apiFetch<{
-    shiftId: number;
-    memberName: string;
-  }>(`/workplaces/${workplaceId}/schedules/${scheduleId}/shifts`, {
+  return await apiFetch<{ shiftId: number; memberName: string; }>(
+      `/workplaces/${workplaceId}/schedules/${scheduleId}/shifts`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+// 근무 수정 API (PUT)
+async function updateShift(
+    workplaceId: string,
+    scheduleId: number,
+    shiftId: number,
+    payload: {
+      memberId: number;
+      startAt: string;
+      endAt: string;
+      confirmUnavailableConflict: boolean;
+    }
+) {
+  return await apiFetch<{ shiftId: number; memberName: string }>(
+      `/workplaces/${workplaceId}/schedules/${scheduleId}/shifts/${shiftId}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      }
+  );
+}
+
+// 근무 삭제 API (DELETE)
+async function deleteShift(
+    workplaceId: string,
+    scheduleId: number,
+    shiftId: number
+) {
+  return await apiFetch(
+      `/workplaces/${workplaceId}/schedules/${scheduleId}/shifts/${shiftId}`,
+      {
+        method: "DELETE",
+      }
+  );
 }
 
 export default function SchedulePage() {
@@ -370,31 +403,89 @@ export default function SchedulePage() {
       setError("종료 시간은 시작 시간보다 늦어야 합니다.");
       return;
     }
-    // TODO: 근무 수정(PUT)에 해당하는 백엔드 엔드포인트가 정해지면 동일한 방식으로 연동
-    if (editingShiftId !== null) {
-      const member = members.find((m) => m.id === selectedMemberId);
-      setShifts((prevShifts) =>
-          prevShifts.map((shift) =>
-              shift.id === editingShiftId
-                  ? {
-                    ...shift,
-                    memberName: member?.name ?? shift.memberName,
-                    day: selectedDay,
-                    startTime,
-                    endTime,
-                  }
-                  : shift
-          )
-      );
 
-      closeAfterSuccess();
+    // 1. 근무 수정 (editingShiftId가 있는 경우)
+    if (editingShiftId !== null) {
+      if (scheduleId === null) {
+        setError("근무표가 생성되지 않았습니다.");
+        return;
+      }
+
+      const day = days.find((d) => d.key === selectedDay);
+      const member = members.find((m) => m.id === selectedMemberId);
+
+      if (!day || !member) {
+        setError("직원 또는 날짜 정보를 확인해주세요.");
+        return;
+      }
+
+      setIsSubmitting(true);
+      setError("");
+
+      try {
+        await updateShift(workplaceId, scheduleId, editingShiftId, {
+          memberId: member.id,
+          startAt: `${day.date}T${startTime}:00`,
+          endAt: `${day.date}T${endTime}:00`,
+          confirmUnavailableConflict: false,
+        });
+
+        // 프론트 State 업데이트
+        setShifts((prevShifts) =>
+            prevShifts.map((shift) =>
+                shift.id === editingShiftId
+                    ? {
+                      ...shift,
+                      memberName: member.name,
+                      day: selectedDay,
+                      startTime,
+                      endTime,
+                    }
+                    : shift
+            )
+        );
+
+        closeAfterSuccess();
+      } catch (err) {
+        if (err instanceof ApiError) {
+          setError(err.message);
+        } else {
+          setError("수정 중 오류가 발생했습니다.");
+        }
+      } finally {
+        setIsSubmitting(false);
+      }
       return;
     }
 
-    // 새 근무 추가 - 실제 백엔드 API 호출
+    // 2. 새 근무 추가 (editingShiftId가 null인 경우)
     await submitCreateShift(false);
   };
+ //근무 삭제 핸들러 구현
+  const handleDeleteShift = async () => {
+    if (editingShiftId === null || scheduleId === null) return;
 
+    if (!window.confirm("정말로 이 근무를 삭제하시겠습니까?")) return;
+
+    setIsSubmitting(true);
+    setError("");
+
+    try {
+      await deleteShift(workplaceId, scheduleId, editingShiftId);
+
+      // 삭제된 근무 State에서 제거
+      setShifts((prev) => prev.filter((shift) => shift.id !== editingShiftId));
+      closeAfterSuccess();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError("삭제 중 오류가 발생했습니다.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
   return (
       <>
         <PageHeader
@@ -727,6 +818,17 @@ export default function SchedulePage() {
                 </div>
 
                 <div className="mt-6 flex gap-3">
+                  {/* 수정 모드일 때만 '삭제' 버튼 표시 */}
+                  {editingShiftId !== null && (
+                      <button
+                          type="button"
+                          onClick={handleDeleteShift}
+                          disabled={isSubmitting}
+                          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-600 transition hover:bg-red-100 disabled:opacity-50"
+                      >
+                        삭제
+                      </button>
+                  )}
                   <button
                       type="button"
                       onClick={closeShiftModal}
