@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import {
   ApiError,
   apiFetch,
@@ -20,6 +20,21 @@ type LoginResponse = {
   };
   accessToken: string;
 };
+
+// 회원가입하고 넘어왔을 때만 안내 보여줌
+function SignupSuccessNotice() {
+  const searchParams = useSearchParams();
+
+  if (searchParams.get("signup") !== "success") {
+    return null;
+  }
+
+  return (
+      <div className="mt-6 rounded-xl bg-[#dff7ec] px-4 py-3 text-sm font-bold text-[#14956c]">
+        회원가입이 완료됐어요. 로그인해주세요.
+      </div>
+  );
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -85,6 +100,13 @@ export default function LoginPage() {
               계정 정보를 입력해주세요.
             </p>
           </div>
+
+          {/* 에러가 있으면 가입 안내는 숨김 */}
+          {!errorMessage && (
+              <Suspense fallback={null}>
+                <SignupSuccessNotice />
+              </Suspense>
+          )}
 
           <form
               onSubmit={handleLogin}
