@@ -66,19 +66,23 @@ function getThisMondayDateString(): string {
   return `${year}-${month}-${date}`;
 }
 
+function toKstDisplay(iso: string): Date {
+  return new Date(parseAsKst(iso).getTime() + KST_OFFSET_MS);
+}
+
 function formatDateLabel(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+  const d = toKstDisplay(iso);
+  return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일`;
 }
 
 function formatDayLabel(iso: string): string {
-  return WEEKDAY_LABELS[new Date(iso).getDay()];
+  return WEEKDAY_LABELS[toKstDisplay(iso).getUTCDay()];
 }
 
 function formatTimeLabel(iso: string): string {
-  const d = new Date(iso);
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
+  const d = toKstDisplay(iso);
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
   return `${hh}:${mm}`;
 }
 
@@ -256,6 +260,7 @@ export default function SubstituteRequestPage() {
                   <div className="relative">
                     <select
                         value={selectedShiftId ?? ""}
+                        disabled={isSubmitting}
                         onChange={(e) => {
                           setSelectedShiftId(Number(e.target.value));
                           resetMessages();
