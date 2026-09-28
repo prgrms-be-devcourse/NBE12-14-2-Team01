@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -22,6 +23,7 @@ import com.merge.backend.domain.substitute.entity.SubstituteRequest;
 import com.merge.backend.domain.substitute.repository.SubstituteCandidateRepository;
 import com.merge.backend.domain.substitute.repository.SubstituteRequestRepository;
 import com.merge.backend.domain.user.entity.User;
+import com.merge.backend.domain.user.service.UserService;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
@@ -35,12 +37,16 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class SubstituteCandidateServiceTest {
+
+    @Mock
+    private UserService userService;
 
     @Mock
     private WorkplaceMemberRepository workplaceMemberRepository;
@@ -218,8 +224,17 @@ class SubstituteCandidateServiceTest {
         verify(substituteCandidateRepository)
             .findRequestIdById(candidateId);
 
-        verify(substituteRequestRepository)
+        InOrder lockOrder =
+            inOrder(
+                substituteRequestRepository,
+                userService
+            );
+
+        lockOrder.verify(substituteRequestRepository)
             .findByIdForUpdate(requestId);
+
+        lockOrder.verify(userService)
+            .getByIdForUpdate(userId);
 
         verify(candidate)
             .acceptRequest(any(LocalDateTime.class));
@@ -411,12 +426,6 @@ class SubstituteCandidateServiceTest {
         Long requestId = 50L;
         Long userId = 10L;
 
-        when(clock.instant())
-            .thenReturn(Instant.parse("2026-09-22T06:00:00Z"));
-
-        when(clock.getZone())
-            .thenReturn(ZoneId.of("Asia/Seoul"));
-
         when(substituteCandidateRepository.findRequestIdById(candidateId))
             .thenReturn(Optional.of(requestId));
 
@@ -454,6 +463,10 @@ class SubstituteCandidateServiceTest {
         // 이미 응답했으므로 다시 accept 처리되면 안 됨
         verify(candidate, never())
             .acceptRequest(any(LocalDateTime.class));
+
+        verify(userService, never())
+            .getByIdForUpdate(any());
+
     }
 
     @Test
@@ -535,6 +548,9 @@ class SubstituteCandidateServiceTest {
 
         verify(substituteRequestRepository)
             .findByIdForUpdate(requestId);
+
+        verify(userService)
+            .getByIdForUpdate(userId);
 
         // 충돌이 있으므로 상태 변경이 일어나면 안 됨
         verify(candidate, never())
