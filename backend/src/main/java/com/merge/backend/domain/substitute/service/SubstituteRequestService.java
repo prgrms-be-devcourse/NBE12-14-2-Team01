@@ -18,8 +18,10 @@ import com.merge.backend.domain.substitute.entity.SubstituteRequest;
 import com.merge.backend.domain.substitute.exception.SubstituteRequestErrorCode;
 import com.merge.backend.domain.substitute.repository.SubstituteCandidateRepository;
 import com.merge.backend.domain.substitute.repository.SubstituteRequestRepository;
+import com.merge.backend.domain.user.service.UserService;
 import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
+import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import com.merge.backend.domain.workplace.exception.WorkplaceErrorCode;
 import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import com.merge.backend.domain.workplace.service.WorkplaceMemberService;
@@ -46,6 +48,7 @@ public class SubstituteRequestService {
     private final ShiftRepository shiftRepository;
     private final WorkplaceRepository workplaceRepository;
     private final UnavailableTimeRepository unavailableTimeRepository;
+    private final UserService userService;
     private final WorkplaceMemberService workplaceMemberService;
     private final Clock clock;
     private final SubstituteCandidateService substituteCandidateService;
@@ -251,27 +254,47 @@ public class SubstituteRequestService {
         //수락자가 해당 근무지 소속인지
         WorkplaceMember acceptedMember = candidate.getMember();
 
-        if (!Objects.equals(acceptedMember.getWorkplace().getId(), workplaceId) ||
-            acceptedMember.getLeftAt() != null
-        ) {
-            throw new BusinessException(ShiftErrorCode.INVALID_WORKPLACE_MEMBER_VALUE);
+        if (!Objects.equals(
+            acceptedMember.getWorkplace().getId(),
+            workplaceId
+        ) || acceptedMember.getLeftAt() != null
+            || acceptedMember.getRole() != WorkplaceRole.EMPLOYEE) {
+
+            throw new BusinessException(
+                ShiftErrorCode.INVALID_WORKPLACE_MEMBER_VALUE
+            );
         }
+
+        Long candidateUserId =
+            acceptedMember.getUser()
+                .getId();
+
+        userService.getByIdForUpdate(
+            candidateUserId
+        );
+
+        //현재를 기준으로 대체 근무 시작 시간이 지나거나 같다면 (now >= startAt)
+        LocalDateTime validationNow =
+            LocalDateTime.now(clock);
+
+        validateNotStarted(
+            request.getShift(),
+            validationNow
+        );
+
         //혹여나 수락 후 승인 전 사이에 근무를 배정받았는지
         boolean hasConflictingShift = shiftRepository.existsConflictingShift(
-            candidate.getMember().getUser().getId(),
+            candidateUserId,
             request.getShift().getStartAt(), // 시작 시간
             request.getShift().getEndAt()// 종료 시간
         );
         if (hasConflictingShift) {
             throw new BusinessException(SubstituteRequestErrorCode.CONFLICT_SHIFT);
         }
-        //현재를 기준으로 대체 근무 시작 시간이 지나거나 같다면 (now >= startAt)
-        LocalDateTime validationNow = LocalDateTime.now(clock);
-        validateNotStarted(request.getShift(), validationNow);
 
         //불가능 시간과 중복되는지
         if (unavailableTimeRepository.existsOverlappingUnavailableTime(
-            candidate.getMember().getUser().getId(),
+            candidateUserId,
             request.getShift().getStartAt(),
             request.getShift().getEndAt()
         )) {
@@ -279,7 +302,7 @@ public class SubstituteRequestService {
         }
         //이전에 다른 대체 근무를 수락했다면, 그것과 중복되는지
         if (substituteCandidateRepository.existsConflictingActiveSubstitute(
-            candidate.getMember().getUser().getId(), requestId,
+            candidateUserId, requestId,
             request.getShift().getStartAt(), request.getShift().getEndAt(), validationNow)
         ) {
             throw new BusinessException(SubstituteRequestErrorCode.CONFLICT_ACTIVE_SUBSTITUTE);
@@ -289,7 +312,10 @@ public class SubstituteRequestService {
         validateNotStarted(request.getShift(), approvedAt);
 
         //최종 승인 시작
-        request.approveRequest(candidate.getMember(), approvedAt);
+        request.approveRequest(
+            acceptedMember,
+            approvedAt
+        );
 
         ///todo: 요청자와 수락자에게 알림 주기
 

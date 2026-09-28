@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -28,6 +29,7 @@ import com.merge.backend.domain.substitute.exception.SubstituteRequestErrorCode;
 import com.merge.backend.domain.substitute.repository.SubstituteCandidateRepository;
 import com.merge.backend.domain.substitute.repository.SubstituteRequestRepository;
 import com.merge.backend.domain.user.entity.User;
+import com.merge.backend.domain.user.service.UserService;
 import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
@@ -48,6 +50,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -85,6 +88,9 @@ class SubstituteRequestServiceTest {
     @Mock
     private WorkplaceMemberService workplaceMemberService;
 
+    @Mock
+    private UserService userService;
+
     private final Clock clock = Clock.fixed(
         Instant.parse("2026-09-22T12:00:00Z"),
         ZoneId.of("Asia/Seoul")
@@ -109,16 +115,18 @@ class SubstituteRequestServiceTest {
 
     @BeforeEach
     void setUp() {
-        substituteRequestService = new SubstituteRequestService(
-            substituteRequestRepository,
-            substituteCandidateRepository,
-            shiftRepository,
-            workplaceRepository,
-            unavailableTimeRepository,
-            workplaceMemberService,
-            clock,
-            substituteCandidateService
-        );
+        substituteRequestService =
+            new SubstituteRequestService(
+                substituteRequestRepository,
+                substituteCandidateRepository,
+                shiftRepository,
+                workplaceRepository,
+                unavailableTimeRepository,
+                userService,
+                workplaceMemberService,
+                clock,
+                substituteCandidateService
+            );
 
         requestId = 1L;
         actorId = 10L;
@@ -158,6 +166,7 @@ class SubstituteRequestServiceTest {
     private void setupValidCandidateInfo() {
         given(candidateMember.getWorkplace()).willReturn(workplace);
         given(candidateMember.getLeftAt()).willReturn(null);
+        given(candidateMember.getRole()).willReturn(WorkplaceRole.EMPLOYEE);
         given(candidateUser.getId()).willReturn(candidateUserId);
         given(candidateMember.getUser()).willReturn(candidateUser);
         given(candidate.getMember()).willReturn(candidateMember);
@@ -199,8 +208,16 @@ class SubstituteRequestServiceTest {
 
             // then
             assertThat(result).isNotNull();
-            verify(substituteRequestRepository)
+            InOrder lockOrder =
+                inOrder(
+                    substituteRequestRepository,
+                    userService
+                );
+
+            lockOrder.verify(substituteRequestRepository)
                 .findByIdForUpdate(requestId);
+            lockOrder.verify(userService)
+                .getByIdForUpdate(candidateUserId);
             verify(workplaceMemberService).requireManager(actorId, workplaceId);
             verify(request).approveRequest(eq(candidateMember), any(LocalDateTime.class));
         }
@@ -256,6 +273,63 @@ class SubstituteRequestServiceTest {
             assertThatThrownBy(() -> substituteRequestService.approve(requestId, actorId))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining(WorkplaceErrorCode.NOT_WORKPLACE_MEMBER.getMessage());
+        }
+
+        @Test
+        @DisplayName("수락 Candidate가 현재 EMPLOYEE가 아니면 승인할 수 없다")
+        void approve_fail_candidate_not_employee() {
+
+            // given
+            setupValidRequestFullInfo();
+
+            given(candidateMember.getWorkplace())
+                .willReturn(workplace);
+
+            given(candidateMember.getLeftAt())
+                .willReturn(null);
+
+            // 수락 당시에는 EMPLOYEE였지만
+            // 승인 시점에는 더 이상 EMPLOYEE가 아닌 상황
+            given(candidateMember.getRole())
+                .willReturn(WorkplaceRole.MANAGER);
+
+            given(candidate.getMember())
+                .willReturn(candidateMember);
+
+            given(substituteRequestRepository.findByIdForUpdate(requestId))
+                .willReturn(Optional.of(request));
+
+            given(workplaceRepository.findById(workplaceId))
+                .willReturn(Optional.of(workplace));
+
+            given(substituteCandidateRepository.findByRequestIdAndStatus(
+                requestId,
+                CandidateStatus.ACCEPTED
+            )).willReturn(Optional.of(candidate));
+
+            // when & then
+            assertThatThrownBy(
+                () -> substituteRequestService.approve(
+                    requestId,
+                    actorId
+                )
+            )
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining(
+                    ShiftErrorCode.INVALID_WORKPLACE_MEMBER_VALUE
+                        .getMessage()
+                );
+
+            // Candidate 자체가 현재 승인 대상이 아니므로
+            // User의 시간 Lock까지 갈 필요가 없음
+            verify(userService, never())
+                .getByIdForUpdate(any());
+
+            verify(request, never())
+                .approveRequest(
+                    any(),
+                    any()
+                );
         }
 
         @Test

@@ -490,6 +490,169 @@ class SubstituteRequestConcurrencyTest {
         }
     }
 
+    @Test
+    @DisplayName(
+        "같은 User가 겹치는 서로 다른 Request를 동시에 수락해도 하나만 ACCEPTED 된다"
+    )
+    void concurrentAcceptOnDifferentRequestsAllowsOnlyOneForSameUser()
+        throws Exception {
+
+        // given
+        UserConflictFixture fixture =
+            createUserConflictFixture(
+                "user-accept-accept"
+            );
+
+        ExecutorService executor =
+            Executors.newFixedThreadPool(2);
+
+        CountDownLatch ready =
+            new CountDownLatch(2);
+
+        CountDownLatch start =
+            new CountDownLatch(1);
+
+        try {
+
+            Future<Throwable> firstFuture =
+                executor.submit(() -> {
+
+                    ready.countDown();
+                    start.await();
+
+                    try {
+                        substituteCandidateService.acceptCandidate(
+                            fixture.firstCandidateId(),
+                            fixture.candidateUserId()
+                        );
+
+                        return null;
+
+                    } catch (Throwable throwable) {
+                        return throwable;
+                    }
+                });
+
+            Future<Throwable> secondFuture =
+                executor.submit(() -> {
+
+                    ready.countDown();
+                    start.await();
+
+                    try {
+                        substituteCandidateService.acceptCandidate(
+                            fixture.secondCandidateId(),
+                            fixture.candidateUserId()
+                        );
+
+                        return null;
+
+                    } catch (Throwable throwable) {
+                        return throwable;
+                    }
+                });
+
+            assertThat(
+                ready.await(
+                    3,
+                    TimeUnit.SECONDS
+                )
+            ).isTrue();
+
+            start.countDown();
+
+            Throwable firstError =
+                firstFuture.get(
+                    5,
+                    TimeUnit.SECONDS
+                );
+
+            Throwable secondError =
+                secondFuture.get(
+                    5,
+                    TimeUnit.SECONDS
+                );
+
+            boolean firstSucceeded =
+                firstError == null;
+
+            boolean secondSucceeded =
+                secondError == null;
+
+            // 정확히 한 요청만 성공해야 함
+            assertThat(
+                firstSucceeded ^ secondSucceeded
+            ).isTrue();
+
+            Throwable failedError =
+                firstError != null
+                    ? firstError
+                    : secondError;
+
+            assertThat(failedError)
+                .isInstanceOf(BusinessException.class);
+
+            BusinessException businessException =
+                (BusinessException) failedError;
+
+            assertThat(
+                businessException.getErrorCode()
+            ).isEqualTo(
+                SubstituteRequestErrorCode.CONFLICT_ACTIVE_SUBSTITUTE
+            );
+
+            // 최종 DB 상태는 새로운 Transaction에서 다시 확인
+            TransactionTemplate transactionTemplate =
+                new TransactionTemplate(transactionManager);
+
+            transactionTemplate.executeWithoutResult(status -> {
+
+                SubstituteRequest firstRequest =
+                    substituteRequestRepository
+                        .findById(fixture.firstRequestId())
+                        .orElseThrow();
+
+                SubstituteRequest secondRequest =
+                    substituteRequestRepository
+                        .findById(fixture.secondRequestId())
+                        .orElseThrow();
+
+                SubstituteCandidate firstCandidate =
+                    substituteCandidateRepository
+                        .findById(fixture.firstCandidateId())
+                        .orElseThrow();
+
+                SubstituteCandidate secondCandidate =
+                    substituteCandidateRepository
+                        .findById(fixture.secondCandidateId())
+                        .orElseThrow();
+
+                assertThat(
+                    List.of(
+                        firstRequest.getStatus(),
+                        secondRequest.getStatus()
+                    )
+                ).containsExactlyInAnyOrder(
+                    RequestStatus.ACCEPTED,
+                    RequestStatus.OPEN
+                );
+
+                assertThat(
+                    List.of(
+                        firstCandidate.getStatus(),
+                        secondCandidate.getStatus()
+                    )
+                ).containsExactlyInAnyOrder(
+                    CandidateStatus.ACCEPTED,
+                    CandidateStatus.PENDING
+                );
+            });
+
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
     private Fixture createFixture(String suffix) {
 
         TransactionTemplate transactionTemplate =
@@ -748,6 +911,192 @@ class SubstituteRequestConcurrencyTest {
         });
     }
 
+    private UserConflictFixture createUserConflictFixture(
+        String suffix
+    ) {
+        TransactionTemplate transactionTemplate =
+            new TransactionTemplate(transactionManager);
+
+        return transactionTemplate.execute(status -> {
+
+            LocalDateTime now =
+                LocalDateTime.now(clock);
+
+            LocalDateTime firstStartAt =
+                now.plusDays(7)
+                    .withHour(10)
+                    .withMinute(0)
+                    .withSecond(0)
+                    .withNano(0);
+
+            LocalDateTime firstEndAt =
+                firstStartAt.plusHours(4);
+
+            LocalDateTime secondStartAt =
+                firstStartAt.plusHours(2);
+
+            LocalDateTime secondEndAt =
+                secondStartAt.plusHours(4);
+
+            LocalDate weekStartDate =
+                firstStartAt.toLocalDate()
+                    .with(
+                        TemporalAdjusters.previousOrSame(
+                            DayOfWeek.MONDAY
+                        )
+                    );
+
+            User firstRequesterUser =
+                userRepository.save(
+                    new User(
+                        "user-conflict-requester-first-"
+                            + suffix
+                            + "@test.com",
+                        "password-hash",
+                        "first-requester"
+                    )
+                );
+
+            User secondRequesterUser =
+                userRepository.save(
+                    new User(
+                        "user-conflict-requester-second-"
+                            + suffix
+                            + "@test.com",
+                        "password-hash",
+                        "second-requester"
+                    )
+                );
+
+            User candidateUser =
+                userRepository.save(
+                    new User(
+                        "user-conflict-candidate-"
+                            + suffix
+                            + "@test.com",
+                        "password-hash",
+                        "candidate"
+                    )
+                );
+
+            Workplace workplace =
+                workplaceRepository.save(
+                    new Workplace(
+                        "대타 User 충돌 테스트 매장 " + suffix,
+                        "UC-" + suffix
+                    )
+                );
+
+            LocalDateTime joinedAt =
+                now.minusDays(30);
+
+            WorkplaceMember firstRequesterMember =
+                workplaceMemberRepository.save(
+                    new WorkplaceMember(
+                        workplace,
+                        firstRequesterUser,
+                        WorkplaceRole.EMPLOYEE,
+                        joinedAt
+                    )
+                );
+
+            WorkplaceMember secondRequesterMember =
+                workplaceMemberRepository.save(
+                    new WorkplaceMember(
+                        workplace,
+                        secondRequesterUser,
+                        WorkplaceRole.EMPLOYEE,
+                        joinedAt
+                    )
+                );
+
+            WorkplaceMember candidateMember =
+                workplaceMemberRepository.save(
+                    new WorkplaceMember(
+                        workplace,
+                        candidateUser,
+                        WorkplaceRole.EMPLOYEE,
+                        joinedAt
+                    )
+                );
+
+            Schedule schedule =
+                new Schedule(
+                    workplace,
+                    weekStartDate
+                );
+
+            schedule.publish(now);
+
+            schedule =
+                scheduleRepository.save(schedule);
+
+            Shift firstShift =
+                shiftRepository.save(
+                    new Shift(
+                        schedule,
+                        firstRequesterMember,
+                        firstStartAt,
+                        firstEndAt,
+                        ShiftStatus.SCHEDULED
+                    )
+                );
+
+            Shift secondShift =
+                shiftRepository.save(
+                    new Shift(
+                        schedule,
+                        secondRequesterMember,
+                        secondStartAt,
+                        secondEndAt,
+                        ShiftStatus.SCHEDULED
+                    )
+                );
+
+            SubstituteRequest firstRequest =
+                substituteRequestRepository.save(
+                    new SubstituteRequest(
+                        firstShift,
+                        firstRequesterMember,
+                        RequestStatus.OPEN
+                    )
+                );
+
+            SubstituteRequest secondRequest =
+                substituteRequestRepository.save(
+                    new SubstituteRequest(
+                        secondShift,
+                        secondRequesterMember,
+                        RequestStatus.OPEN
+                    )
+                );
+
+            SubstituteCandidate firstCandidate =
+                substituteCandidateRepository.save(
+                    new SubstituteCandidate(
+                        firstRequest,
+                        candidateMember
+                    )
+                );
+
+            SubstituteCandidate secondCandidate =
+                substituteCandidateRepository.save(
+                    new SubstituteCandidate(
+                        secondRequest,
+                        candidateMember
+                    )
+                );
+
+            return new UserConflictFixture(
+                firstRequest.getId(),
+                secondRequest.getId(),
+                firstCandidate.getId(),
+                secondCandidate.getId(),
+                candidateUser.getId()
+            );
+        });
+    }
+
     private record Fixture(
         Long requesterUserId,
         Long shiftId
@@ -763,4 +1112,12 @@ class SubstituteRequestConcurrencyTest {
     ) {
     }
 
+    private record UserConflictFixture(
+        Long firstRequestId,
+        Long secondRequestId,
+        Long firstCandidateId,
+        Long secondCandidateId,
+        Long candidateUserId
+    ) {
+    }
 }

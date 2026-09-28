@@ -12,6 +12,7 @@ import com.merge.backend.domain.substitute.entity.SubstituteRequest;
 import com.merge.backend.domain.substitute.exception.SubstituteRequestErrorCode;
 import com.merge.backend.domain.substitute.repository.SubstituteCandidateRepository;
 import com.merge.backend.domain.substitute.repository.SubstituteRequestRepository;
+import com.merge.backend.domain.user.service.UserService;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
@@ -32,6 +33,7 @@ public class SubstituteCandidateService {
     private final UnavailableTimeRepository unavailableTimeRepository;
     private final SubstituteCandidateRepository substituteCandidateRepository;
     private final SubstituteRequestRepository substituteRequestRepository;
+    private final UserService userService;
     private final Clock clock;
 
     @Transactional(readOnly = true)
@@ -95,8 +97,7 @@ public class SubstituteCandidateService {
 
     private SubstituteCandidate validateRespondableCandidate(
         Long candidateId, // 응답하려는 대타 후보 ID
-        Long userId,      // 현재 로그인한 User ID
-        LocalDateTime now // Clock으로 구한 현재 시간
+        Long userId      // 현재 로그인한 User ID
     ) {
         Long requestId =
             substituteCandidateRepository.findRequestIdById(candidateId)
@@ -153,12 +154,18 @@ public class SubstituteCandidateService {
             throw new BusinessException(SubstituteRequestErrorCode.SHIFT_CANCELLED);
         }
 
-        // 이미 시작된 Shift에는 응답할 수 없음
-        if (!shift.getStartAt().isAfter(now)) {
-            throw new BusinessException(SubstituteRequestErrorCode.SHIFT_ALREADY_STARTED);
-        }
-
         return candidate;
+    }
+
+    private void validateShiftNotStarted(
+        Shift shift,
+        LocalDateTime now
+    ) {
+        if (!shift.getStartAt().isAfter(now)) {
+            throw new BusinessException(
+                SubstituteRequestErrorCode.SHIFT_ALREADY_STARTED
+            );
+        }
     }
 
     @Transactional
@@ -166,14 +173,29 @@ public class SubstituteCandidateService {
         Long candidateId, // 수락할 Candidate ID
         Long userId       // 현재 로그인한 User ID
     ) {
-        LocalDateTime now = LocalDateTime.now(clock);
 
-        // 수락/거절 공통 조건 먼저 검사
+        // Request Lock을 획득하고
+        // Candidate / Request의 기본 응답 가능 상태 확인
         SubstituteCandidate candidate =
-            validateRespondableCandidate(candidateId, userId, now);
+            validateRespondableCandidate(
+                candidateId,
+                userId
+            );
 
         Shift targetShift = candidate.getRequest().getShift();
         Long candidateUserId = candidate.getMember().getUser().getId();
+
+        // 같은 User의 시간 상태를 변경하는 작업끼리 직렬화
+        userService.getByIdForUpdate(candidateUserId);
+
+        // Request/User Lock 대기 이후의 최신 시간
+        LocalDateTime now =
+            LocalDateTime.now(clock);
+
+        validateShiftNotStarted(
+            targetShift,
+            now
+        );
 
         // 1. 다른 공식 근무와 시간이 겹치는지 확인
         if (shiftRepository.existsOverlappingOfficialShift(
@@ -223,11 +245,17 @@ public class SubstituteCandidateService {
         Long candidateId, // 거절할 Candidate ID
         Long userId       // 현재 로그인한 User ID
     ) {
-        LocalDateTime now = LocalDateTime.now(clock);
-
         // 수락/거절 공통 조건 확인
         SubstituteCandidate candidate =
-            validateRespondableCandidate(candidateId, userId, now);
+            validateRespondableCandidate(candidateId, userId);
+
+        LocalDateTime now =
+            LocalDateTime.now(clock);
+
+        validateShiftNotStarted(
+            candidate.getRequest().getShift(),
+            now
+        );
 
         SubstituteRequest request = candidate.getRequest();
 
