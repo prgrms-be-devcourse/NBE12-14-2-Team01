@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import {useParams} from "next/navigation";
 import Card from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
+import { apiFetch, ApiError } from "@/lib/api";
 
 type ScheduleStatus = "NONE" | "DRAFT" | "PUBLISHED";
 
@@ -17,6 +19,7 @@ type DayKey =
 
 type Shift = {
   id: number;
+  memberId: number;
   memberName: string;
   day: DayKey;
   startTime: string;
@@ -28,23 +31,31 @@ type PositionedShift = Shift & {
   laneCount: number;
 };
 
-const days: { key: DayKey; label: string }[] = [
-  { key: "mon", label: "9/14 월" },
-  { key: "tue", label: "9/15 화" },
-  { key: "wed", label: "9/16 수" },
-  { key: "thu", label: "9/17 목" },
-  { key: "fri", label: "9/18 금" },
-  { key: "sat", label: "9/19 토" },
-  { key: "sun", label: "9/20 일" },
+// TODO: API 연동 후 실제 주차의 날짜로 대체 (date는 백엔드에 startAt/endAt을 만들 때 필요)
+const days: { key: DayKey; label: string; date: string }[] = [
+  { key: "mon", label: "9/14 월", date: "2026-09-14" },
+  { key: "tue", label: "9/15 화", date: "2026-09-15" },
+  { key: "wed", label: "9/16 수", date: "2026-09-16" },
+  { key: "thu", label: "9/17 목", date: "2026-09-17" },
+  { key: "fri", label: "9/18 금", date: "2026-09-18" },
+  { key: "sat", label: "9/19 토", date: "2026-09-19" },
+  { key: "sun", label: "9/20 일", date: "2026-09-20" },
 ];
 
-const members = ["김지연", "이서연", "박민수", "최하은"];
+// TODO: API 연동 후 GET 근무지 구성원 목록으로 대체 (id는 WorkplaceMember의 id)
+const members: { id: number; name: string }[] = [
+  { id: 1, name: "김지연" },
+  { id: 2, name: "이서연" },
+  { id: 3, name: "박민수" },
+  { id: 4, name: "최하은" },
+];
 
 // TODO: API 연동 후 SCH-01 응답으로 대체
 // 현재는 정기 근무를 기준으로 주간 근무표가 생성됐다고 가정한 mock 데이터
 const generatedShifts: Shift[] = [
   {
     id: 1,
+    memberId: 3,
     memberName: "박민수",
     day: "mon",
     startTime: "14:00",
@@ -52,6 +63,7 @@ const generatedShifts: Shift[] = [
   },
   {
     id: 2,
+    memberId: 1,
     memberName: "김지연",
     day: "tue",
     startTime: "09:00",
@@ -59,6 +71,7 @@ const generatedShifts: Shift[] = [
   },
   {
     id: 3,
+    memberId: 1,
     memberName: "김지연",
     day: "wed",
     startTime: "09:00",
@@ -66,6 +79,7 @@ const generatedShifts: Shift[] = [
   },
   {
     id: 4,
+    memberId: 2,
     memberName: "이서연",
     day: "wed",
     startTime: "09:00",
@@ -73,6 +87,7 @@ const generatedShifts: Shift[] = [
   },
   {
     id: 5,
+    memberId: 3,
     memberName: "박민수",
     day: "thu",
     startTime: "14:00",
@@ -80,6 +95,7 @@ const generatedShifts: Shift[] = [
   },
   {
     id: 6,
+    memberId: 4,
     memberName: "최하은",
     day: "sat",
     startTime: "09:00",
@@ -187,21 +203,84 @@ function getShiftStyle(shift: PositionedShift) {
   };
 }
 
+// 에러 코드 상수 정의
+const UNAVAILABLE_TIME_CONFLICT_CODE = "SFT-015";
+
+// API 요청 함수 정의
+async function createShift(
+    workplaceId: string,
+    scheduleId: number,
+    payload: {
+      memberId: number;
+      startAt: string;
+      endAt: string;
+      confirmUnavailableConflict: boolean;
+    }
+) {
+  return await apiFetch<{ shiftId: number; memberName: string; }>(
+      `/workplaces/${workplaceId}/schedules/${scheduleId}/shifts`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+// 근무 수정 API (PUT)
+async function updateShift(
+    workplaceId: string,
+    scheduleId: number,
+    shiftId: number,
+    payload: {
+      memberId: number;
+      startAt: string;
+      endAt: string;
+      confirmUnavailableConflict: boolean;
+    }
+) {
+  return await apiFetch<{ shiftId: number; memberName: string }>(
+      `/workplaces/${workplaceId}/schedules/${scheduleId}/shifts/${shiftId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      }
+  );
+}
+
+// 근무 삭제 API (DELETE)
+async function deleteShift(
+    workplaceId: string,
+    scheduleId: number,
+    shiftId: number
+) {
+  return await apiFetch(
+      `/workplaces/${workplaceId}/schedules/${scheduleId}/shifts/${shiftId}`,
+      {
+        method: "DELETE",
+      }
+  );
+}
+
 export default function SchedulePage() {
+  const params = useParams<{ workplaceId: string }>();
+  const workplaceId = params.workplaceId;
   const [status, setStatus] = useState<ScheduleStatus>("NONE");
   const [shifts, setShifts] = useState<Shift[]>([]);
+
+  // TODO: SCH-01(이번 주 근무표 생성) API 연동 후, 응답으로 받은 실제 scheduleId로 대체
+  const [scheduleId, setScheduleId] = useState<number | null>(null);
   const [showShiftModal, setShowShiftModal] = useState(false);
   const [editingShiftId, setEditingShiftId] = useState<number | null>(null);
-  const [selectedMember, setSelectedMember] = useState("김지연");
+  const [selectedMemberId, setSelectedMemberId] = useState<number>(members[0].id);
   const [selectedDay, setSelectedDay] = useState<DayKey>("mon");
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("18:00");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // TODO: API 연동 후 SCH-01 호출로 변경
+  // TODO: API 연동 후 SCH-01 호출로 변경 (응답의 schedule.id를 scheduleId로 저장)
   const handleCreateSchedule = () => {
     setShifts(generatedShifts);
     setStatus("DRAFT");
+    setScheduleId(1); // 임시값 - 실제 SCH-01 응답의 scheduleId로 교체 필요
   };
 
   /*
@@ -223,7 +302,7 @@ export default function SchedulePage() {
 
   const openAddShiftModal = () => {
     setEditingShiftId(null);
-    setSelectedMember("김지연");
+    setSelectedMemberId(members[0].id);
     setSelectedDay("mon");
     setStartTime("09:00");
     setEndTime("18:00");
@@ -235,9 +314,8 @@ export default function SchedulePage() {
     if (status !== "DRAFT") {
       return;
     }
-
     setEditingShiftId(shift.id);
-    setSelectedMember(shift.memberName);
+    setSelectedMemberId(shift.memberId);
     setSelectedDay(shift.day);
     setStartTime(shift.startTime);
     setEndTime(shift.endTime);
@@ -246,48 +324,200 @@ export default function SchedulePage() {
   };
 
   const closeShiftModal = () => {
+    if (isSubmitting) {
+      return;
+    }
     setShowShiftModal(false);
     setEditingShiftId(null);
     setError("");
   };
 
-  const handleSaveShift = () => {
-    if (startTime >= endTime) {
-      setError("종료 시간은 시작 시간보다 늦어야 합니다.");
+  const closeAfterSuccess = () => {
+    setShowShiftModal(false);
+    setEditingShiftId(null);
+    setError("");
+  };
+
+  const submitCreateShift = async (confirmUnavailableConflict: boolean) => {
+    if (scheduleId === null) {
+      setError("근무표가 아직 생성되지 않았습니다.");
       return;
     }
 
-    // 기존 근무 수정
-    if (editingShiftId !== null) {
-      setShifts((prevShifts) =>
-          prevShifts.map((shift) =>
-              shift.id === editingShiftId
-                  ? {
-                    ...shift,
-                    memberName: selectedMember,
-                    day: selectedDay,
-                    startTime,
-                    endTime,
-                  }
-                  : shift
-          )
-      );
-    } else {
-      // 새 근무 추가
+    const day = days.find((d) => d.key === selectedDay);
+    const member = members.find((m) => m.id === selectedMemberId);
+
+    if (!day || !member) {
+      setError("직원 또는 날짜 정보를 확인해주세요.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError("");
+
+    try {
+      const created = await createShift(workplaceId, scheduleId, {
+        memberId: member.id,
+        startAt: `${day.date}T${startTime}:00`,
+        endAt: `${day.date}T${endTime}:00`,
+        confirmUnavailableConflict,
+      });
+
+      // 서버가 내려준 값을 화면 표시용 Shift 형태로 변환해 반영
       const newShift: Shift = {
-        id: Date.now(),
-        memberName: selectedMember,
+        id: created.shiftId,
+        memberId: member.id,
+        memberName: created.memberName,
         day: selectedDay,
         startTime,
         endTime,
       };
 
-      setShifts((prevShifts) => [...prevShifts, newShift]);
-    }
+      setShifts((prev) => [...prev, newShift]);
+      closeAfterSuccess();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        // 직원의 불가능 시간과 겹치는 경우, 관리자에게 강행 여부를 확인
+        if (
+            err.code === UNAVAILABLE_TIME_CONFLICT_CODE &&
+            !confirmUnavailableConflict
+        ) {
+          const confirmed = window.confirm(
+              `${err.message}\n\n그래도 근무를 등록하시겠습니까?`
+          );
 
-    closeShiftModal();
+          if (confirmed) {
+            await submitCreateShift(true);
+            return;
+          }
+
+          setError("근무 등록이 취소되었습니다.");
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError("근무 등록 중 오류가 발생했습니다. 다시 시도해주세요.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
+  const handleSaveShift = async () => {
+    if (startTime >= endTime) {
+      setError("종료 시간은 시작 시간보다 늦어야 합니다.");
+      return;
+    }
+
+    // 1. 근무 수정 (editingShiftId가 있는 경우)
+    if (editingShiftId !== null) {
+      if (scheduleId === null) {
+        setError("근무표가 생성되지 않았습니다.");
+        return;
+      }
+
+      const day = days.find((d) => d.key === selectedDay);
+      const member = members.find((m) => m.id === selectedMemberId);
+
+      if (!day || !member) {
+        setError("직원 또는 날짜 정보를 확인해주세요.");
+        return;
+      }
+
+      setIsSubmitting(true);
+      setError("");
+
+      //SFT-015 발생 시 재요청을 처리하기 위한 내부 함수 구현
+      const submitUpdateShift = async (confirmUnavailableConflict: boolean) => {
+        try {
+          await updateShift(workplaceId, scheduleId, editingShiftId, {
+            memberId: member.id,
+            startAt: `${day.date}T${startTime}:00`,
+            endAt: `${day.date}T${endTime}:00`,
+            confirmUnavailableConflict,
+          });
+
+          // 프론트 State 업데이트
+          setShifts((prevShifts) =>
+              prevShifts.map((shift) =>
+                  shift.id === editingShiftId
+                      ? {
+                        ...shift,
+                        memberId: member.id,
+                        memberName: member.name,
+                        day: selectedDay,
+                        startTime,
+                        endTime,
+                      }
+                      : shift
+              )
+          );
+
+          closeAfterSuccess();
+        } catch (err) {
+          if (err instanceof ApiError) {
+            // 직원의 불가능 시간과 겹치는 경우, 관리자에게 강행 여부를 확인
+            if (
+                err.code === UNAVAILABLE_TIME_CONFLICT_CODE &&
+                !confirmUnavailableConflict
+            ) {
+              const confirmed = window.confirm(
+                  `${err.message}\n\n그래도 근무를 수정하시겠습니까?`
+              );
+
+              if (confirmed) {
+                //confirmUnavailableConflict: true로 재요청
+                await submitUpdateShift(true);
+                return;
+              }
+
+              setError("근무 수정이 취소되었습니다.");
+            } else {
+              setError(err.message);
+            }
+          } else {
+            setError("수정 중 오류가 발생했습니다.");
+          }
+        }
+      };
+
+      try {
+        await submitUpdateShift(false);
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    // 2. 새 근무 추가 (editingShiftId가 null인 경우)
+    await submitCreateShift(false);
+  };
+
+ //근무 삭제 핸들러 구현
+  const handleDeleteShift = async () => {
+    if (editingShiftId === null || scheduleId === null) return;
+
+    if (!window.confirm("정말로 이 근무를 삭제하시겠습니까?")) return;
+
+    setIsSubmitting(true);
+    setError("");
+
+    try {
+      await deleteShift(workplaceId, scheduleId, editingShiftId);
+
+      // 삭제된 근무 State에서 제거
+      setShifts((prev) => prev.filter((shift) => shift.id !== editingShiftId));
+      closeAfterSuccess();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError("삭제 중 오류가 발생했습니다.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
   return (
       <>
         <PageHeader
@@ -556,13 +786,14 @@ export default function SchedulePage() {
                     </label>
 
                     <select
-                        value={selectedMember}
-                        onChange={(e) => setSelectedMember(e.target.value)}
+                        value={selectedMemberId}
+                        onChange={(e) => setSelectedMemberId(Number(e.target.value))}
+                        disabled={isSubmitting}
                         className="w-full rounded-xl border border-[#dce8e2] bg-white px-4 py-3 outline-none focus:border-[#14956c]"
                     >
                       {members.map((member) => (
-                          <option key={member} value={member}>
-                            {member}
+                          <option key={member.id} value={member.id}>
+                            {member.name}
                           </option>
                       ))}
                     </select>
@@ -576,6 +807,7 @@ export default function SchedulePage() {
                     <select
                         value={selectedDay}
                         onChange={(e) => setSelectedDay(e.target.value as DayKey)}
+                        disabled={isSubmitting}
                         className="w-full rounded-xl border border-[#dce8e2] bg-white px-4 py-3 outline-none focus:border-[#14956c]"
                     >
                       {days.map((day) => (
@@ -596,6 +828,7 @@ export default function SchedulePage() {
                           type="time"
                           value={startTime}
                           onChange={(e) => setStartTime(e.target.value)}
+                          disabled={isSubmitting}
                           className="rounded-xl border border-[#dce8e2] px-4 py-3 outline-none focus:border-[#14956c]"
                       />
 
@@ -605,6 +838,7 @@ export default function SchedulePage() {
                           type="time"
                           value={endTime}
                           onChange={(e) => setEndTime(e.target.value)}
+                          disabled={isSubmitting}
                           className="rounded-xl border border-[#dce8e2] px-4 py-3 outline-none focus:border-[#14956c]"
                       />
                     </div>
@@ -618,9 +852,21 @@ export default function SchedulePage() {
                 </div>
 
                 <div className="mt-6 flex gap-3">
+                  {/* 수정 모드일 때만 '삭제' 버튼 표시 */}
+                  {editingShiftId !== null && (
+                      <button
+                          type="button"
+                          onClick={handleDeleteShift}
+                          disabled={isSubmitting}
+                          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-600 transition hover:bg-red-100 disabled:opacity-50"
+                      >
+                        삭제
+                      </button>
+                  )}
                   <button
                       type="button"
                       onClick={closeShiftModal}
+                      disabled={isSubmitting}
                       className="flex-1 rounded-xl border border-[#dce8e2] px-4 py-3 text-sm font-bold text-[#66736d] transition hover:bg-[#f3fbf7]"
                   >
                     취소
@@ -629,9 +875,11 @@ export default function SchedulePage() {
                   <button
                       type="button"
                       onClick={handleSaveShift}
+                      disabled={isSubmitting}
                       className="flex-1 rounded-xl bg-[#005642] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#0b6b52]"
                   >
-                    {editingShiftId !== null ? "수정 완료" : "근무 추가"}
+                    {isSubmitting ? "처리 중..." : editingShiftId !== null
+                            ? "수정 완료" : "근무 추가"}
                   </button>
                 </div>
               </div>

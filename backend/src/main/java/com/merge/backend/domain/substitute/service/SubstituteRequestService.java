@@ -212,7 +212,7 @@ public class SubstituteRequestService {
     public SubstituteRequest approve(Long requestId, Long actorId) {
 
         //대체 근무 요청이 존재하는지
-        SubstituteRequest request = substituteRequestRepository.findById(requestId)
+        SubstituteRequest request = substituteRequestRepository.findByIdForUpdate(requestId)
             .orElseThrow(() ->
                 new BusinessException(SubstituteRequestErrorCode.SUBSTITUTE_REQUEST_NOT_FOUND));
 
@@ -305,7 +305,7 @@ public class SubstituteRequestService {
     @Transactional
     public SubstituteRequest close(Long requestId, Long actorId) {
         // Request 조회
-        SubstituteRequest request = substituteRequestRepository.findById(requestId)
+        SubstituteRequest request = substituteRequestRepository.findByIdForUpdate(requestId)
             .orElseThrow(() -> new BusinessException(SubstituteRequestErrorCode
                 .SUBSTITUTE_REQUEST_NOT_FOUND));
 

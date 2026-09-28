@@ -13,6 +13,16 @@ import org.springframework.data.repository.query.Param;
 public interface SubstituteCandidateRepository
     extends JpaRepository<SubstituteCandidate, Long> {
 
+    // Candidate의 Request ID만 조회하는 메서드
+    @Query("""
+        SELECT c.request.id
+        FROM SubstituteCandidate c
+        WHERE c.id = :candidateId
+        """)
+    Optional<Long> findRequestIdById(
+        @Param("candidateId") Long candidateId
+    );
+
     // SUB-01 / SUB-03
     // 이미 수락한 다른 활성 대타 근무와 시간이 겹치는지 확인
     @Query("""
