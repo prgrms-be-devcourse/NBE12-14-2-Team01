@@ -19,6 +19,7 @@ type DayKey =
 
 type Shift = {
   id: number;
+  memberId: number;
   memberName: string;
   day: DayKey;
   startTime: string;
@@ -54,6 +55,7 @@ const members: { id: number; name: string }[] = [
 const generatedShifts: Shift[] = [
   {
     id: 1,
+    memberId: 3,
     memberName: "박민수",
     day: "mon",
     startTime: "14:00",
@@ -61,6 +63,7 @@ const generatedShifts: Shift[] = [
   },
   {
     id: 2,
+    memberId: 1,
     memberName: "김지연",
     day: "tue",
     startTime: "09:00",
@@ -68,6 +71,7 @@ const generatedShifts: Shift[] = [
   },
   {
     id: 3,
+    memberId: 1,
     memberName: "김지연",
     day: "wed",
     startTime: "09:00",
@@ -75,6 +79,7 @@ const generatedShifts: Shift[] = [
   },
   {
     id: 4,
+    memberId: 2,
     memberName: "이서연",
     day: "wed",
     startTime: "09:00",
@@ -82,6 +87,7 @@ const generatedShifts: Shift[] = [
   },
   {
     id: 5,
+    memberId: 3,
     memberName: "박민수",
     day: "thu",
     startTime: "14:00",
@@ -89,6 +95,7 @@ const generatedShifts: Shift[] = [
   },
   {
     id: 6,
+    memberId: 4,
     memberName: "최하은",
     day: "sat",
     startTime: "09:00",
@@ -307,11 +314,8 @@ export default function SchedulePage() {
     if (status !== "DRAFT") {
       return;
     }
-
-    const member = members.find((m) => m.name === shift.memberName);
-
     setEditingShiftId(shift.id);
-    setSelectedMemberId(member?.id ?? members[0].id);
+    setSelectedMemberId(shift.memberId);
     setSelectedDay(shift.day);
     setStartTime(shift.startTime);
     setEndTime(shift.endTime);
@@ -362,6 +366,7 @@ export default function SchedulePage() {
       // 서버가 내려준 값을 화면 표시용 Shift 형태로 변환해 반영
       const newShift: Shift = {
         id: created.shiftId,
+        memberId: member.id,
         memberName: created.memberName,
         day: selectedDay,
         startTime,
@@ -422,36 +427,62 @@ export default function SchedulePage() {
       setIsSubmitting(true);
       setError("");
 
-      try {
-        await updateShift(workplaceId, scheduleId, editingShiftId, {
-          memberId: member.id,
-          startAt: `${day.date}T${startTime}:00`,
-          endAt: `${day.date}T${endTime}:00`,
-          confirmUnavailableConflict: false,
-        });
+      //SFT-015 발생 시 재요청을 처리하기 위한 내부 함수 구현
+      const submitUpdateShift = async (confirmUnavailableConflict: boolean) => {
+        try {
+          await updateShift(workplaceId, scheduleId, editingShiftId, {
+            memberId: member.id,
+            startAt: `${day.date}T${startTime}:00`,
+            endAt: `${day.date}T${endTime}:00`,
+            confirmUnavailableConflict,
+          });
 
-        // 프론트 State 업데이트
-        setShifts((prevShifts) =>
-            prevShifts.map((shift) =>
-                shift.id === editingShiftId
-                    ? {
-                      ...shift,
-                      memberName: member.name,
-                      day: selectedDay,
-                      startTime,
-                      endTime,
-                    }
-                    : shift
-            )
-        );
+          // 프론트 State 업데이트
+          setShifts((prevShifts) =>
+              prevShifts.map((shift) =>
+                  shift.id === editingShiftId
+                      ? {
+                        ...shift,
+                        memberId: member.id,
+                        memberName: member.name,
+                        day: selectedDay,
+                        startTime,
+                        endTime,
+                      }
+                      : shift
+              )
+          );
 
-        closeAfterSuccess();
-      } catch (err) {
-        if (err instanceof ApiError) {
-          setError(err.message);
-        } else {
-          setError("수정 중 오류가 발생했습니다.");
+          closeAfterSuccess();
+        } catch (err) {
+          if (err instanceof ApiError) {
+            // 직원의 불가능 시간과 겹치는 경우, 관리자에게 강행 여부를 확인
+            if (
+                err.code === UNAVAILABLE_TIME_CONFLICT_CODE &&
+                !confirmUnavailableConflict
+            ) {
+              const confirmed = window.confirm(
+                  `${err.message}\n\n그래도 근무를 수정하시겠습니까?`
+              );
+
+              if (confirmed) {
+                //confirmUnavailableConflict: true로 재요청
+                await submitUpdateShift(true);
+                return;
+              }
+
+              setError("근무 수정이 취소되었습니다.");
+            } else {
+              setError(err.message);
+            }
+          } else {
+            setError("수정 중 오류가 발생했습니다.");
+          }
         }
+      };
+
+      try {
+        await submitUpdateShift(false);
       } finally {
         setIsSubmitting(false);
       }
@@ -461,6 +492,7 @@ export default function SchedulePage() {
     // 2. 새 근무 추가 (editingShiftId가 null인 경우)
     await submitCreateShift(false);
   };
+
  //근무 삭제 핸들러 구현
   const handleDeleteShift = async () => {
     if (editingShiftId === null || scheduleId === null) return;
