@@ -788,6 +788,7 @@ export default function SchedulePage() {
                     <select
                         value={selectedMemberId}
                         onChange={(e) => setSelectedMemberId(Number(e.target.value))}
+                        disabled={isSubmitting}
                         className="w-full rounded-xl border border-[#dce8e2] bg-white px-4 py-3 outline-none focus:border-[#14956c]"
                     >
                       {members.map((member) => (
@@ -806,6 +807,7 @@ export default function SchedulePage() {
                     <select
                         value={selectedDay}
                         onChange={(e) => setSelectedDay(e.target.value as DayKey)}
+                        disabled={isSubmitting}
                         className="w-full rounded-xl border border-[#dce8e2] bg-white px-4 py-3 outline-none focus:border-[#14956c]"
                     >
                       {days.map((day) => (
