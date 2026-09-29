@@ -1,55 +1,39 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import Card from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
+import { apiFetch } from "@/lib/api";
 
 type MemberRole = "MANAGER" | "EMPLOYEE";
+
+type MemberResponse = {
+  memberId: number;
+  name: string;
+  email: string;
+  role: MemberRole;
+};
 
 type Member = {
   id: number;
   name: string;
   email: string;
   role: MemberRole;
-
-  // null이면 현재 소속
-  // 값이 있으면 소속 종료
   leftAt: string | null;
 };
 
-const initialMembers: Member[] = [
-  {
-    id: 1,
-    name: "김지연",
-    email: "jiyeon@switch.com",
-    role: "MANAGER",
-    leftAt: null,
-  },
-  {
-    id: 2,
-    name: "이서연",
-    email: "seoyeon@switch.com",
-    role: "EMPLOYEE",
-    leftAt: null,
-  },
-  {
-    id: 3,
-    name: "박민수",
-    email: "minsu@switch.com",
-    role: "EMPLOYEE",
-    leftAt: null,
-  },
-  {
-    id: 4,
-    name: "최하은",
-    email: "haeun@switch.com",
-    role: "EMPLOYEE",
-    leftAt: null,
-  },
-];
+type InviteCodeResponse = {
+  inviteCode: string;
+};
+
 
 export default function MembersPage() {
-  const [members, setMembers] = useState<Member[]>(initialMembers);
+  const params = useParams();
+  const workplaceId = params.workplaceId as string;
+
+  const [members, setMembers] = useState<Member[]>([]);
+  const [inviteCode, setInviteCode] = useState("");
 
   const [filter, setFilter] = useState<
       "ALL" | "MANAGER" | "EMPLOYEE"
@@ -61,11 +45,36 @@ export default function MembersPage() {
   const [memberToEnd, setMemberToEnd] = useState<Member | null>(null);
   const [successMessage, setSuccessMessage] = useState("");
 
-  /*
-   * TODO: API 연동 후
-   * WP-05 초대 코드 조회 결과로 교체
-   */
-  const inviteCode = "SW-9284";
+  useEffect(() => {
+    const fetchMembersData = async () => {
+      try {
+        const [memberData, inviteData] = await Promise.all([
+          apiFetch<MemberResponse[]>(
+              `/workplaces/${workplaceId}/members`
+          ),
+          apiFetch<InviteCodeResponse>(
+              `/workplaces/${workplaceId}/invite-code`
+          ),
+        ]);
+
+        setMembers(
+            memberData.map((member) => ({
+              id: member.memberId,
+              name: member.name,
+              email: member.email,
+              role: member.role,
+              leftAt: null,
+            }))
+        );
+
+        setInviteCode(inviteData.inviteCode);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    fetchMembersData();
+  }, [workplaceId]);
 
   const filteredMembers = members.filter((member) => {
     if (filter === "ALL") {
@@ -192,7 +201,7 @@ export default function MembersPage() {
           </div>
 
           {/* 직원 목록 */}
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto md:overflow-visible">
             <table className="w-full min-w-[760px] border-collapse">
               <thead>
               <tr className="border-b border-[#dce8e2] text-left text-sm text-[#78847f]">
@@ -298,7 +307,7 @@ export default function MembersPage() {
                                 </button>
 
                                 {openMenuId === member.id && (
-                                    <div className="absolute right-0 top-10 z-20 w-36 overflow-hidden rounded-xl border border-[#dce8e2] bg-white shadow-lg">
+                                    <div className="absolute -left-24 top-10 z-30 w-36 overflow-hidden rounded-xl border border-[#dce8e2] bg-white shadow-lg">
                                       <button
                                           type="button"
                                           onClick={() => {
