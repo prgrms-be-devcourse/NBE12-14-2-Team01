@@ -1,37 +1,58 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import {useEffect, useState} from "react";
+import {apiFetch} from "@/lib/api";
 
 type WorkplaceRole = "MANAGER" | "EMPLOYEE";
+
+type MyWorkplaceResponse = {
+  workplaceId: number;
+  name: string;
+  role: WorkplaceRole;
+};
 
 type Workplace = {
   id: number;
   name: string;
   role: WorkplaceRole;
-  members: number;
 };
 
-const initialWorkplaces: Workplace[] = [
-  {
-    id: 1,
-    name: "카페 스위치",
-    role: "MANAGER",
-    members: 4,
-  },
-  {
-    id: 2,
-    name: "스위치 베이커리",
-    role: "EMPLOYEE",
-    members: 7,
-  },
-];
-
 export default function WorkplacesPage() {
-  const [workplaces, setWorkplaces] =
-      useState<Workplace[]>(initialWorkplaces);
+  const [workplaces, setWorkplaces] = useState<Workplace[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [workplaceName, setWorkplaceName] = useState("");
   const [inviteCode, setInviteCode] = useState("");
+
+  useEffect(() => {
+    const fetchWorkplaces = async () => {
+      try {
+        setIsLoading(true);
+        setLoadError(null);
+
+        const data = await apiFetch<MyWorkplaceResponse[]>("/workplaces");
+
+        setWorkplaces(
+            data.map((workplace) => ({
+              id: workplace.workplaceId,
+              name: workplace.name,
+              role: workplace.role,
+            }))
+        );
+      } catch (error) {
+        setLoadError(
+            error instanceof Error
+                ? error.message
+                : "근무지 목록을 불러오지 못했습니다."
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchWorkplaces();
+  }, []);
 
   const handleCreateWorkplace = () => {
     const name = workplaceName.trim();
@@ -41,19 +62,6 @@ export default function WorkplacesPage() {
       return;
     }
 
-    const newWorkplace: Workplace = {
-      id: Date.now(),
-      name,
-      role: "MANAGER",
-      members: 1,
-    };
-
-    setWorkplaces((prev) => [
-      ...prev,
-      newWorkplace,
-    ]);
-
-    setWorkplaceName("");
   };
 
   const handleJoinWorkplace = () => {
@@ -101,7 +109,8 @@ export default function WorkplacesPage() {
                 </p>
               </div>
 
-              <div className="grid h-10 w-10 place-items-center rounded-full bg-[#dff7ec] font-black text-[#005642]">
+              <div
+                  className="grid h-10 w-10 place-items-center rounded-full bg-[#dff7ec] font-black text-[#005642]">
                 김
               </div>
 
@@ -134,49 +143,56 @@ export default function WorkplacesPage() {
               </div>
 
               <div className="space-y-3">
-                {workplaces.map((workplace) => (
-                    <Link
-                        key={workplace.id}
-                        href={`/workplaces/${workplace.id}`}
-                        className="block rounded-2xl border border-[#dce8e2] bg-white p-5 transition hover:border-[#14956c] hover:shadow-sm"
-                    >
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex min-w-0 items-center gap-4">
-                          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#dff7ec] text-xl font-black text-[#005642]">
-                            {workplace.name.slice(0, 1)}
+                {isLoading && (
+                    <div className="rounded-2xl border border-dashed border-[#dce8e2] bg-white p-8 text-center text-sm text-[#78847f]">
+                      근무지 목록을 불러오는 중입니다...
+                    </div>
+                )}
+
+                {!isLoading && loadError && (
+                    <div className="rounded-2xl border border-dashed border-[#f1cccc] bg-white p-8 text-center text-sm text-[#d95555]">
+                      {loadError}
+                    </div>
+                )}
+
+                {!isLoading && !loadError && workplaces.map((workplace) => (
+                        <Link
+                            key={workplace.id}
+                            href={`/workplaces/${workplace.id}`}
+                            className="block rounded-2xl border border-[#dce8e2] bg-white p-5 transition hover:border-[#14956c] hover:shadow-sm"
+                        >
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex min-w-0 items-center gap-4">
+                              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#dff7ec] text-xl font-black text-[#005642]">
+                                {workplace.name.slice(0, 1)}
+                              </div>
+
+                              <div className="min-w-0">
+                                <p className="truncate font-black">{workplace.name}</p>
+                              </div>
+                            </div>
+
+                            <div className="flex shrink-0 items-center gap-3">
+                              <span
+                                  className={
+                                    workplace.role === "MANAGER"
+                                        ? "rounded-full bg-[#ece8ff] px-3 py-1 text-xs font-bold text-[#6758c7]"
+                                        : "rounded-full bg-[#f3f5f4] px-3 py-1 text-xs font-bold text-[#66736d]"
+                                  }
+                              >
+                                {workplace.role === "MANAGER" ? "관리자" : "직원"}
+                              </span>
+                              <span className="text-xl text-[#9eaaa5]">›</span>
+                            </div>
                           </div>
+                        </Link>
+                    ))}
 
-                          <div className="min-w-0">
-                            <p className="truncate font-black">
-                              {workplace.name}
-                            </p>
-
-                            <p className="mt-1 text-sm text-[#78847f]">
-                              구성원 {workplace.members}명
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex shrink-0 items-center gap-3">
-                      <span
-                          className={
-                            workplace.role === "MANAGER"
-                                ? "rounded-full bg-[#ece8ff] px-3 py-1 text-xs font-bold text-[#6758c7]"
-                                : "rounded-full bg-[#f3f5f4] px-3 py-1 text-xs font-bold text-[#66736d]"
-                          }
-                      >
-                        {workplace.role === "MANAGER"
-                            ? "관리자"
-                            : "직원"}
-                      </span>
-
-                          <span className="text-xl text-[#9eaaa5]">
-                        ›
-                      </span>
-                        </div>
-                      </div>
-                    </Link>
-                ))}
+                {!isLoading && !loadError && workplaces.length === 0 && (
+                    <div className="rounded-2xl border border-dashed border-[#dce8e2] bg-white p-8 text-center text-sm text-[#78847f]">
+                      참여 중인 근무지가 없습니다.
+                    </div>
+                )}
               </div>
             </section>
 
