@@ -116,8 +116,13 @@ class NotificationServiceTest {
             "새로운 주간 근무표가 공개되었습니다."
         );
 
-        when(notificationRepository.findById(notificationId))
-            .thenReturn(Optional.of(notification));
+        when(
+            notificationRepository.findByIdForUpdate(
+                notificationId
+            )
+        ).thenReturn(
+            Optional.of(notification)
+        );
 
         NotificationReadResponse result =
             notificationService.markAsRead(
@@ -139,6 +144,11 @@ class NotificationServiceTest {
 
         assertThat(result.readAt())
             .isEqualTo(expectedReadAt);
+
+        verify(notificationRepository)
+            .findByIdForUpdate(
+                notificationId
+            );
     }
 
     @Test
@@ -147,8 +157,13 @@ class NotificationServiceTest {
         Long actorUserId = 1L;
         Long notificationId = 100L;
 
-        when(notificationRepository.findById(notificationId))
-            .thenReturn(Optional.empty());
+        when(
+            notificationRepository.findByIdForUpdate(
+                notificationId
+            )
+        ).thenReturn(
+            Optional.empty()
+        );
 
         assertThatThrownBy(() ->
             notificationService.markAsRead(
@@ -193,8 +208,13 @@ class NotificationServiceTest {
             "새로운 주간 근무표가 공개되었습니다."
         );
 
-        when(notificationRepository.findById(notificationId))
-            .thenReturn(Optional.of(notification));
+        when(
+            notificationRepository.findByIdForUpdate(
+                notificationId
+            )
+        ).thenReturn(
+            Optional.of(notification)
+        );
 
         assertThatThrownBy(() ->
             notificationService.markAsRead(
@@ -516,6 +536,546 @@ class NotificationServiceTest {
             .extracting(Notification::getMessage)
             .containsOnly(
                 "새로운 주간 근무표가 공개되었습니다."
+            );
+    }
+
+    @Test
+    void createSubstituteRequestReceivedNotifications() {
+
+        // given
+        List<Long> candidateMemberIds =
+            List.of(
+                100L,
+                200L
+            );
+
+        WorkplaceMember firstCandidate =
+            mock(WorkplaceMember.class);
+
+        WorkplaceMember secondCandidate =
+            mock(WorkplaceMember.class);
+
+        when(
+            workplaceMemberRepository.findAllById(
+                candidateMemberIds
+            )
+        ).thenReturn(
+            List.of(
+                firstCandidate,
+                secondCandidate
+            )
+        );
+
+        when(
+            notificationRepository.save(
+                any(Notification.class)
+            )
+        ).thenAnswer(
+            invocation ->
+                invocation.getArgument(0)
+        );
+
+        // when
+        notificationService.createSubstituteRequestReceivedNotifications(
+            candidateMemberIds
+        );
+
+        // then
+        verify(workplaceMemberRepository)
+            .findAllById(
+                candidateMemberIds
+            );
+
+        ArgumentCaptor<Notification> notificationCaptor =
+            ArgumentCaptor.forClass(
+                Notification.class
+            );
+
+        verify(notificationRepository, times(2))
+            .save(
+                notificationCaptor.capture()
+            );
+
+        List<Notification> savedNotifications =
+            notificationCaptor.getAllValues();
+
+        assertThat(savedNotifications)
+            .extracting(Notification::getRecipientMember)
+            .containsExactlyInAnyOrder(
+                firstCandidate,
+                secondCandidate
+            );
+
+        assertThat(savedNotifications)
+            .extracting(Notification::getType)
+            .containsOnly(
+                NotificationType.SUBSTITUTE_REQUEST_RECEIVED
+            );
+
+        assertThat(savedNotifications)
+            .extracting(Notification::getMessage)
+            .containsOnly(
+                "새로운 대타 요청이 도착했습니다."
+            );
+    }
+
+    @Test
+    void createSubstituteNoCandidateNotifications() {
+
+        // given
+        List<Long> managerMemberIds =
+            List.of(
+                100L,
+                200L
+            );
+
+        WorkplaceMember firstManager =
+            mock(WorkplaceMember.class);
+
+        WorkplaceMember secondManager =
+            mock(WorkplaceMember.class);
+
+        when(
+            workplaceMemberRepository.findAllById(
+                managerMemberIds
+            )
+        ).thenReturn(
+            List.of(
+                firstManager,
+                secondManager
+            )
+        );
+
+        when(
+            notificationRepository.save(
+                any(Notification.class)
+            )
+        ).thenAnswer(
+            invocation ->
+                invocation.getArgument(0)
+        );
+
+        // when
+        notificationService.createSubstituteNoCandidateNotifications(
+            managerMemberIds
+        );
+
+        // then
+        verify(workplaceMemberRepository)
+            .findAllById(
+                managerMemberIds
+            );
+
+        ArgumentCaptor<Notification> notificationCaptor =
+            ArgumentCaptor.forClass(
+                Notification.class
+            );
+
+        verify(notificationRepository, times(2))
+            .save(
+                notificationCaptor.capture()
+            );
+
+        List<Notification> savedNotifications =
+            notificationCaptor.getAllValues();
+
+        assertThat(savedNotifications)
+            .extracting(Notification::getRecipientMember)
+            .containsExactlyInAnyOrder(
+                firstManager,
+                secondManager
+            );
+
+        assertThat(savedNotifications)
+            .extracting(Notification::getType)
+            .containsOnly(
+                NotificationType.SUBSTITUTE_NO_CANDIDATE
+            );
+
+        assertThat(savedNotifications)
+            .extracting(Notification::getMessage)
+            .containsOnly(
+                "대체 근무 가능한 후보가 없습니다."
+            );
+    }
+
+    @Test
+    void createSubstituteAcceptedNotifications() {
+
+        // given
+        List<Long> managerMemberIds =
+            List.of(
+                100L,
+                200L
+            );
+
+        WorkplaceMember firstManager =
+            mock(WorkplaceMember.class);
+
+        WorkplaceMember secondManager =
+            mock(WorkplaceMember.class);
+
+        when(
+            workplaceMemberRepository.findAllById(
+                managerMemberIds
+            )
+        ).thenReturn(
+            List.of(
+                firstManager,
+                secondManager
+            )
+        );
+
+        when(
+            notificationRepository.save(
+                any(Notification.class)
+            )
+        ).thenAnswer(
+            invocation ->
+                invocation.getArgument(0)
+        );
+
+        // when
+        notificationService.createSubstituteAcceptedNotifications(
+            managerMemberIds
+        );
+
+        // then
+        verify(workplaceMemberRepository)
+            .findAllById(
+                managerMemberIds
+            );
+
+        ArgumentCaptor<Notification> notificationCaptor =
+            ArgumentCaptor.forClass(
+                Notification.class
+            );
+
+        verify(notificationRepository, times(2))
+            .save(
+                notificationCaptor.capture()
+            );
+
+        List<Notification> savedNotifications =
+            notificationCaptor.getAllValues();
+
+        assertThat(savedNotifications)
+            .extracting(
+                Notification::getRecipientMember
+            )
+            .containsExactlyInAnyOrder(
+                firstManager,
+                secondManager
+            );
+
+        assertThat(savedNotifications)
+            .extracting(
+                Notification::getType
+            )
+            .containsOnly(
+                NotificationType.SUBSTITUTE_ACCEPTED
+            );
+
+        assertThat(savedNotifications)
+            .extracting(
+                Notification::getMessage
+            )
+            .containsOnly(
+                "대체 근무 수락자가 생겼습니다. 최종 승인이 필요합니다."
+            );
+    }
+
+    @Test
+    void createSubstituteAllRejectedNotifications() {
+
+        // given
+        List<Long> recipientMemberIds =
+            List.of(
+                100L,
+                200L
+            );
+
+        WorkplaceMember requester =
+            mock(WorkplaceMember.class);
+
+        WorkplaceMember manager =
+            mock(WorkplaceMember.class);
+
+        when(
+            workplaceMemberRepository.findAllById(
+                recipientMemberIds
+            )
+        ).thenReturn(
+            List.of(
+                requester,
+                manager
+            )
+        );
+
+        when(
+            notificationRepository.save(
+                any(Notification.class)
+            )
+        ).thenAnswer(
+            invocation ->
+                invocation.getArgument(0)
+        );
+
+        // when
+        notificationService.createSubstituteAllRejectedNotifications(
+            recipientMemberIds
+        );
+
+        // then
+        verify(workplaceMemberRepository)
+            .findAllById(
+                recipientMemberIds
+            );
+
+        ArgumentCaptor<Notification> notificationCaptor =
+            ArgumentCaptor.forClass(
+                Notification.class
+            );
+
+        verify(notificationRepository, times(2))
+            .save(
+                notificationCaptor.capture()
+            );
+
+        List<Notification> savedNotifications =
+            notificationCaptor.getAllValues();
+
+        assertThat(savedNotifications)
+            .extracting(
+                Notification::getRecipientMember
+            )
+            .containsExactlyInAnyOrder(
+                requester,
+                manager
+            );
+
+        assertThat(savedNotifications)
+            .extracting(
+                Notification::getType
+            )
+            .containsOnly(
+                NotificationType.SUBSTITUTE_ALL_REJECTED
+            );
+
+        assertThat(savedNotifications)
+            .extracting(
+                Notification::getMessage
+            )
+            .containsOnly(
+                "대체 근무 요청을 받은 모든 수신자가 거절했습니다."
+            );
+    }
+
+    @Test
+    void createSubstituteApprovedNotifications() {
+
+        // given
+        Long requesterMemberId = 100L;
+        Long acceptedMemberId = 200L;
+
+        WorkplaceMember requester =
+            mock(WorkplaceMember.class);
+
+        WorkplaceMember acceptedMember =
+            mock(WorkplaceMember.class);
+
+        when(requester.getId())
+            .thenReturn(requesterMemberId);
+
+        when(acceptedMember.getId())
+            .thenReturn(acceptedMemberId);
+
+        List<Long> recipientMemberIds =
+            List.of(
+                requesterMemberId,
+                acceptedMemberId
+            );
+
+        /*
+         * 일부러 요청한 ID 순서와 반대로 반환한다.
+         *
+         * findAllById() 결과 순서에 의존하지 않고
+         * ID로 요청자/수락자를 구분하는지 확인하기 위함.
+         */
+        when(
+            workplaceMemberRepository.findAllById(
+                recipientMemberIds
+            )
+        ).thenReturn(
+            List.of(
+                acceptedMember,
+                requester
+            )
+        );
+
+        when(
+            notificationRepository.save(
+                any(Notification.class)
+            )
+        ).thenAnswer(
+            invocation ->
+                invocation.getArgument(0)
+        );
+
+        // when
+        notificationService.createSubstituteApprovedNotifications(
+            requesterMemberId,
+            acceptedMemberId
+        );
+
+        // then
+        verify(workplaceMemberRepository)
+            .findAllById(
+                recipientMemberIds
+            );
+
+        ArgumentCaptor<Notification> notificationCaptor =
+            ArgumentCaptor.forClass(
+                Notification.class
+            );
+
+        verify(notificationRepository, times(2))
+            .save(
+                notificationCaptor.capture()
+            );
+
+        List<Notification> savedNotifications =
+            notificationCaptor.getAllValues();
+
+        assertThat(savedNotifications)
+            .hasSize(2);
+
+        Notification requesterNotification =
+            savedNotifications.stream()
+                .filter(notification ->
+                    notification
+                        .getRecipientMember()
+                        .equals(requester)
+                )
+                .findFirst()
+                .orElseThrow();
+
+        Notification acceptedNotification =
+            savedNotifications.stream()
+                .filter(notification ->
+                    notification
+                        .getRecipientMember()
+                        .equals(acceptedMember)
+                )
+                .findFirst()
+                .orElseThrow();
+
+        // 요청자 알림
+        assertThat(requesterNotification.getType())
+            .isEqualTo(
+                NotificationType.SUBSTITUTE_APPROVED
+            );
+
+        assertThat(requesterNotification.getMessage())
+            .isEqualTo(
+                "요청한 대체 근무 변경이 최종 승인되었습니다."
+            );
+
+        // 수락자 알림
+        assertThat(acceptedNotification.getType())
+            .isEqualTo(
+                NotificationType.SUBSTITUTE_APPROVED
+            );
+
+        assertThat(acceptedNotification.getMessage())
+            .isEqualTo(
+                "수락한 대체 근무가 공식 근무로 확정되었습니다."
+            );
+    }
+
+    @Test
+    void createSubstituteManagerClosedNotifications() {
+
+        // given
+        List<Long> recipientMemberIds =
+            List.of(
+                100L,
+                200L
+            );
+
+        WorkplaceMember requester =
+            mock(WorkplaceMember.class);
+
+        WorkplaceMember candidate =
+            mock(WorkplaceMember.class);
+
+        when(
+            workplaceMemberRepository.findAllById(
+                recipientMemberIds
+            )
+        ).thenReturn(
+            List.of(
+                requester,
+                candidate
+            )
+        );
+
+        when(
+            notificationRepository.save(
+                any(Notification.class)
+            )
+        ).thenAnswer(
+            invocation ->
+                invocation.getArgument(0)
+        );
+
+        // when
+        notificationService.createSubstituteManagerClosedNotifications(
+            recipientMemberIds
+        );
+
+        // then
+        verify(workplaceMemberRepository)
+            .findAllById(
+                recipientMemberIds
+            );
+
+        ArgumentCaptor<Notification> notificationCaptor =
+            ArgumentCaptor.forClass(
+                Notification.class
+            );
+
+        verify(notificationRepository, times(2))
+            .save(
+                notificationCaptor.capture()
+            );
+
+        List<Notification> savedNotifications =
+            notificationCaptor.getAllValues();
+
+        assertThat(savedNotifications)
+            .extracting(
+                Notification::getRecipientMember
+            )
+            .containsExactlyInAnyOrder(
+                requester,
+                candidate
+            );
+
+        assertThat(savedNotifications)
+            .extracting(
+                Notification::getType
+            )
+            .containsOnly(
+                NotificationType.SUBSTITUTE_MANAGER_CLOSED
+            );
+
+        assertThat(savedNotifications)
+            .extracting(
+                Notification::getMessage
+            )
+            .containsOnly(
+                "관리자가 대체 근무 요청을 종료했습니다."
             );
     }
 

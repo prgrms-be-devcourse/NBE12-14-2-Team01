@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/api";
-import { useCurrentUser } from "@/components/providers/CurrentUserProvider";
+import {useEffect, useState} from "react";
+import { apiFetch, clearToken } from "@/lib/api";
+import {useRouter} from "next/navigation";
+import {useCurrentUser} from "@/components/providers/CurrentUserProvider";
 
 type WorkplaceRole = "MANAGER" | "EMPLOYEE";
 
@@ -17,9 +18,11 @@ type Workplace = {
   id: number;
   name: string;
   role: WorkplaceRole;
+  // members: number;
 };
 
 export default function WorkplacesPage() {
+  const router = useRouter();
   const [workplaces, setWorkplaces] = useState<Workplace[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -27,7 +30,7 @@ export default function WorkplacesPage() {
   const [inviteCode, setInviteCode] = useState("");
 
   // 로그인한 사람 이름, 동그라미엔 첫 글자
-  const { user, status } = useCurrentUser();
+  const {user, status} = useCurrentUser();
   const userName = status === "success" && user ? user.name.trim() : "";
   const userInitial = userName.charAt(0);
 
@@ -47,11 +50,7 @@ export default function WorkplacesPage() {
             }))
         );
       } catch (error) {
-        setLoadError(
-            error instanceof Error
-                ? error.message
-                : "근무지 목록을 불러오지 못했습니다."
-        );
+        setLoadError(error instanceof Error ? error.message : "근무지 목록을 불러오지 못했습니다.");
       } finally {
         setIsLoading(false);
       }
@@ -59,6 +58,12 @@ export default function WorkplacesPage() {
 
     fetchWorkplaces();
   }, []);
+
+  // 토큰 지우고 로그인 화면으로 (뒤로 가기로 못 돌아오게 replace)
+  const handleLogout = () => {
+    clearToken();
+    router.replace("/login");
+  };
 
   const handleCreateWorkplace = async () => {
     const name = workplaceName.trim();
@@ -148,13 +153,9 @@ export default function WorkplacesPage() {
             {/* 사용자 */}
             <div className="flex items-center gap-3">
               <div className="hidden min-w-0 text-right sm:block">
-                {/* 불러오는 중엔 회색 막대, 실패하면 빈칸 (높이는 유지) */}
+                {/* 실패하면 빈칸 (높이는 유지) */}
                 <p className="min-h-5 max-w-[160px] truncate text-sm font-black">
-                  {status === "loading" ? (
-                      <span className="inline-block h-3.5 w-14 rounded bg-[#edf2ef] align-middle" />
-                  ) : (
-                      userName
-                  )}
+                  {userName}
                 </p>
 
                 <p className="text-xs text-[#78847f]">
@@ -166,12 +167,13 @@ export default function WorkplacesPage() {
                 {userInitial}
               </div>
 
-              <Link
-                  href="/login"
+              <button
+                  type="button"
+                  onClick={handleLogout}
                   className="rounded-xl border border-[#dce8e2] bg-white px-3 py-2 text-sm font-bold text-[#66736d] transition hover:bg-[#f3fbf7] hover:text-[#005642]"
               >
                 로그아웃
-              </Link>
+              </button>
             </div>
           </div>
 
@@ -190,8 +192,8 @@ export default function WorkplacesPage() {
                 </div>
 
                 <span className="text-sm font-bold text-[#005642]">
-                {workplaces.length}개
-              </span>
+                  {workplaces.length}개
+                </span>
               </div>
 
               <div className="space-y-3">
@@ -208,23 +210,23 @@ export default function WorkplacesPage() {
                 )}
 
                 {!isLoading && !loadError && workplaces.map((workplace) => (
-                        <Link
-                            key={workplace.id}
-                            href={`/workplaces/${workplace.id}`}
-                            className="block rounded-2xl border border-[#dce8e2] bg-white p-5 transition hover:border-[#14956c] hover:shadow-sm"
-                        >
-                          <div className="flex items-center justify-between gap-4">
-                            <div className="flex min-w-0 items-center gap-4">
-                              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#dff7ec] text-xl font-black text-[#005642]">
-                                {workplace.name.slice(0, 1)}
-                              </div>
+                    <Link
+                        key={workplace.id}
+                        href={`/workplaces/${workplace.id}`}
+                        className="block rounded-2xl border border-[#dce8e2] bg-white p-5 transition hover:border-[#14956c] hover:shadow-sm"
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex min-w-0 items-center gap-4">
+                          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#dff7ec] text-xl font-black text-[#005642]">
+                            {workplace.name.slice(0, 1)}
+                          </div>
 
-                              <div className="min-w-0">
-                                <p className="truncate font-black">{workplace.name}</p>
-                              </div>
-                            </div>
+                          <div className="min-w-0">
+                            <p className="truncate font-black">{workplace.name}</p>
+                          </div>
+                        </div>
 
-                            <div className="flex shrink-0 items-center gap-3">
+                        <div className="flex shrink-0 items-center gap-3">
                               <span
                                   className={
                                     workplace.role === "MANAGER"
@@ -234,11 +236,11 @@ export default function WorkplacesPage() {
                               >
                                 {workplace.role === "MANAGER" ? "관리자" : "직원"}
                               </span>
-                              <span className="text-xl text-[#9eaaa5]">›</span>
-                            </div>
-                          </div>
-                        </Link>
-                    ))}
+                          <span className="text-xl text-[#9eaaa5]">›</span>
+                        </div>
+                      </div>
+                    </Link>
+                ))}
 
                 {!isLoading && !loadError && workplaces.length === 0 && (
                     <div className="rounded-2xl border border-dashed border-[#dce8e2] bg-white p-8 text-center text-sm text-[#78847f]">

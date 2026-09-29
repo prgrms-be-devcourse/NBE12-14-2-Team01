@@ -20,10 +20,13 @@ import com.merge.backend.domain.substitute.entity.CandidateStatus;
 import com.merge.backend.domain.substitute.entity.RequestStatus;
 import com.merge.backend.domain.substitute.entity.SubstituteCandidate;
 import com.merge.backend.domain.substitute.entity.SubstituteRequest;
+import com.merge.backend.domain.substitute.event.SubstituteAllCandidatesRejectedEvent;
+import com.merge.backend.domain.substitute.event.SubstituteCandidateAcceptedEvent;
 import com.merge.backend.domain.substitute.repository.SubstituteCandidateRepository;
 import com.merge.backend.domain.substitute.repository.SubstituteRequestRepository;
 import com.merge.backend.domain.user.entity.User;
 import com.merge.backend.domain.user.service.UserService;
+import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
@@ -37,10 +40,12 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class SubstituteCandidateServiceTest {
@@ -70,6 +75,9 @@ class SubstituteCandidateServiceTest {
     private Clock clock; // 테스트에서 사용할 가짜 시간
 
     @Mock
+    private ApplicationEventPublisher applicationEventPublisher;
+
+    @Mock
     private SubstituteRequest substituteRequest;
 
     @Mock
@@ -77,6 +85,9 @@ class SubstituteCandidateServiceTest {
 
     @Mock
     private Schedule schedule;
+
+    @Mock
+    private Workplace workplace;
 
     @Mock
     private WorkplaceMember member;
@@ -141,103 +152,257 @@ class SubstituteCandidateServiceTest {
         Long requestId = 50L;
         Long userId = 10L;
 
+        Long workplaceId = 100L;
+        Long managerMemberId = 200L;
+
+        WorkplaceMember managerMember =
+            mock(WorkplaceMember.class);
+
         LocalDateTime startAt =
-            LocalDateTime.of(2026, 9, 23, 18, 0);
+            LocalDateTime.of(
+                2026,
+                9,
+                23,
+                18,
+                0
+            );
 
         LocalDateTime endAt =
-            LocalDateTime.of(2026, 9, 23, 22, 0);
+            LocalDateTime.of(
+                2026,
+                9,
+                23,
+                22,
+                0
+            );
 
         when(clock.instant())
-            .thenReturn(Instant.parse("2026-09-22T06:00:00Z"));
+            .thenReturn(
+                Instant.parse(
+                    "2026-09-22T06:00:00Z"
+                )
+            );
 
         when(clock.getZone())
-            .thenReturn(ZoneId.of("Asia/Seoul"));
+            .thenReturn(
+                ZoneId.of("Asia/Seoul")
+            );
 
-        // Candidate가 어느 Request에 속하는지 ID만 먼저 조회
-        when(substituteCandidateRepository.findRequestIdById(candidateId))
-            .thenReturn(Optional.of(requestId));
+        // Candidate가 어느 Request에 속하는지 ID 조회
+        when(
+            substituteCandidateRepository
+                .findRequestIdById(candidateId)
+        ).thenReturn(
+            Optional.of(requestId)
+        );
 
-        // 같은 Request의 상태 전이를 직렬화하기 위해 Request Lock 획득
-        when(substituteRequestRepository.findByIdForUpdate(requestId))
-            .thenReturn(Optional.of(substituteRequest));
+        // 같은 Request 상태 전이를 직렬화하기 위해 Request Lock
+        when(
+            substituteRequestRepository
+                .findByIdForUpdate(requestId)
+        ).thenReturn(
+            Optional.of(substituteRequest)
+        );
 
         // Lock 획득 후 Candidate 최신 조회
-        when(substituteCandidateRepository.findById(candidateId))
-            .thenReturn(Optional.of(candidate));
+        when(
+            substituteCandidateRepository
+                .findById(candidateId)
+        ).thenReturn(
+            Optional.of(candidate)
+        );
 
         // Candidate → Member → User
-        when(candidate.getMember()).thenReturn(member);
-        when(member.getUser()).thenReturn(user);
-        when(user.getId()).thenReturn(userId);
+        when(candidate.getMember())
+            .thenReturn(member);
 
-        // 현재도 유효한 EMPLOYEE
-        when(member.getLeftAt()).thenReturn(null);
-        when(member.getRole()).thenReturn(WorkplaceRole.EMPLOYEE);
+        when(member.getUser())
+            .thenReturn(user);
 
-        // 아직 응답 전
-        when(candidate.getStatus()).thenReturn(CandidateStatus.PENDING);
+        when(user.getId())
+            .thenReturn(userId);
+
+        // Candidate는 현재도 유효한 EMPLOYEE
+        when(member.getLeftAt())
+            .thenReturn(null);
+
+        when(member.getRole())
+            .thenReturn(
+                WorkplaceRole.EMPLOYEE
+            );
+
+        // 아직 응답하지 않은 Candidate
+        when(candidate.getStatus())
+            .thenReturn(
+                CandidateStatus.PENDING
+            );
 
         // Candidate → Request
-        when(candidate.getRequest()).thenReturn(substituteRequest);
-        when(substituteRequest.getStatus()).thenReturn(RequestStatus.OPEN);
+        when(candidate.getRequest())
+            .thenReturn(substituteRequest);
+
+        when(substituteRequest.getId())
+            .thenReturn(requestId);
+
+        when(substituteRequest.getStatus())
+            .thenReturn(
+                RequestStatus.OPEN
+            );
 
         // Request → Shift
-        when(substituteRequest.getShift()).thenReturn(shift);
+        when(substituteRequest.getShift())
+            .thenReturn(shift);
 
-        when(shift.getSchedule()).thenReturn(schedule);
-        when(schedule.getStatus()).thenReturn(ScheduleStatus.PUBLISHED);
+        // Shift → Schedule
+        when(shift.getSchedule())
+            .thenReturn(schedule);
 
-        when(shift.getStatus()).thenReturn(ShiftStatus.SCHEDULED);
-        when(shift.getStartAt()).thenReturn(startAt);
-        when(shift.getEndAt()).thenReturn(endAt);
-        when(shift.getId()).thenReturn(100L);
+        when(schedule.getStatus())
+            .thenReturn(
+                ScheduleStatus.PUBLISHED
+            );
 
-        // 최신 충돌 없음
-        when(shiftRepository.existsOverlappingOfficialShift(
-            userId,
-            ScheduleStatus.PUBLISHED,
-            startAt,
-            endAt,
-            100L
-        )).thenReturn(false);
+        // Event 수신자 결정에 필요한 Workplace
+        when(schedule.getWorkplace())
+            .thenReturn(workplace);
 
-        when(unavailableTimeRepository.existsOverlappingUnavailableTime(
-            userId,
-            startAt,
-            endAt
-        )).thenReturn(false);
+        when(workplace.getId())
+            .thenReturn(workplaceId);
 
-        when(substituteCandidateRepository.existsOverlappingAcceptedSubstitute(
-            eq(userId),
-            eq(startAt),
-            eq(endAt),
-            any(LocalDateTime.class)
-        )).thenReturn(false);
+        // Shift 정상 상태
+        when(shift.getStatus())
+            .thenReturn(
+                ShiftStatus.SCHEDULED
+            );
+
+        when(shift.getStartAt())
+            .thenReturn(startAt);
+
+        when(shift.getEndAt())
+            .thenReturn(endAt);
+
+        when(shift.getId())
+            .thenReturn(100L);
+
+        // 현재 Manager
+        when(managerMember.getId())
+            .thenReturn(managerMemberId);
+
+        when(
+            workplaceMemberRepository
+                .findAllByWorkplace_IdAndRoleAndLeftAtIsNull(
+                    workplaceId,
+                    WorkplaceRole.MANAGER
+                )
+        ).thenReturn(
+            List.of(managerMember)
+        );
+
+        // 최신 공식 Shift 충돌 없음
+        when(
+            shiftRepository
+                .existsOverlappingOfficialShift(
+                    userId,
+                    ScheduleStatus.PUBLISHED,
+                    startAt,
+                    endAt,
+                    100L
+                )
+        ).thenReturn(false);
+
+        // UnavailableTime 충돌 없음
+        when(
+            unavailableTimeRepository
+                .existsOverlappingUnavailableTime(
+                    userId,
+                    startAt,
+                    endAt
+                )
+        ).thenReturn(false);
+
+        // 다른 활성 대타 수락 약속과 충돌 없음
+        when(
+            substituteCandidateRepository
+                .existsOverlappingAcceptedSubstitute(
+                    eq(userId),
+                    eq(startAt),
+                    eq(endAt),
+                    any(LocalDateTime.class)
+                )
+        ).thenReturn(false);
 
         // when
         SubstituteCandidate result =
-            substituteCandidateService.acceptCandidate(candidateId, userId);
+            substituteCandidateService
+                .acceptCandidate(
+                    candidateId,
+                    userId
+                );
 
         // then
-        assertThat(result).isEqualTo(candidate);
+        assertThat(result)
+            .isEqualTo(candidate);
 
-        verify(substituteCandidateRepository)
-            .findRequestIdById(candidateId);
+        verify(
+            substituteCandidateRepository
+        ).findRequestIdById(candidateId);
 
+        // Request Lock → User Lock 순서 확인
         InOrder lockOrder =
             inOrder(
                 substituteRequestRepository,
                 userService
             );
 
-        lockOrder.verify(substituteRequestRepository)
+        lockOrder
+            .verify(
+                substituteRequestRepository
+            )
             .findByIdForUpdate(requestId);
 
-        lockOrder.verify(userService)
+        lockOrder
+            .verify(
+                userService
+            )
             .getByIdForUpdate(userId);
 
+        // 실제 상태 전환 확인
         verify(candidate)
-            .acceptRequest(any(LocalDateTime.class));
+            .acceptRequest(
+                any(LocalDateTime.class)
+            );
+
+        // 사건 발생 시점의 현재 Manager 조회 확인
+        verify(workplaceMemberRepository)
+            .findAllByWorkplace_IdAndRoleAndLeftAtIsNull(
+                workplaceId,
+                WorkplaceRole.MANAGER
+            );
+
+        // Event 캡처
+        ArgumentCaptor<SubstituteCandidateAcceptedEvent>
+            eventCaptor =
+            ArgumentCaptor.forClass(
+                SubstituteCandidateAcceptedEvent.class
+            );
+
+        verify(applicationEventPublisher)
+            .publishEvent(
+                eventCaptor.capture()
+            );
+
+        SubstituteCandidateAcceptedEvent event =
+            eventCaptor.getValue();
+
+        // 어떤 Request에서 발생한 ACCEPT인가?
+        assertThat(event.requestId())
+            .isEqualTo(requestId);
+
+        // 사건 발생 당시 Manager가 정확히 들어갔는가?
+        assertThat(event.managerMemberIds())
+            .containsExactly(
+                managerMemberId
+            );
     }
 
     @Test
@@ -338,83 +503,230 @@ class SubstituteCandidateServiceTest {
         Long requestId = 50L;
         Long userId = 10L;
 
-        LocalDateTime startAt =
-            LocalDateTime.of(2026, 9, 23, 18, 0);
+        // 알림 수신자 결정에 사용할 값
+        Long workplaceId = 100L;
+        Long requesterMemberId = 15L;
+        Long otherManagerMemberId = 20L;
 
+        // 요청자가 동시에 MANAGER인 상황을 일부러 만든다.
+        WorkplaceMember requesterManager =
+            mock(WorkplaceMember.class);
+
+        WorkplaceMember otherManager =
+            mock(WorkplaceMember.class);
+
+        LocalDateTime startAt =
+            LocalDateTime.of(
+                2026,
+                9,
+                23,
+                18,
+                0
+            );
+
+        // 현재 시간 고정
         when(clock.instant())
-            .thenReturn(Instant.parse("2026-09-22T06:00:00Z"));
+            .thenReturn(
+                Instant.parse(
+                    "2026-09-22T06:00:00Z"
+                )
+            );
 
         when(clock.getZone())
-            .thenReturn(ZoneId.of("Asia/Seoul"));
+            .thenReturn(
+                ZoneId.of("Asia/Seoul")
+            );
 
-        // Candidate가 어느 Request에 속하는지 ID만 먼저 조회
-        when(substituteCandidateRepository.findRequestIdById(candidateId))
-            .thenReturn(Optional.of(requestId));
+        // Candidate가 속한 Request ID 조회
+        when(
+            substituteCandidateRepository
+                .findRequestIdById(candidateId)
+        ).thenReturn(
+            Optional.of(requestId)
+        );
 
-        // 같은 Request의 상태 전이를 직렬화하기 위해 Request Lock 획득
-        when(substituteRequestRepository.findByIdForUpdate(requestId))
-            .thenReturn(Optional.of(substituteRequest));
+        // 같은 Request의 상태 전이를 직렬화하기 위해 Request Lock
+        when(
+            substituteRequestRepository
+                .findByIdForUpdate(requestId)
+        ).thenReturn(
+            Optional.of(substituteRequest)
+        );
 
-        // Lock 획득 후 Candidate 최신 조회
-        when(substituteCandidateRepository.findById(candidateId))
-            .thenReturn(Optional.of(candidate));
+        // Lock 획득 후 Candidate 조회
+        when(
+            substituteCandidateRepository
+                .findById(candidateId)
+        ).thenReturn(
+            Optional.of(candidate)
+        );
 
         // Candidate → Member → User
-        when(candidate.getMember()).thenReturn(member);
-        when(member.getUser()).thenReturn(user);
-        when(user.getId()).thenReturn(userId);
+        when(candidate.getMember())
+            .thenReturn(member);
+
+        when(member.getUser())
+            .thenReturn(user);
+
+        when(user.getId())
+            .thenReturn(userId);
 
         // 현재도 유효한 EMPLOYEE
-        when(member.getLeftAt()).thenReturn(null);
-        when(member.getRole()).thenReturn(WorkplaceRole.EMPLOYEE);
+        when(member.getLeftAt())
+            .thenReturn(null);
 
-        // 아직 응답 전
-        when(candidate.getStatus()).thenReturn(CandidateStatus.PENDING);
+        when(member.getRole())
+            .thenReturn(
+                WorkplaceRole.EMPLOYEE
+            );
+
+        // 아직 응답하지 않은 Candidate
+        when(candidate.getStatus())
+            .thenReturn(
+                CandidateStatus.PENDING
+            );
 
         // Candidate → Request
-        when(candidate.getRequest()).thenReturn(substituteRequest);
-        when(candidate.getId()).thenReturn(candidateId);
+        when(candidate.getRequest())
+            .thenReturn(substituteRequest);
 
-        when(substituteRequest.getId()).thenReturn(requestId);
-        when(substituteRequest.getStatus()).thenReturn(RequestStatus.OPEN);
+        when(candidate.getId())
+            .thenReturn(candidateId);
+
+        when(substituteRequest.getId())
+            .thenReturn(requestId);
+
+        when(substituteRequest.getStatus())
+            .thenReturn(
+                RequestStatus.OPEN
+            );
 
         // Request → Shift
-        when(substituteRequest.getShift()).thenReturn(shift);
+        when(substituteRequest.getShift())
+            .thenReturn(shift);
 
-        when(shift.getSchedule()).thenReturn(schedule);
-        when(schedule.getStatus()).thenReturn(ScheduleStatus.PUBLISHED);
+        // Shift → Schedule
+        when(shift.getSchedule())
+            .thenReturn(schedule);
 
-        when(shift.getStatus()).thenReturn(ShiftStatus.SCHEDULED);
-        when(shift.getStartAt()).thenReturn(startAt);
+        when(schedule.getStatus())
+            .thenReturn(
+                ScheduleStatus.PUBLISHED
+            );
 
-        // 나 말고 다른 PENDING 후보가 없음
+        when(shift.getStatus())
+            .thenReturn(
+                ShiftStatus.SCHEDULED
+            );
+
+        when(shift.getStartAt())
+            .thenReturn(startAt);
+
+        // 알림 수신자 설정
+        // Request가 속한 Workplace
+        when(schedule.getWorkplace())
+            .thenReturn(workplace);
+
+        when(workplace.getId())
+            .thenReturn(workplaceId);
+
+        // Request의 원래 요청자
+        when(substituteRequest.getRequesterMember())
+            .thenReturn(requesterManager);
+
+        when(requesterManager.getId())
+            .thenReturn(requesterMemberId);
+
+        // 또 다른 Manager
+        when(otherManager.getId())
+            .thenReturn(otherManagerMemberId);
+
         when(
-            substituteCandidateRepository.existsByRequest_IdAndStatusAndIdNot(
-                requestId,
-                CandidateStatus.PENDING,
-                candidateId
+            workplaceMemberRepository
+                .findAllByWorkplace_IdAndRoleAndLeftAtIsNull(
+                    workplaceId,
+                    WorkplaceRole.MANAGER
+                )
+        ).thenReturn(
+            List.of(
+                requesterManager,
+                otherManager
             )
+        );
+
+        // 현재 Candidate를 제외하고 다른 PENDING 후보가 없음
+        when(
+            substituteCandidateRepository
+                .existsByRequest_IdAndStatusAndIdNot(
+                    requestId,
+                    CandidateStatus.PENDING,
+                    candidateId
+                )
         ).thenReturn(false);
 
         // when
         SubstituteCandidate result =
-            substituteCandidateService.rejectCandidate(candidateId, userId);
+            substituteCandidateService
+                .rejectCandidate(
+                    candidateId,
+                    userId
+                );
 
         // then
-        assertThat(result).isEqualTo(candidate);
+        assertThat(result)
+            .isEqualTo(candidate);
 
+        // Candidate가 어느 Request인지 조회했는지 확인
         verify(substituteCandidateRepository)
             .findRequestIdById(candidateId);
 
+        // Request Lock을 획득했는지 확인
         verify(substituteRequestRepository)
             .findByIdForUpdate(requestId);
 
-        // Candidate는 거절 처리
-        verify(candidate).reject(any(LocalDateTime.class));
+        // Candidate는 REJECTED 처리
+        verify(candidate)
+            .reject(
+                any(LocalDateTime.class)
+            );
 
-        // 마지막 후보이므로 Request도 종료 처리
+        // 마지막 Candidate이므로 Request도 종료
         verify(substituteRequest)
-            .closeAllCandidatesRejected(any(LocalDateTime.class));
+            .closeAllCandidatesRejected(
+                any(LocalDateTime.class)
+            );
+
+        // 현재 Manager를 조회했는지 확인
+        verify(workplaceMemberRepository)
+            .findAllByWorkplace_IdAndRoleAndLeftAtIsNull(
+                workplaceId,
+                WorkplaceRole.MANAGER
+            );
+
+        // Event 검증
+        ArgumentCaptor<SubstituteAllCandidatesRejectedEvent>
+            eventCaptor =
+            ArgumentCaptor.forClass(
+                SubstituteAllCandidatesRejectedEvent.class
+            );
+
+        verify(applicationEventPublisher)
+            .publishEvent(
+                eventCaptor.capture()
+            );
+
+        SubstituteAllCandidatesRejectedEvent event =
+            eventCaptor.getValue();
+
+        // 어떤 Request에서 모든 후보 거절이 발생했는가?
+        assertThat(event.requestId())
+            .isEqualTo(requestId);
+
+        assertThat(event.recipientMemberIds())
+            .containsExactlyInAnyOrder(
+                requesterMemberId,
+                otherManagerMemberId
+            );
     }
 
     @Test

@@ -25,6 +25,10 @@ import com.merge.backend.domain.substitute.entity.RequestCloseReason;
 import com.merge.backend.domain.substitute.entity.RequestStatus;
 import com.merge.backend.domain.substitute.entity.SubstituteCandidate;
 import com.merge.backend.domain.substitute.entity.SubstituteRequest;
+import com.merge.backend.domain.substitute.event.SubstituteNoCandidateEvent;
+import com.merge.backend.domain.substitute.event.SubstituteRequestApprovedEvent;
+import com.merge.backend.domain.substitute.event.SubstituteRequestCreatedEvent;
+import com.merge.backend.domain.substitute.event.SubstituteRequestManagerClosedEvent;
 import com.merge.backend.domain.substitute.exception.SubstituteRequestErrorCode;
 import com.merge.backend.domain.substitute.repository.SubstituteCandidateRepository;
 import com.merge.backend.domain.substitute.repository.SubstituteRequestRepository;
@@ -34,6 +38,7 @@ import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import com.merge.backend.domain.workplace.exception.WorkplaceErrorCode;
+import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
 import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import com.merge.backend.domain.workplace.service.WorkplaceMemberService;
 import com.merge.backend.global.exception.BusinessException;
@@ -53,6 +58,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -89,7 +95,13 @@ class SubstituteRequestServiceTest {
     private WorkplaceMemberService workplaceMemberService;
 
     @Mock
+    private WorkplaceMemberRepository workplaceMemberRepository;
+
+    @Mock
     private UserService userService;
+
+    @Mock
+    private ApplicationEventPublisher applicationEventPublisher;
 
     private final Clock clock = Clock.fixed(
         Instant.parse("2026-09-22T12:00:00Z"),
@@ -118,14 +130,16 @@ class SubstituteRequestServiceTest {
         substituteRequestService =
             new SubstituteRequestService(
                 substituteRequestRepository,
+                substituteCandidateService,
                 substituteCandidateRepository,
                 shiftRepository,
                 workplaceRepository,
                 unavailableTimeRepository,
                 userService,
                 workplaceMemberService,
+                workplaceMemberRepository,
                 clock,
-                substituteCandidateService
+                applicationEventPublisher
             );
 
         requestId = 1L;
@@ -181,45 +195,145 @@ class SubstituteRequestServiceTest {
         @Test
         @DisplayName("대체 근무 승인 성공")
         void approve_success() {
+
             // given
             setupValidRequestFullInfo();
             setupValidCandidateInfo();
 
-            given(shift.getStartAt()).willReturn(now.plusDays(1));
-            given(shift.getEndAt()).willReturn(now.plusDays(1).plusHours(8));
+            Long acceptedMemberId = 25L;
 
-            given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(Optional.of(request));
-            given(workplaceRepository.findById(workplaceId)).willReturn(Optional.of(workplace));
-            given(substituteCandidateRepository.findByRequestIdAndStatus(
-                requestId, CandidateStatus.ACCEPTED))
-                .willReturn(Optional.of(candidate));
+            given(request.getId())
+                .willReturn(requestId);
 
-            given(shiftRepository.existsConflictingShift(
-                eq(candidateUserId), any(), any())).willReturn(false);
-            given(unavailableTimeRepository.existsOverlappingUnavailableTime(
-                eq(candidateUserId), any(), any())).willReturn(false);
-            given(substituteCandidateRepository.existsConflictingActiveSubstitute(
-                eq(candidateUserId), eq(requestId), any(), any(), any()))
-                .willReturn(false);
+            given(candidateMember.getId())
+                .willReturn(acceptedMemberId);
+
+            given(shift.getStartAt())
+                .willReturn(
+                    now.plusDays(1)
+                );
+
+            given(shift.getEndAt())
+                .willReturn(
+                    now.plusDays(1)
+                        .plusHours(8)
+                );
+
+            given(
+                substituteRequestRepository
+                    .findByIdForUpdate(requestId)
+            ).willReturn(
+                Optional.of(request)
+            );
+
+            given(
+                workplaceRepository
+                    .findById(workplaceId)
+            ).willReturn(
+                Optional.of(workplace)
+            );
+
+            given(
+                substituteCandidateRepository
+                    .findByRequestIdAndStatus(
+                        requestId,
+                        CandidateStatus.ACCEPTED
+                    )
+            ).willReturn(
+                Optional.of(candidate)
+            );
+
+            given(
+                shiftRepository
+                    .existsConflictingShift(
+                        eq(candidateUserId),
+                        any(),
+                        any()
+                    )
+            ).willReturn(false);
+
+            given(
+                unavailableTimeRepository
+                    .existsOverlappingUnavailableTime(
+                        eq(candidateUserId),
+                        any(),
+                        any()
+                    )
+            ).willReturn(false);
+
+            given(
+                substituteCandidateRepository
+                    .existsConflictingActiveSubstitute(
+                        eq(candidateUserId),
+                        eq(requestId),
+                        any(),
+                        any(),
+                        any()
+                    )
+            ).willReturn(false);
 
             // when
-            SubstituteRequest result = substituteRequestService.approve(requestId, actorId);
+            SubstituteRequest result =
+                substituteRequestService.approve(
+                    requestId,
+                    actorId
+                );
 
             // then
-            assertThat(result).isNotNull();
+            assertThat(result)
+                .isNotNull();
+
             InOrder lockOrder =
                 inOrder(
                     substituteRequestRepository,
                     userService
                 );
 
-            lockOrder.verify(substituteRequestRepository)
+            lockOrder
+                .verify(substituteRequestRepository)
                 .findByIdForUpdate(requestId);
-            lockOrder.verify(userService)
-                .getByIdForUpdate(candidateUserId);
-            verify(workplaceMemberService).requireManager(actorId, workplaceId);
-            verify(request).approveRequest(eq(candidateMember), any(LocalDateTime.class));
+
+            lockOrder
+                .verify(userService)
+                .getByIdForUpdate(
+                    candidateUserId
+                );
+
+            verify(workplaceMemberService)
+                .requireManager(
+                    actorId,
+                    workplaceId
+                );
+
+            verify(request)
+                .approveRequest(
+                    eq(candidateMember),
+                    any(LocalDateTime.class)
+                );
+
+            // 승인 Event 검증
+            ArgumentCaptor<SubstituteRequestApprovedEvent>
+                eventCaptor =
+                ArgumentCaptor.forClass(
+                    SubstituteRequestApprovedEvent.class
+                );
+
+            verify(applicationEventPublisher)
+                .publishEvent(
+                    eventCaptor.capture()
+                );
+
+            SubstituteRequestApprovedEvent event =
+                eventCaptor.getValue();
+
+            assertThat(event.requestId())
+                .isEqualTo(requestId);
+
+            assertThat(event.requesterMemberId())
+                .isEqualTo(requesterMemberId);
+
+            assertThat(event.acceptedMemberId())
+                .isEqualTo(acceptedMemberId);
         }
 
         @Test
@@ -575,46 +689,290 @@ class SubstituteRequestServiceTest {
         @Test
         @DisplayName("성공: OPEN 상태의 요청을 MANAGER가 종료하면 CLOSED로 변경된다.")
         void close_OpenRequest_Success() {
-            given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(Optional.of(request));
-            given(request.getShift()).willReturn(shift);
-            given(shift.getSchedule()).willReturn(schedule);
-            given(schedule.getWorkplace()).willReturn(workplace);
-            given(workplace.getId()).willReturn(workplaceId);
 
-            given(request.getStatus()).willReturn(RequestStatus.OPEN);
-            given(schedule.getStatus()).willReturn(ScheduleStatus.PUBLISHED);
-            given(shift.getStatus()).willReturn(ShiftStatus.SCHEDULED);
-            given(shift.getStartAt()).willReturn(now.plusDays(1));
+            // given
+            given(
+                substituteRequestRepository
+                    .findByIdForUpdate(requestId)
+            ).willReturn(
+                Optional.of(request)
+            );
 
-            SubstituteRequest result = substituteRequestService.close(requestId, actorId);
+            given(request.getShift())
+                .willReturn(shift);
 
-            assertThat(result).isEqualTo(request);
+            given(shift.getSchedule())
+                .willReturn(schedule);
+
+            given(schedule.getWorkplace())
+                .willReturn(workplace);
+
+            given(workplace.getId())
+                .willReturn(workplaceId);
+
+            given(request.getStatus())
+                .willReturn(RequestStatus.OPEN);
+
+            given(schedule.getStatus())
+                .willReturn(ScheduleStatus.PUBLISHED);
+
+            given(shift.getStatus())
+                .willReturn(ShiftStatus.SCHEDULED);
+
+            given(shift.getStartAt())
+                .willReturn(now.plusDays(1));
+
+            // 알림 수신자 설정 추가
+
+            Long firstPendingMemberId = 20L;
+            Long secondPendingMemberId = 30L;
+
+            SubstituteCandidate firstPendingCandidate =
+                mock(SubstituteCandidate.class);
+
+            SubstituteCandidate secondPendingCandidate =
+                mock(SubstituteCandidate.class);
+
+            WorkplaceMember firstPendingMember =
+                mock(WorkplaceMember.class);
+
+            WorkplaceMember secondPendingMember =
+                mock(WorkplaceMember.class);
+
+            // 원래 대타 요청자
+            given(request.getRequesterMember())
+                .willReturn(requesterMember);
+
+            given(requesterMember.getId())
+                .willReturn(requesterMemberId);
+
+            // 첫 번째 PENDING Candidate → Member #20
+            given(firstPendingCandidate.getMember())
+                .willReturn(firstPendingMember);
+
+            given(firstPendingMember.getId())
+                .willReturn(firstPendingMemberId);
+
+            // 두 번째 PENDING Candidate → Member #30
+            given(secondPendingCandidate.getMember())
+                .willReturn(secondPendingMember);
+
+            given(secondPendingMember.getId())
+                .willReturn(secondPendingMemberId);
+
+            /*
+             * OPEN 상태이므로
+             * 현재 PENDING Candidate만 조회한다.
+             */
+            given(
+                substituteCandidateRepository
+                    .findByRequestIdInAndStatus(
+                        List.of(requestId),
+                        CandidateStatus.PENDING
+                    )
+            ).willReturn(
+                List.of(
+                    firstPendingCandidate,
+                    secondPendingCandidate
+                )
+            );
+
+            // when
+            SubstituteRequest result =
+                substituteRequestService.close(
+                    requestId,
+                    actorId
+                );
+
+            // then
+            assertThat(result)
+                .isEqualTo(request);
+
             verify(substituteRequestRepository)
                 .findByIdForUpdate(requestId);
-            verify(workplaceMemberService).requireManager(actorId, workplaceId);
-            verify(request).closeByManager(any(LocalDateTime.class));
+
+            verify(workplaceMemberService)
+                .requireManager(
+                    actorId,
+                    workplaceId
+                );
+
+            /*
+             * OPEN 종료에서는 PENDING Candidate만
+             * 조회했는지 확인
+             */
+            verify(substituteCandidateRepository)
+                .findByRequestIdInAndStatus(
+                    List.of(requestId),
+                    CandidateStatus.PENDING
+                );
+
+            // Request 자체는 MANAGER_CLOSED 처리
+            verify(request)
+                .closeByManager(
+                    any(LocalDateTime.class)
+                );
+
+            // Event 검증
+
+            ArgumentCaptor<SubstituteRequestManagerClosedEvent>
+                eventCaptor =
+                ArgumentCaptor.forClass(
+                    SubstituteRequestManagerClosedEvent.class
+                );
+
+            verify(applicationEventPublisher)
+                .publishEvent(
+                    eventCaptor.capture()
+                );
+
+            SubstituteRequestManagerClosedEvent event =
+                eventCaptor.getValue();
+
+            // 어떤 Request가 종료됐는가?
+            assertThat(event.requestId())
+                .isEqualTo(requestId);
+
+            /*
+             * 요청자 = 15
+             * PENDING 후보 = 20, 30
+             *
+             * 최종 수신자는
+             * [15, 20, 30]
+             */
+            assertThat(event.recipientMemberIds())
+                .containsExactlyInAnyOrder(
+                    requesterMemberId,
+                    firstPendingMemberId,
+                    secondPendingMemberId
+                );
         }
 
         @Test
         @DisplayName("성공: ACCEPTED 상태의 요청도 MANAGER가 종료할 수 있다.")
         void close_AcceptedRequest_Success() {
-            given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(Optional.of(request));
-            given(request.getShift()).willReturn(shift);
-            given(shift.getSchedule()).willReturn(schedule);
-            given(schedule.getWorkplace()).willReturn(workplace);
-            given(workplace.getId()).willReturn(workplaceId);
 
-            given(request.getStatus()).willReturn(RequestStatus.ACCEPTED);
-            given(schedule.getStatus()).willReturn(ScheduleStatus.PUBLISHED);
-            given(shift.getStatus()).willReturn(ShiftStatus.SCHEDULED);
-            given(shift.getStartAt()).willReturn(now.plusDays(1));
+            // given
+            given(
+                substituteRequestRepository
+                    .findByIdForUpdate(requestId)
+            ).willReturn(
+                Optional.of(request)
+            );
 
-            SubstituteRequest result = substituteRequestService.close(requestId, actorId);
+            given(request.getShift())
+                .willReturn(shift);
 
-            assertThat(result).isEqualTo(request);
-            verify(request).closeByManager(any(LocalDateTime.class));
+            given(shift.getSchedule())
+                .willReturn(schedule);
+
+            given(schedule.getWorkplace())
+                .willReturn(workplace);
+
+            given(workplace.getId())
+                .willReturn(workplaceId);
+
+            given(request.getStatus())
+                .willReturn(RequestStatus.ACCEPTED);
+
+            given(schedule.getStatus())
+                .willReturn(ScheduleStatus.PUBLISHED);
+
+            given(shift.getStatus())
+                .willReturn(ShiftStatus.SCHEDULED);
+
+            given(shift.getStartAt())
+                .willReturn(now.plusDays(1));
+
+            // ACCEPTED 종료 알림 설정
+            Long acceptedMemberId = 25L;
+
+            // 요청자
+            given(request.getRequesterMember())
+                .willReturn(requesterMember);
+
+            given(requesterMember.getId())
+                .willReturn(requesterMemberId);
+
+            /*
+             * getAcceptedCandidates() 내부에서
+             *
+             * candidate.getRequest().getId()
+             *
+             * 를 사용하므로 둘 다 설정해야 한다.
+             */
+            given(request.getId())
+                .willReturn(requestId);
+
+            given(candidate.getRequest())
+                .willReturn(request);
+
+            // ACCEPTED Candidate의 WorkplaceMember
+            given(candidate.getMember())
+                .willReturn(candidateMember);
+
+            given(candidateMember.getId())
+                .willReturn(acceptedMemberId);
+
+            /*
+             * ACCEPTED 상태 종료에서는
+             * ACCEPTED Candidate만 조회한다.
+             */
+            given(
+                substituteCandidateRepository
+                    .findByRequestIdInAndStatus(
+                        List.of(requestId),
+                        CandidateStatus.ACCEPTED
+                    )
+            ).willReturn(
+                List.of(candidate)
+            );
+
+            // when
+            SubstituteRequest result =
+                substituteRequestService.close(
+                    requestId,
+                    actorId
+                );
+
+            // then
+            assertThat(result)
+                .isEqualTo(request);
+
+            verify(request)
+                .closeByManager(
+                    any(LocalDateTime.class)
+                );
+
+            verify(substituteCandidateRepository)
+                .findByRequestIdInAndStatus(
+                    List.of(requestId),
+                    CandidateStatus.ACCEPTED
+                );
+
+            // Event 검증
+            ArgumentCaptor<SubstituteRequestManagerClosedEvent>
+                eventCaptor =
+                ArgumentCaptor.forClass(
+                    SubstituteRequestManagerClosedEvent.class
+                );
+
+            verify(applicationEventPublisher)
+                .publishEvent(
+                    eventCaptor.capture()
+                );
+
+            SubstituteRequestManagerClosedEvent event =
+                eventCaptor.getValue();
+
+            assertThat(event.requestId())
+                .isEqualTo(requestId);
+
+            assertThat(event.recipientMemberIds())
+                .containsExactlyInAnyOrder(
+                    requesterMemberId,
+                    acceptedMemberId
+                );
         }
 
         @Test
@@ -759,22 +1117,105 @@ class SubstituteRequestServiceTest {
         @Test
         @DisplayName("성공: Candidate 상태는 변경되지 않는다 (요청만 CLOSED 처리).")
         void close_DoesNotModifyCandidateStatus() {
-            given(substituteRequestRepository.findByIdForUpdate(requestId))
-                .willReturn(Optional.of(request));
-            given(request.getShift()).willReturn(shift);
-            given(shift.getSchedule()).willReturn(schedule);
-            given(schedule.getWorkplace()).willReturn(workplace);
-            given(workplace.getId()).willReturn(workplaceId);
 
-            given(request.getStatus()).willReturn(RequestStatus.ACCEPTED);
-            given(schedule.getStatus()).willReturn(ScheduleStatus.PUBLISHED);
-            given(shift.getStatus()).willReturn(ShiftStatus.SCHEDULED);
-            given(shift.getStartAt()).willReturn(now.plusDays(1));
+            // given
+            given(
+                substituteRequestRepository
+                    .findByIdForUpdate(requestId)
+            ).willReturn(
+                Optional.of(request)
+            );
 
-            substituteRequestService.close(requestId, actorId);
+            given(request.getShift())
+                .willReturn(shift);
 
-            verify(request, never()).approveRequest(any(), any());
-            verify(shift, never()).changeMember(any()); // 실제 메서드명에 맞게 조정 필요
+            given(shift.getSchedule())
+                .willReturn(schedule);
+
+            given(schedule.getWorkplace())
+                .willReturn(workplace);
+
+            given(workplace.getId())
+                .willReturn(workplaceId);
+
+            given(request.getStatus())
+                .willReturn(RequestStatus.ACCEPTED);
+
+            given(schedule.getStatus())
+                .willReturn(ScheduleStatus.PUBLISHED);
+
+            given(shift.getStatus())
+                .willReturn(ShiftStatus.SCHEDULED);
+
+            given(shift.getStartAt())
+                .willReturn(now.plusDays(1));
+
+            Long acceptedMemberId = 25L;
+
+            // 요청자 Member 조회
+            given(request.getRequesterMember())
+                .willReturn(requesterMember);
+
+            given(requesterMember.getId())
+                .willReturn(requesterMemberId);
+
+            // getAcceptedCandidates()가 Request ID를 사용함
+            given(request.getId())
+                .willReturn(requestId);
+
+            given(candidate.getRequest())
+                .willReturn(request);
+
+            // ACCEPTED Candidate의 Member
+            given(candidate.getMember())
+                .willReturn(candidateMember);
+
+            given(candidateMember.getId())
+                .willReturn(acceptedMemberId);
+
+            // ACCEPTED 상태 종료이므로 ACCEPTED Candidate 조회
+            given(
+                substituteCandidateRepository
+                    .findByRequestIdInAndStatus(
+                        List.of(requestId),
+                        CandidateStatus.ACCEPTED
+                    )
+            ).willReturn(
+                List.of(candidate)
+            );
+
+            // when
+            substituteRequestService.close(
+                requestId,
+                actorId
+            );
+
+            // then
+
+            // Manager 종료이므로 승인 처리는 하지 않는다.
+            verify(request, never())
+                .approveRequest(
+                    any(),
+                    any()
+                );
+
+            // Shift 담당자도 바꾸지 않는다.
+            verify(shift, never())
+                .changeMember(
+                    any()
+                );
+
+            // Candidate를 새로 ACCEPTED 처리하지 않는다.
+            verify(candidate, never())
+                .acceptRequest(
+                    any(LocalDateTime.class)
+                );
+
+            // Candidate를 REJECTED 처리하지도 않는다.
+            verify(candidate, never())
+                .reject(
+                    any(LocalDateTime.class)
+                );
         }
     }
 
@@ -791,7 +1232,19 @@ class SubstituteRequestServiceTest {
                 publishedSchedule(), REQUESTER_USER_ID, futureStartAt(), ShiftStatus.SCHEDULED
             );
 
-            WorkplaceMember newCandidateMember = mock(WorkplaceMember.class);
+            Long candidateMemberId = 30L;
+
+            WorkplaceMember newCandidateMember =
+                mock(WorkplaceMember.class);
+
+            SubstituteCandidate createdCandidate =
+                mock(SubstituteCandidate.class);
+
+            given(newCandidateMember.getId())
+                .willReturn(candidateMemberId);
+
+            given(createdCandidate.getMember())
+                .willReturn(newCandidateMember);
 
             given(shiftRepository.findByIdForUpdate(SHIFT_ID)).willReturn(Optional.of(newShift));
             given(substituteRequestRepository
@@ -812,8 +1265,12 @@ class SubstituteRequestServiceTest {
                 });
 
             given(substituteCandidateService.createCandidates(
-                any(SubstituteRequest.class), any()))
-                .willReturn(List.of(mock(SubstituteCandidate.class)));
+                any(SubstituteRequest.class),
+                any()
+            ))
+                .willReturn(
+                    List.of(createdCandidate)
+                );
 
             SubstituteRequestCreateResponse response =
                 substituteRequestService.create(SHIFT_ID, REQUESTER_USER_ID);
@@ -832,38 +1289,158 @@ class SubstituteRequestServiceTest {
             assertThat(response.shiftId()).isEqualTo(SHIFT_ID);
             assertThat(response.status()).isEqualTo(RequestStatus.OPEN);
             assertThat(response.candidateCount()).isEqualTo(1);
+
+            ArgumentCaptor<SubstituteRequestCreatedEvent> eventCaptor =
+                ArgumentCaptor.forClass(
+                    SubstituteRequestCreatedEvent.class
+                );
+
+            verify(applicationEventPublisher)
+                .publishEvent(
+                    eventCaptor.capture()
+                );
+
+            SubstituteRequestCreatedEvent event =
+                eventCaptor.getValue();
+
+            assertThat(event.requestId())
+                .isEqualTo(SAVED_REQUEST_ID);
+
+            assertThat(event.candidateMemberIds())
+                .containsExactly(candidateMemberId);
         }
 
         @Test
         @DisplayName("SUB-01 - 대타 후보가 없으면 Request를 생성하지 않는다")
         void create_NoCandidate_DoesNotCreateRequest() {
+
+            // given
             Shift newShift = createShift(
-                publishedSchedule(), REQUESTER_USER_ID, futureStartAt(), ShiftStatus.SCHEDULED
+                publishedSchedule(),
+                REQUESTER_USER_ID,
+                futureStartAt(),
+                ShiftStatus.SCHEDULED
             );
 
-            given(shiftRepository.findByIdForUpdate(SHIFT_ID)).willReturn(Optional.of(newShift));
-            given(substituteRequestRepository
-                .existsByShift_IdAndStatusIn(SHIFT_ID, ACTIVE_STATUSES))
-                .willReturn(false);
+            // 실제 DB에서 조회한 Shift/Workplace라면 ID가 존재하지만,
+            // 테스트 Fixture는 직접 만든 Entity이므로 ID를 지정해준다.
+            ReflectionTestUtils.setField(
+                newShift,
+                "id",
+                SHIFT_ID
+            );
 
-            given(substituteCandidateService.findCandidates(
-                newShift.getSchedule().getWorkplace().getId(),
-                newShift.getMember().getId(),
-                newShift
-            )).willReturn(List.of());
+            ReflectionTestUtils.setField(
+                newShift.getSchedule().getWorkplace(),
+                "id",
+                workplaceId
+            );
 
+            Long managerMemberId = 30L;
+
+            WorkplaceMember managerMember =
+                mock(WorkplaceMember.class);
+
+            given(managerMember.getId())
+                .willReturn(managerMemberId);
+
+            // 기존 Shift 조회
+            given(
+                shiftRepository.findByIdForUpdate(SHIFT_ID)
+            ).willReturn(
+                Optional.of(newShift)
+            );
+
+            // 기존 활성 Request 없음
+            given(
+                substituteRequestRepository
+                    .existsByShift_IdAndStatusIn(
+                        SHIFT_ID,
+                        ACTIVE_STATUSES
+                    )
+            ).willReturn(false);
+
+            // Candidate 없음
+            given(
+                substituteCandidateService.findCandidates(
+                    newShift.getSchedule().getWorkplace().getId(),
+                    newShift.getMember().getId(),
+                    newShift
+                )
+            ).willReturn(
+                List.of()
+            );
+
+            // Candidate가 없을 때 현재 MANAGER 조회
+            given(
+                workplaceMemberRepository
+                    .findAllByWorkplace_IdAndRoleAndLeftAtIsNull(
+                        workplaceId,
+                        WorkplaceRole.MANAGER
+                    )
+            ).willReturn(
+                List.of(managerMember)
+            );
+
+            // when
             SubstituteRequestCreateResponse response =
-                substituteRequestService.create(SHIFT_ID, REQUESTER_USER_ID);
+                substituteRequestService.create(
+                    SHIFT_ID,
+                    REQUESTER_USER_ID
+                );
 
-            assertThat(response.requestCreated()).isFalse();
-            assertThat(response.requestId()).isNull();
-            assertThat(response.shiftId()).isEqualTo(SHIFT_ID);
-            assertThat(response.status()).isNull();
-            assertThat(response.candidateCount()).isZero();
+            // then - 기존 Response 검증
+            assertThat(response.requestCreated())
+                .isFalse();
 
-            verify(substituteRequestRepository, never()).save(any(SubstituteRequest.class));
+            assertThat(response.requestId())
+                .isNull();
+
+            assertThat(response.shiftId())
+                .isEqualTo(SHIFT_ID);
+
+            assertThat(response.status())
+                .isNull();
+
+            assertThat(response.candidateCount())
+                .isZero();
+
+            // Request / Candidate는 여전히 생성되지 않음
+            verify(substituteRequestRepository, never())
+                .save(any(SubstituteRequest.class));
+
             verify(substituteCandidateService, never())
-                .createCandidates(any(SubstituteRequest.class), any());
+                .createCandidates(
+                    any(SubstituteRequest.class),
+                    any()
+                );
+
+            // 현재 MANAGER 조회가 수행됐는지 확인
+            verify(workplaceMemberRepository)
+                .findAllByWorkplace_IdAndRoleAndLeftAtIsNull(
+                    workplaceId,
+                    WorkplaceRole.MANAGER
+                );
+
+            // NoCandidate Event 검증
+            ArgumentCaptor<SubstituteNoCandidateEvent> eventCaptor =
+                ArgumentCaptor.forClass(
+                    SubstituteNoCandidateEvent.class
+                );
+
+            verify(applicationEventPublisher)
+                .publishEvent(
+                    eventCaptor.capture()
+                );
+
+            SubstituteNoCandidateEvent event =
+                eventCaptor.getValue();
+
+            assertThat(event.shiftId())
+                .isEqualTo(SHIFT_ID);
+
+            assertThat(event.managerMemberIds())
+                .containsExactly(managerMemberId);
         }
 
         @Test
