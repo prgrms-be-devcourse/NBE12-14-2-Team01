@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, ApiError } from "@/lib/api";
 import Card from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 
@@ -80,6 +80,7 @@ export default function RegularShiftsPage() {
   const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
   const [patterns, setPatterns] = useState<RegularShiftPattern[]>([]);
   const [editingPatternId, setEditingPatternId] = useState<number | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [selectedDays, setSelectedDays] = useState<DayKey[]>([]);
   const [startTime, setStartTime] = useState("09:00");
@@ -104,7 +105,13 @@ useEffect(() => {
       setMembers(memberData);
       setPatterns(patternData);
     } catch (error) {
-      console.error("조회 오류:", error);
+      console.error("정기근무 조회 오류:", error);
+
+      if (error instanceof ApiError) {
+        alert(error.message);
+      } else {
+        alert("정기 근무 목록을 불러오지 못했습니다.");
+      }
     }
   };
 
@@ -139,6 +146,12 @@ const handleRegister = async () => {
     return;
   }
 
+  if (isSubmitting) {
+    return;
+  }
+
+  setIsSubmitting(true);
+
   try {
     // 수정 모드
     if (editingPatternId !== null) {
@@ -168,15 +181,17 @@ const handleRegister = async () => {
         )
       );
 
-      setEditingPatternId(null);
-      setSelectedDays([]);
+      resetEditMode();
 
       alert("정기 근무가 수정되었습니다.");
       return;
     }
 
     // 등록 모드
-    for (const day of selectedDays) {
+const succeededDays: DayKey[] = [];
+
+  for (const day of selectedDays) {
+    try {
       const created = await apiFetch<RegularShiftPattern>(
         `/workplaces/${workplaceId}/regular-shift-patterns`,
         {
@@ -191,19 +206,48 @@ const handleRegister = async () => {
       );
 
       setPatterns((prev) => [...prev, created]);
+      succeededDays.push(day);
+    } catch (error) {
+      // 이미 성공한 요일은 선택에서 제거
+      setSelectedDays((prev) =>
+        prev.filter((selectedDay) => !succeededDays.includes(selectedDay))
+      );
+
+      const succeededMessage =
+        succeededDays.length > 0
+          ? `등록 완료: ${succeededDays
+              .map((succeededDay) => `${succeededDay}요일`)
+              .join(", ")}\n`
+          : "";
+
+      if (error instanceof ApiError) {
+        alert(
+          `${succeededMessage}${day}요일 등록 실패: ${error.message}`
+        );
+      } else {
+        alert(
+          `${succeededMessage}${day}요일 등록 중 통신 오류가 발생했습니다.`
+        );
+      }
+
+      return;
     }
+  }
 
     setSelectedDays([]);
     alert("정기 근무가 등록되었습니다.");
-  } catch (error) {
-    console.error(
-      editingPatternId !== null
-        ? "정기근무 수정 오류:"
-        : "정기근무 등록 오류:",
-      error
-    );
+    } catch (error) {
+      console.error("정기근무 저장 오류:", error);
+
+      if (error instanceof ApiError) {
+        alert(error.message);
+      } else {
+        alert("정기 근무 처리 중 오류가 발생했습니다.");
+    }
+  } finally {
+    setIsSubmitting(false);
   }
-};
+}
 
 const handleDelete = async (patternId: number) => {
   const confirmed = confirm("이 정기 근무를 삭제하시겠습니까?");
@@ -211,6 +255,13 @@ const handleDelete = async (patternId: number) => {
   if (!confirmed) {
     return;
   }
+
+  if (isSubmitting) {
+    return;
+  }
+
+  setIsSubmitting(true);
+
 
   try {
     await apiFetch<void>(
@@ -224,16 +275,34 @@ const handleDelete = async (patternId: number) => {
       prev.filter((pattern) => pattern.patternId !== patternId)
     );
 
+    if (editingPatternId === patternId) {
+      resetEditMode();
+    }
+
     alert("정기 근무가 삭제되었습니다.");
   } catch (error) {
     console.error("정기근무 삭제 오류:", error);
-    alert("정기 근무 삭제에 실패했습니다.");
+
+    if (error instanceof ApiError) {
+      alert(error.message);
+    } else {
+      alert("정기 근무 삭제 중 오류가 발생했습니다.");
+    }
+  } finally {
+    setIsSubmitting(false);
   }
-};
+}
 
 const selectedMemberShifts = patterns.filter(
   (pattern) => pattern.memberId === selectedMemberId
 );
+
+const resetEditMode = () => {
+  setEditingPatternId(null);
+  setSelectedDays([]);
+  setStartTime("09:00");
+  setEndTime("18:00");
+};
 
 const handleEdit = (shift: RegularShiftPattern) => {
   setEditingPatternId(shift.patternId);
@@ -266,11 +335,13 @@ const handleEdit = (shift: RegularShiftPattern) => {
                 <div className="relative">
                   <select
                     value={selectedMemberId ?? ""}
-                    onChange={(e) =>
+                    disabled={isSubmitting}
+                    onChange={(e) => {
                       setSelectedMemberId(
                         e.target.value === "" ? null : Number(e.target.value)
-                      )
-                    }
+                      );
+                      resetEditMode();
+                    }}
                     className="w-full appearance-none rounded-xl border border-[#dce8e2] bg-white py-3 pl-4 pr-12 outline-none transition focus:border-[#14956c]"
                   >
                     <option value="">직원을 선택하세요</option>
@@ -313,6 +384,7 @@ const handleEdit = (shift: RegularShiftPattern) => {
                         <button
                             key={day}
                             type="button"
+                            disabled={isSubmitting}
                             onClick={() => handleDayClick(day)}
                             className={`rounded-xl border py-3 text-sm font-bold transition ${
                                 selected
@@ -335,6 +407,7 @@ const handleEdit = (shift: RegularShiftPattern) => {
                   <input
                       type="time"
                       value={startTime}
+                      disabled={isSubmitting}
                       onChange={(e) => setStartTime(e.target.value)}
                       className="rounded-xl border border-[#dce8e2] px-4 py-3 outline-none focus:border-[#14956c]"
                   />
@@ -344,6 +417,7 @@ const handleEdit = (shift: RegularShiftPattern) => {
                   <input
                       type="time"
                       value={endTime}
+                      disabled={isSubmitting}
                       onChange={(e) => setEndTime(e.target.value)}
                       className="rounded-xl border border-[#dce8e2] px-4 py-3 outline-none focus:border-[#14956c]"
                   />
@@ -353,11 +427,30 @@ const handleEdit = (shift: RegularShiftPattern) => {
               <button
                   type="button"
                   onClick={handleRegister}
-                  disabled={selectedDays.length === 0 || selectedMemberId === null}
+                  disabled={
+                    selectedDays.length === 0 ||
+                    selectedMemberId === null ||
+                    isSubmitting
+                  }
                   className="w-full rounded-xl bg-[#005642] px-4 py-3 font-bold text-white transition hover:bg-[#0b6b52] disabled:cursor-not-allowed disabled:bg-[#b8c4be]"
               >
-                {editingPatternId !== null ? "정기 근무 수정" : "정기 근무 등록"}
+                {isSubmitting
+                  ? "처리 중..."
+                  : editingPatternId !== null
+                    ? "정기 근무 수정"
+                    : "정기 근무 등록"}
               </button>
+
+              {editingPatternId !== null && (
+                  <button
+                    type="button"
+                    onClick={resetEditMode}
+                    disabled={isSubmitting}
+                    className="w-full rounded-xl border border-[#dce8e2] px-4 py-3 font-bold text-[#66736d] transition hover:bg-[#f3fbf7]"
+                  >
+                    수정 취소
+                  </button>
+                )}
             </div>
           </Card>
 
@@ -391,6 +484,7 @@ const handleEdit = (shift: RegularShiftPattern) => {
                       <button
                         type="button"
                         onClick={() => handleEdit(shift)}
+                        disabled={isSubmitting}
                         className="rounded-lg border border-[#dce8e2] px-3 py-2 text-sm font-semibold text-[#66736d] hover:bg-[#f3fbf7]"
                       >
                         수정
@@ -399,6 +493,7 @@ const handleEdit = (shift: RegularShiftPattern) => {
                       <button
                         type="button"
                         onClick={() => handleDelete(shift.patternId)}
+                        disabled={isSubmitting}
                         className="rounded-lg border border-[#f1cccc] px-3 py-2 text-sm font-semibold text-[#d95555] hover:bg-[#fff5f5]"
                       >
                         삭제
