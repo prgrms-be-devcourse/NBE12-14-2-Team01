@@ -297,7 +297,7 @@ export default function WorkplacesPage() {
                 </h2>
 
                 <p className="mt-1 text-sm leading-6 text-[#78847f]">
-                  관리자에게 받은 초대 코드를 입력해주세요.
+                  관리자에게 받은 코드를 입력해주세요.
                 </p>
 
                 <div className="mt-5">
@@ -316,7 +316,7 @@ export default function WorkplacesPage() {
                           handleJoinWorkplace();
                         }
                       }}
-                      placeholder="예) SW-9284"
+                      placeholder="코드를 입력해주세요"
                       className="w-full rounded-xl border border-[#dce8e2] px-4 py-3 font-bold uppercase tracking-wider outline-none transition focus:border-[#14956c]"
                   />
                 </div>
