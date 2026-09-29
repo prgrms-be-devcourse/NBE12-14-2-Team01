@@ -46,10 +46,7 @@ export default function WorkplacePage() {
   useEffect(() => {
     const fetchWorkplaceData = async () => {
       try {
-        const [workplaceData, memberData] = await Promise.all([
-          apiFetch<MyWorkplaceResponse[]>("/workplaces"),
-          apiFetch<Member[]>(`/workplaces/${workplaceId}/members`),
-        ]);
+        const workplaceData = await apiFetch<MyWorkplaceResponse[]>("/workplaces");
 
         const currentWorkplace = workplaceData.find(
             (workplace) => workplace.workplaceId === Number(workplaceId)
@@ -57,13 +54,14 @@ export default function WorkplacePage() {
 
         setWorkplaceName(currentWorkplace?.name ?? "");
         setWorkplaceRole(currentWorkplace?.role ?? null);
-        setMembers(memberData);
 
-        // 초대 코드는 관리자만 조회
         if (currentWorkplace?.role === "MANAGER") {
-          const inviteData = await apiFetch<InviteCodeResponse>(
-              `/workplaces/${workplaceId}/invite-code`
-          );
+          const [memberData, inviteData] = await Promise.all([
+            apiFetch<Member[]>(`/workplaces/${workplaceId}/members`),
+            apiFetch<InviteCodeResponse>(`/workplaces/${workplaceId}/invite-code`),
+          ]);
+
+          setMembers(memberData);
           setInviteCode(inviteData.inviteCode);
         }
       } catch (error) {
@@ -294,83 +292,85 @@ export default function WorkplacePage() {
         )}
 
         {/* 구성원 */}
-        <Card className="mt-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-black">
-                구성원
-              </h2>
-
-              <p className="mt-1 text-sm text-[#78847f]">
-                현재 근무지에 참여한 사용자
-              </p>
-            </div>
-
-            <Link
-                href={`/workplaces/${workplaceId}/members`}
-                className="text-sm font-bold text-[#005642] hover:underline"
-            >
-              전체 보기
-            </Link>
-          </div>
-
-          {/* 구성원 미리보기 */}
-          <div className="mt-5 space-y-3">
-            {members.map((member) => (
-                <div
-                    key={member.memberId}
-                    className="flex items-center justify-between rounded-xl bg-[#f3fbf7] p-4"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="grid h-10 w-10 place-items-center rounded-full bg-[#dff7ec] font-black text-[#005642]">
-                      {member.name.slice(0, 1)}
-                    </div>
-
-                    <div>
-                      <p className="font-black">
-                        {member.name}
-                      </p>
-
-                      <p className="mt-0.5 text-xs text-[#78847f]">
-                        {member.email}
-                      </p>
-                    </div>
-                  </div>
-
-                  <span
-                      className={`rounded-full px-3 py-1 text-xs font-bold ${
-                          member.role === "MANAGER"
-                              ? "bg-[#ece7ff] text-[#7861c9]"
-                              : "bg-[#dff7ec] text-[#14956c]"
-                      }`}
-                  >
-                {member.role === "MANAGER" ? "관리자" : "직원"}
-              </span>
-                </div>
-            ))}
-          </div>
-
-          {/* 직원이 아직 없을 때만 표시 */}
-          {workplaceRole === "MANAGER" && !hasEmployees && (
-              <div className="mt-5 rounded-xl border border-dashed border-[#c9ded4] p-5 text-center">
-                <div className="text-2xl">
-                  📨
-                </div>
-
-                <p className="mt-3 font-black">
-                  아직 참여한 직원이 없어요.
-                </p>
+        {workplaceRole === "MANAGER" && (
+          <Card className="mt-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-black">
+                  구성원
+                </h2>
 
                 <p className="mt-1 text-sm text-[#78847f]">
-                  초대 코드를 직원에게 전달해보세요.
+                  현재 근무지에 참여한 사용자
                 </p>
-
-                <div className="mt-4">
-                  <InviteCodeBox inviteCode={inviteCode} />
-                </div>
               </div>
-          )}
-        </Card>
+
+              <Link
+                  href={`/workplaces/${workplaceId}/members`}
+                  className="text-sm font-bold text-[#005642] hover:underline"
+              >
+                전체 보기
+              </Link>
+            </div>
+
+            {/* 구성원 미리보기 */}
+            <div className="mt-5 space-y-3">
+              {members.map((member) => (
+                  <div
+                      key={member.memberId}
+                      className="flex items-center justify-between rounded-xl bg-[#f3fbf7] p-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="grid h-10 w-10 place-items-center rounded-full bg-[#dff7ec] font-black text-[#005642]">
+                        {member.name.slice(0, 1)}
+                      </div>
+
+                      <div>
+                        <p className="font-black">
+                          {member.name}
+                        </p>
+
+                        <p className="mt-0.5 text-xs text-[#78847f]">
+                          {member.email}
+                        </p>
+                      </div>
+                    </div>
+
+                    <span
+                        className={`rounded-full px-3 py-1 text-xs font-bold ${
+                            member.role === "MANAGER"
+                                ? "bg-[#ece7ff] text-[#7861c9]"
+                                : "bg-[#dff7ec] text-[#14956c]"
+                        }`}
+                    >
+                  {member.role === "MANAGER" ? "관리자" : "직원"}
+                </span>
+                  </div>
+              ))}
+            </div>
+
+            {/* 직원이 아직 없을 때만 표시 */}
+            {workplaceRole === "MANAGER" && !hasEmployees && (
+                <div className="mt-5 rounded-xl border border-dashed border-[#c9ded4] p-5 text-center">
+                  <div className="text-2xl">
+                    📨
+                  </div>
+
+                  <p className="mt-3 font-black">
+                    아직 참여한 직원이 없어요.
+                  </p>
+
+                  <p className="mt-1 text-sm text-[#78847f]">
+                    초대 코드를 직원에게 전달해보세요.
+                  </p>
+
+                  <div className="mt-4">
+                    <InviteCodeBox inviteCode={inviteCode} />
+                  </div>
+                </div>
+            )}
+            </Card>
+        )}
       </>
   );
 }
