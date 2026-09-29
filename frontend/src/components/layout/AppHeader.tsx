@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useCurrentUser } from "@/components/providers/CurrentUserProvider";
 
 type Notification = {
   id: number;
@@ -40,6 +41,11 @@ export default function AppHeader() {
   const params = useParams();
 
   const workplaceId = params.workplaceId as string;
+
+  // 로그인한 사람 이름, 동그라미엔 첫 글자
+  const { user, status } = useCurrentUser();
+  const userName = status === "success" && user ? user.name.trim() : "";
+  const userInitial = userName.charAt(0);
 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotificationMenu, setShowNotificationMenu] = useState(false);
@@ -221,12 +227,17 @@ export default function AppHeader() {
                 className="flex items-center gap-3 rounded-xl px-2 py-1.5 text-left transition hover:bg-[#f3fbf7]"
             >
               <div className="grid h-10 w-10 place-items-center rounded-full bg-[#dff7ec] font-black text-[#005642]">
-                김
+                {userInitial}
               </div>
 
-              <div className="hidden sm:block">
-                <p className="text-sm font-black">
-                  김지연
+              <div className="hidden min-w-0 sm:block">
+                {/* 불러오는 중엔 회색 막대, 실패하면 빈칸 (높이는 유지) */}
+                <p className="min-h-5 max-w-[160px] truncate text-sm font-black">
+                  {status === "loading" ? (
+                      <span className="inline-block h-3.5 w-14 rounded bg-[#edf2ef] align-middle" />
+                  ) : (
+                      userName
+                  )}
                 </p>
 
                 <p className="text-xs text-[#78847f]">
@@ -247,8 +258,12 @@ export default function AppHeader() {
             {showProfileMenu && (
                 <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-52 overflow-hidden rounded-xl border border-[#dce8e2] bg-white shadow-lg">
                   <div className="border-b border-[#edf2ef] px-4 py-3">
-                    <p className="text-sm font-black">
-                      김지연
+                    <p className="min-h-5 truncate text-sm font-black">
+                      {status === "loading" ? (
+                          <span className="inline-block h-3.5 w-14 rounded bg-[#edf2ef] align-middle" />
+                      ) : (
+                          userName
+                      )}
                     </p>
 
                     <p className="mt-0.5 text-xs text-[#78847f]">
