@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import {useEffect, useState, useCallback, useRef} from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import Card from "@/components/ui/Card";
@@ -39,6 +39,8 @@ type ShiftDetailResponse = {
 // UI 전용 타입
 type MyShift = {
   id: number;
+  workplaceId: number;
+  workplaceName: string;
   date: string;
   day: string;
   dayNumber: string;
@@ -47,12 +49,15 @@ type MyShift = {
   status: "SCHEDULED";
 };
 
-// 요일 변환용 배열
-const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
+// KST 기준 날짜 변환 유틸리티
+function getKstDate(date = new Date()): Date {
+  const utc = date.getTime() + date.getTimezoneOffset() * 60000;
+  return new Date(utc + 9 * 60 * 60 * 1000);
+}
 
 // 오늘 날짜 기준 '월요일' YYYY-MM-DD 반환 유틸
-function getMondayOfCurrentWeek(d = new Date()): string {
-  const date = new Date(d);
+function getMondayOfCurrentWeek(): string {
+  const date = getKstDate();
   const day = date.getDay();
   // 일요일(0)이면 -6일, 월~토(1~6)이면 1-day 만큼 이동
   const diff = date.getDate() - day + (day === 0 ? -6 : 1);
@@ -68,22 +73,35 @@ function parseShiftDto(dto: ShiftItemDto): MyShift {
   const startDate = new Date(dto.startAt);
   const endDate = new Date(dto.endAt);
 
-  const month = startDate.getMonth() + 1;
-  const dayNum = startDate.getDate();
-  const dayName = DAY_NAMES[startDate.getDay()];
+  // KST 포맷터
+  const formatKstTime = (date: Date) =>
+      date.toLocaleTimeString("ko-KR", {
+        timeZone: "Asia/Seoul",
+        hour12: false,
+        hour: "2-digit",
+        minute: "2-digit",
+      });
 
-  const formatTime = (date: Date) =>
-      `${String(date.getHours()).padStart(2, "0")}:${String(
-          date.getMinutes()
-      ).padStart(2, "0")}`;
+  const month = Number(
+      new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "numeric" }).format(startDate)
+  );
+  const dayNum = Number(
+      new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", day: "numeric" }).format(startDate)
+  );
+  const dayName = new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    weekday: "short",
+  }).format(startDate);
 
   return {
     id: dto.shiftId,
+    workplaceId: dto.workplaceId,
+    workplaceName: dto.workplaceName,
     date: `${month}월 ${dayNum}일`,
     day: dayName,
     dayNumber: String(dayNum),
-    startTime: formatTime(startDate),
-    endTime: formatTime(endDate),
+    startTime: formatKstTime(startDate),
+    endTime: formatKstTime(endDate),
     status: dto.status,
   };
 }
@@ -104,36 +122,45 @@ function getWorkHours(startTime: string, endTime: string) {
   return (endMins - startMins) / 60;
 }
 
-// YYYY-MM-DD 날짜 계산 유틸
+// YYYY-MM-DD 날짜 계산 유틸 (KST 기준 날짜 처리)
 function addDays(dateStr: string, days: number): string {
-  const date = new Date(dateStr);
-  date.setDate(date.getDate() + days);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + days);
+
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 // YYYY-MM-DD -> "YYYY년 M월 N주차" 포맷 변환
 function formatWeekTitle(dateStr: string): string {
-  const date = new Date(dateStr);
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  const weekNum = Math.ceil(day / 7);
+  const [year, month, day] = dateStr.split("-").map(Number);
+
+  // 1일의 요일 구하기 (0: 일, 1: 월, ..., 6: 토)
+  const firstDay = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+  const offset = firstDay === 0 ? 6 : firstDay - 1; // 월요일 시작 기준 오프셋
+  const weekNum = Math.ceil((day + offset) / 7);
+
   return `${year}년 ${month}월 ${weekNum}주차`;
 }
 
-// 날짜/시간 포맷팅 유틸 (ISO -> YYYY.MM.DD HH:mm)
+// 날짜/시간 포맷팅 유틸 (ISO -> KST YYYY.MM.DD HH:mm)
 function formatDateTime(isoString: string | null) {
   if (!isoString) return "-";
   const date = new Date(isoString);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  return `${year}.${month}.${day} ${hours}:${minutes}`;
+  const formatted = new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+
+  return formatted.replace(/\. /g, ".").replace(/\.$/, "");
 }
 
 export default function MyShiftsPage() {
@@ -149,10 +176,14 @@ export default function MyShiftsPage() {
   const [error, setError] = useState("");
 
   // 상세조회 모달 State
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedShiftDetail, setSelectedShiftDetail] =
       useState<ShiftDetailResponse | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
+
+  // 최신 상세조회 요청 추적 Ref
+  const detailRequestIdRef = useRef(0);
 
   // 주 이동 핸들러
   const handlePrevWeek = () => {
@@ -163,37 +194,48 @@ export default function MyShiftsPage() {
     setCurrentWeekStart((prev) => addDays(prev, 7));
   };
 
-  // 상세 데이터 조회 핸들러
+  // 상세 데이터 조회 핸들러 (API: GET /shifts/{shiftId})
   const handleOpenDetail = async (shiftId: number) => {
+    // 요청 우선순위를 매겨주는 순서 변수
+    const requestId = ++detailRequestIdRef.current;
+
+    setIsModalOpen(true);
+    setSelectedShiftDetail(null);
     setIsDetailLoading(true);
     setDetailError("");
 
     try {
       const detailData = await apiFetch<ShiftDetailResponse>(
-          `/workplaces/${workplaceId}/shifts/${shiftId}`
+          `/shifts/${shiftId}`
       );
-      setSelectedShiftDetail(detailData);
+      if (requestId === detailRequestIdRef.current) {
+        setSelectedShiftDetail(detailData);
+      }
     } catch (err) {
-      if (err instanceof ApiError) {
-        setDetailError(err.message);
-      } else if (err instanceof Error) {
-        setDetailError(err.message);
-      } else {
-        setDetailError("근무 상세 정보를 불러오는 중 오류가 발생했습니다.");
+      if (requestId === detailRequestIdRef.current) {
+        if (err instanceof ApiError || err instanceof Error) {
+          setDetailError(err.message);
+        } else {
+          setDetailError("근무 상세 정보를 불러오는 중 오류가 발생했습니다.");
+        }
       }
     } finally {
-      setIsDetailLoading(false);
+      if (requestId === detailRequestIdRef.current) {
+        setIsDetailLoading(false);
+      }
     }
   };
 
   const handleCloseDetail = useCallback(() => {
+    detailRequestIdRef.current += 1; // 진행 중인 요청 무시
+    setIsModalOpen(false);
     setSelectedShiftDetail(null);
+    setIsDetailLoading(false);
     setDetailError("");
   }, []);
 
   // 모달 열림 상태일 때 키보드 ESC 누르면 닫기 & 스크롤 방지
   useEffect(() => {
-    const isModalOpen = Boolean(selectedShiftDetail || isDetailLoading || detailError);
     if (!isModalOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -207,7 +249,7 @@ export default function MyShiftsPage() {
       document.body.style.overflow = "unset";
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [selectedShiftDetail, isDetailLoading, detailError, handleCloseDetail]);
+  }, [isModalOpen, handleCloseDetail]);
 
   // 근무 목록 조회 API
   useEffect(() => {
@@ -228,9 +270,7 @@ export default function MyShiftsPage() {
         }
       } catch (err) {
         if (!isCancelled) {
-          if (err instanceof ApiError) {
-            setError(err.message);
-          } else if (err instanceof Error) {
+          if (err instanceof ApiError || err instanceof Error) {
             setError(err.message);
           } else {
             setError("근무 일정을 불러오는 중 오류가 발생했습니다.");
@@ -320,9 +360,15 @@ export default function MyShiftsPage() {
                         </div>
 
                         <div>
-                          <p className="font-black">
-                            {shift.date} ({shift.day})
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-black">
+                              {shift.date} ({shift.day})
+                            </p>
+                            {/* 근무지 구분 표시 */}
+                            <span className="rounded bg-[#edf2ef] px-2 py-0.5 text-xs font-bold text-[#4a5568]">
+                        {shift.workplaceName}
+                      </span>
+                          </div>
 
                           <p className="mt-1 text-sm text-[#78847f]">
                             {shift.startTime} ~ {shift.endTime}
@@ -357,7 +403,7 @@ export default function MyShiftsPage() {
               <p className="text-sm text-[#78847f]">총 근무</p>
 
               <p className="mt-1 text-2xl font-black text-[#005642]">
-                {shifts.length}회
+                {isLoading || error ? "-" : `${shifts.length}회`}
               </p>
             </div>
 
@@ -365,7 +411,7 @@ export default function MyShiftsPage() {
               <p className="text-sm text-[#78847f]">예정 시간</p>
 
               <p className="mt-1 text-2xl font-black text-[#005642]">
-                {totalHours}시간
+                {isLoading || error ? "-" : `${totalHours}시간`}
               </p>
             </div>
           </div>
@@ -388,7 +434,7 @@ export default function MyShiftsPage() {
         </Card>
 
         {/* 상세조회 모달 UI */}
-        {(selectedShiftDetail || isDetailLoading || detailError) && (
+        {isModalOpen && (
             <div
                 className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
                 onClick={handleCloseDetail}
