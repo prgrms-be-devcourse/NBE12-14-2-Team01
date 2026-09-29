@@ -36,6 +36,8 @@ export default function WorkplacePage() {
 
   const [workplaceName, setWorkplaceName] = useState("");
 
+  const [workplaceRole, setWorkplaceRole] = useState<MemberRole | null>(null);
+
   useEffect(() => {
     const fetchWorkplaceData = async () => {
       try {
@@ -54,6 +56,7 @@ export default function WorkplacePage() {
         );
 
         setWorkplaceName(currentWorkplace?.name ?? "");
+        setWorkplaceRole(currentWorkplace?.role ?? null);
         setInviteCode(inviteData.inviteCode);
         setMembers(memberData);
       } catch (error) {
@@ -109,7 +112,9 @@ export default function WorkplacePage() {
           >
             <Card className="h-full cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md">
               <p className="text-sm font-semibold text-[#78847f]">
-                이번 주 공식 근무
+                {workplaceRole === "MANAGER"
+                    ? "이번 주 공식 근무"
+                    : "이번 주 내 근무"}
               </p>
 
               <p className="mt-2 text-3xl font-black text-[#005642]">
@@ -117,7 +122,9 @@ export default function WorkplacePage() {
               </p>
 
               <p className="mt-1 text-sm text-[#78847f]">
-                아직 공개된 근무표가 없어요.
+                {workplaceRole === "MANAGER"
+                    ? "아직 공개된 근무표가 없어요."
+                    : "이번 주 예정된 근무를 확인하세요."}
               </p>
             </Card>
           </Link>
@@ -128,7 +135,9 @@ export default function WorkplacePage() {
           >
             <Card className="h-full cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md">
               <p className="text-sm font-semibold text-[#78847f]">
-                진행 중 대체 근무
+                {workplaceRole === "MANAGER"
+                    ? "진행 중 대체 근무"
+                    : "대체 근무 요청"}
               </p>
 
               <p className="mt-2 text-3xl font-black text-[#005642]">
@@ -136,111 +145,115 @@ export default function WorkplacePage() {
               </p>
 
               <p className="mt-1 text-sm text-[#78847f]">
-                현재 처리할 요청이 없어요.
+                {workplaceRole === "MANAGER"
+                    ? "현재 처리할 요청이 없어요."
+                    : "진행 중인 요청을 확인해보세요."}
               </p>
             </Card>
           </Link>
         </div>
 
         {/* 시작하기 */}
-        <Card className="mt-6">
-          <div className="mb-5">
-            <h2 className="text-lg font-black">
-              시작하기
-            </h2>
+        {workplaceRole === "MANAGER" && (
+          <Card className="mt-6">
+            <div className="mb-5">
+              <h2 className="text-lg font-black">
+                시작하기
+              </h2>
 
-            <p className="mt-1 text-sm text-[#78847f]">
-              근무표를 만들기 위한 기본 설정을 진행해보세요.
-            </p>
-          </div>
+              <p className="mt-1 text-sm text-[#78847f]">
+                근무표를 만들기 위한 기본 설정을 진행해보세요.
+              </p>
+            </div>
 
-          <div className="space-y-3">
-            <Link
-                href={`/workplaces/${workplaceId}/members`}
-                className="flex w-full items-center justify-between rounded-xl border border-[#dce8e2] p-4 text-left transition hover:bg-[#f3fbf7]"
-            >
-              <div className="flex items-center gap-4">
-              <span className="text-2xl">
-                👥
-              </span>
+            <div className="space-y-3">
+              <Link
+                  href={`/workplaces/${workplaceId}/members`}
+                  className="flex w-full items-center justify-between rounded-xl border border-[#dce8e2] p-4 text-left transition hover:bg-[#f3fbf7]"
+              >
+                <div className="flex items-center gap-4">
+                <span className="text-2xl">
+                  👥
+                </span>
 
-                <div>
-                  <p className="font-bold">
-                    직원 초대
-                  </p>
+                  <div>
+                    <p className="font-bold">
+                      직원 초대
+                    </p>
 
-                  <p className="mt-0.5 text-sm text-[#78847f]">
-                    초대 코드를 공유하고 구성원을 추가하세요.
-                  </p>
+                    <p className="mt-0.5 text-sm text-[#78847f]">
+                      초대 코드를 공유하고 구성원을 추가하세요.
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <span className="text-[#78847f]">
-              ›
-            </span>
-            </Link>
-
-            <Link
-                href={`/workplaces/${workplaceId}/regular-shifts`}
-                className="flex w-full items-center justify-between rounded-xl border border-[#dce8e2] p-4 text-left transition hover:bg-[#f3fbf7]"
-            >
-              <div className="flex items-center gap-4">
-              <span className="text-2xl">
-                🗓️
+                <span className="text-[#78847f]">
+                ›
               </span>
+              </Link>
 
-                <div>
-                  <p className="font-bold">
-                    정기 근무 등록
-                  </p>
+              <Link
+                  href={`/workplaces/${workplaceId}/regular-shifts`}
+                  className="flex w-full items-center justify-between rounded-xl border border-[#dce8e2] p-4 text-left transition hover:bg-[#f3fbf7]"
+              >
+                <div className="flex items-center gap-4">
+                <span className="text-2xl">
+                  🗓️
+                </span>
 
-                  <p className="mt-0.5 text-sm text-[#78847f]">
-                    직원별 반복 근무 요일과 시간을 등록하세요.
-                  </p>
+                  <div>
+                    <p className="font-bold">
+                      정기 근무 등록
+                    </p>
+
+                    <p className="mt-0.5 text-sm text-[#78847f]">
+                      직원별 반복 근무 요일과 시간을 등록하세요.
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <span className="text-[#78847f]">
-              ›
-            </span>
-            </Link>
-
-            <Link
-                href={`/workplaces/${workplaceId}/schedule`}
-                className="flex w-full items-center justify-between rounded-xl border border-[#dce8e2] p-4 text-left transition hover:bg-[#f3fbf7]"
-            >
-              <div className="flex items-center gap-4">
-              <span className="text-2xl">
-                📅
+                <span className="text-[#78847f]">
+                ›
               </span>
+              </Link>
 
-                <div>
-                  <p className="font-bold">
-                    주간 근무표 만들기
-                  </p>
+              <Link
+                  href={`/workplaces/${workplaceId}/schedule`}
+                  className="flex w-full items-center justify-between rounded-xl border border-[#dce8e2] p-4 text-left transition hover:bg-[#f3fbf7]"
+              >
+                <div className="flex items-center gap-4">
+                <span className="text-2xl">
+                  📅
+                </span>
 
-                  <p className="mt-0.5 text-sm text-[#78847f]">
-                    정기 근무를 기준으로 이번 주 근무표를 만드세요.
-                  </p>
+                  <div>
+                    <p className="font-bold">
+                      주간 근무표 만들기
+                    </p>
+
+                    <p className="mt-0.5 text-sm text-[#78847f]">
+                      정기 근무를 기준으로 이번 주 근무표를 만드세요.
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <span className="text-[#78847f]">
-              ›
-            </span>
-            </Link>
-          </div>
+                <span className="text-[#78847f]">
+                ›
+              </span>
+              </Link>
+            </div>
 
-          {/*
-          TODO:
-          직원 등록, 정기 근무 등록, 근무표 생성 등
-          초기 설정이 완료되면 "시작하기" 영역을
-          "칸편 메뉴" 형태로 변경할 수 있다.
+            {/*
+            TODO:
+            직원 등록, 정기 근무 등록, 근무표 생성 등
+            초기 설정이 완료되면 "시작하기" 영역을
+            "칸편 메뉴" 형태로 변경할 수 있다.
 
-          현재는 프론트 기본 틀 제공을 위해
-          초기 상태 화면으로 유지한다.
-        */}
-        </Card>
+            현재는 프론트 기본 틀 제공을 위해
+            초기 상태 화면으로 유지한다.
+          */}
+          </Card>
+        )}
 
         {/* 구성원 */}
         <Card className="mt-6">
@@ -300,7 +313,7 @@ export default function WorkplacePage() {
           </div>
 
           {/* 직원이 아직 없을 때만 표시 */}
-          {!hasEmployees && (
+          {workplaceRole === "MANAGER" && !hasEmployees && (
               <div className="mt-5 rounded-xl border border-dashed border-[#c9ded4] p-5 text-center">
                 <div className="text-2xl">
                   📨
