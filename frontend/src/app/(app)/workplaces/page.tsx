@@ -54,7 +54,7 @@ export default function WorkplacesPage() {
     fetchWorkplaces();
   }, []);
 
-  const handleCreateWorkplace = () => {
+  const handleCreateWorkplace = async () => {
     const name = workplaceName.trim();
 
     if (!name) {
@@ -62,9 +62,34 @@ export default function WorkplacesPage() {
       return;
     }
 
+    try {
+      const created = await apiFetch<MyWorkplaceResponse>("/workplaces", {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+        }),
+      });
+
+      setWorkplaces((prev) => [
+        ...prev,
+        {
+          id: created.workplaceId,
+          name: created.name,
+          role: created.role,
+        },
+      ]);
+
+      setWorkplaceName("");
+    } catch (error) {
+      alert(
+          error instanceof Error
+              ? error.message
+              : "근무지 생성에 실패했습니다."
+      );
+    }
   };
 
-  const handleJoinWorkplace = () => {
+  const handleJoinWorkplace = async () => {
     const code = inviteCode.trim();
 
     if (!code) {
@@ -72,14 +97,31 @@ export default function WorkplacesPage() {
       return;
     }
 
-    /*
-     * TODO:
-     * API 연동 후 실제 근무지 참여 API 호출
-     *
-     * 현재는 화면 동작 확인용으로
-     * 입력 여부만 확인한다.
-     */
-    alert("초대 코드 확인 기능은 API 연동 후 연결할 예정입니다.");
+    try {
+      const joined = await apiFetch<MyWorkplaceResponse>("/workplaces/join", {
+        method: "POST",
+        body: JSON.stringify({
+          inviteCode: code,
+        }),
+      });
+
+      setWorkplaces((prev) => [
+        ...prev,
+        {
+          id: joined.workplaceId,
+          name: joined.name,
+          role: joined.role,
+        },
+      ]);
+
+      setInviteCode("");
+    } catch (error) {
+      alert(
+          error instanceof Error
+              ? error.message
+              : "근무지 참여에 실패했습니다."
+      );
+    }
   };
 
   return (

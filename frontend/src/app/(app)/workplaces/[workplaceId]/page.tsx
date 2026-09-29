@@ -1,33 +1,54 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Card from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 import InviteCodeBox from "@/components/ui/InviteCodeBox";
+import { apiFetch } from "@/lib/api";
 
 type MemberRole = "MANAGER" | "EMPLOYEE";
 
 type Member = {
-  id: number;
+  memberId: number;
   name: string;
   email: string;
   role: MemberRole;
 };
 
-// TODO: API 연동 후 실제 구성원 데이터로 교체
-const members: Member[] = [
-  {
-    id: 1,
-    name: "김지연",
-    email: "jiyeon@switch.com",
-    role: "MANAGER",
-  },
-];
+type InviteCodeResponse = {
+  inviteCode: string;
+};
 
 export default function WorkplacePage() {
   const params = useParams();
   const workplaceId = params.workplaceId as string;
+
+  const [members, setMembers] = useState<Member[]>([]);
+  const [inviteCode, setInviteCode] = useState("");
+
+  useEffect(() => {
+    const fetchWorkplaceData = async () => {
+      try {
+        const [inviteData, memberData] = await Promise.all([
+          apiFetch<InviteCodeResponse>(
+              `/workplaces/${workplaceId}/invite-code`
+          ),
+          apiFetch<Member[]>(
+              `/workplaces/${workplaceId}/members`
+          ),
+        ]);
+
+        setInviteCode(inviteData.inviteCode);
+        setMembers(memberData);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    fetchWorkplaceData();
+  }, [workplaceId]);
 
   const managerCount = members.filter(
       (member) => member.role === "MANAGER"
@@ -232,7 +253,7 @@ export default function WorkplacePage() {
           <div className="mt-5 space-y-3">
             {members.map((member) => (
                 <div
-                    key={member.id}
+                    key={member.memberId}
                     className="flex items-center justify-between rounded-xl bg-[#f3fbf7] p-4"
                 >
                   <div className="flex items-center gap-3">
@@ -280,15 +301,7 @@ export default function WorkplacePage() {
                 </p>
 
                 <div className="mt-4">
-                  {/*
-                TODO:
-                Workplace 초대 코드 조회 API 연동 후
-                inviteCode 값을 전달한다.
-
-                예:
-                <InviteCodeBox inviteCode={workplace.inviteCode}/>
-              */}
-                  <InviteCodeBox inviteCode={"SW-1234"} />
+                  <InviteCodeBox inviteCode={inviteCode} />
                 </div>
               </div>
           )}
