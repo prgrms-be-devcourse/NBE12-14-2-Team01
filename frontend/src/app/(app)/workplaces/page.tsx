@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useCurrentUser } from "@/components/providers/CurrentUserProvider";
 
 type WorkplaceRole = "MANAGER" | "EMPLOYEE";
 
@@ -32,6 +33,11 @@ export default function WorkplacesPage() {
       useState<Workplace[]>(initialWorkplaces);
   const [workplaceName, setWorkplaceName] = useState("");
   const [inviteCode, setInviteCode] = useState("");
+
+  // 로그인한 사람 이름, 동그라미엔 첫 글자
+  const { user, status } = useCurrentUser();
+  const userName = status === "success" && user ? user.name.trim() : "";
+  const userInitial = userName.charAt(0);
 
   const handleCreateWorkplace = () => {
     const name = workplaceName.trim();
@@ -91,9 +97,14 @@ export default function WorkplacesPage() {
 
             {/* 사용자 */}
             <div className="flex items-center gap-3">
-              <div className="hidden text-right sm:block">
-                <p className="text-sm font-black">
-                  김지연
+              <div className="hidden min-w-0 text-right sm:block">
+                {/* 불러오는 중엔 회색 막대, 실패하면 빈칸 (높이는 유지) */}
+                <p className="min-h-5 max-w-[160px] truncate text-sm font-black">
+                  {status === "loading" ? (
+                      <span className="inline-block h-3.5 w-14 rounded bg-[#edf2ef] align-middle" />
+                  ) : (
+                      userName
+                  )}
                 </p>
 
                 <p className="text-xs text-[#78847f]">
@@ -102,7 +113,7 @@ export default function WorkplacesPage() {
               </div>
 
               <div className="grid h-10 w-10 place-items-center rounded-full bg-[#dff7ec] font-black text-[#005642]">
-                김
+                {userInitial}
               </div>
 
               <Link
