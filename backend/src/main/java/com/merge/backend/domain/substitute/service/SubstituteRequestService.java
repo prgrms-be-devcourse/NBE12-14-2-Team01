@@ -15,6 +15,10 @@ import com.merge.backend.domain.substitute.entity.CandidateStatus;
 import com.merge.backend.domain.substitute.entity.RequestStatus;
 import com.merge.backend.domain.substitute.entity.SubstituteCandidate;
 import com.merge.backend.domain.substitute.entity.SubstituteRequest;
+import com.merge.backend.domain.substitute.event.SubstituteNoCandidateEvent;
+import com.merge.backend.domain.substitute.event.SubstituteRequestApprovedEvent;
+import com.merge.backend.domain.substitute.event.SubstituteRequestCreatedEvent;
+import com.merge.backend.domain.substitute.event.SubstituteRequestManagerClosedEvent;
 import com.merge.backend.domain.substitute.exception.SubstituteRequestErrorCode;
 import com.merge.backend.domain.substitute.repository.SubstituteCandidateRepository;
 import com.merge.backend.domain.substitute.repository.SubstituteRequestRepository;
@@ -23,6 +27,7 @@ import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import com.merge.backend.domain.workplace.exception.WorkplaceErrorCode;
+import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
 import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import com.merge.backend.domain.workplace.service.WorkplaceMemberService;
 import com.merge.backend.global.exception.BusinessException;
@@ -33,8 +38,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,14 +51,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class SubstituteRequestService {
 
     private final SubstituteRequestRepository substituteRequestRepository;
+    private final SubstituteCandidateService substituteCandidateService;
     private final SubstituteCandidateRepository substituteCandidateRepository;
     private final ShiftRepository shiftRepository;
     private final WorkplaceRepository workplaceRepository;
     private final UnavailableTimeRepository unavailableTimeRepository;
     private final UserService userService;
     private final WorkplaceMemberService workplaceMemberService;
+    private final WorkplaceMemberRepository workplaceMemberRepository;
     private final Clock clock;
-    private final SubstituteCandidateService substituteCandidateService;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     @Transactional
     public SubstituteRequestCreateResponse create(Long shiftId, Long actorUserId) {
@@ -67,6 +76,10 @@ public class SubstituteRequestService {
 
         // 후보가 한 명도 없으면 Request 자체를 만들지 않음
         if (candidates.isEmpty()) {
+            publishSubstituteNoCandidateEvent(
+                shift
+            );
+
             return new SubstituteRequestCreateResponse(
                 false,   // requestCreated: Request 생성 안 됨
                 null,    // requestId: 생성된 Request가 없으므로 null
@@ -86,6 +99,11 @@ public class SubstituteRequestService {
                 request,    // 방금 생성한 대타 요청
                 candidates  // 앞에서 찾은 대타 후보 목록
             );
+
+        publishSubstituteRequestCreatedEvent(
+            request,
+            createdCandidates
+        );
 
         return new SubstituteRequestCreateResponse(
             true,                     // Request 생성 성공
@@ -311,13 +329,24 @@ public class SubstituteRequestService {
         LocalDateTime approvedAt = LocalDateTime.now(clock);
         validateNotStarted(request.getShift(), approvedAt);
 
+        Long requesterMemberId =
+            request.getRequesterMember()
+                .getId();
+
+        Long acceptedMemberId =
+            acceptedMember.getId();
+
         //최종 승인 시작
         request.approveRequest(
             acceptedMember,
             approvedAt
         );
 
-        ///todo: 요청자와 수락자에게 알림 주기
+        publishSubstituteRequestApprovedEvent(
+            request.getId(),
+            requesterMemberId,
+            acceptedMemberId
+        );
 
         return request;
     }
@@ -342,10 +371,16 @@ public class SubstituteRequestService {
         // 매니저 인가 검증
         workplaceMemberService.requireManager(actorId, workplace.getId());
 
+        RequestStatus statusBeforeClose =
+            request.getStatus();
+
         //Request 상태 검증. OPEN 또는 ACCEPTED만 종료 가능
-        if (request.getStatus() != RequestStatus.OPEN
-            && request.getStatus() != RequestStatus.ACCEPTED) {
-            throw new BusinessException(SubstituteRequestErrorCode.ALREADY_TERMINATED);
+        if (statusBeforeClose != RequestStatus.OPEN
+            && statusBeforeClose != RequestStatus.ACCEPTED) {
+
+            throw new BusinessException(
+                SubstituteRequestErrorCode.ALREADY_TERMINATED
+            );
         }
 
         //Schedule/Shift 상태 검증
@@ -362,11 +397,154 @@ public class SubstituteRequestService {
             throw new BusinessException(SubstituteRequestErrorCode.SHIFT_ALREADY_STARTED_NOT_CLOSE);
         }
 
+        Long requesterMemberId =
+            request.getRequesterMember()
+                .getId();
+
+        List<Long> recipientMemberIds =
+            findManagerClosedRecipientMemberIds(
+                requestId,
+                requesterMemberId,
+                statusBeforeClose
+            );
+
         //Request 종료 처리 (Shift.member, Candidate 상태는 변경하지 않음)
         request.closeByManager(now);
 
-        //TODO: 알림 연동
+        publishSubstituteRequestManagerClosedEvent(
+            requestId,
+            recipientMemberIds
+        );
+
 
         return request;
     }
+
+    private void publishSubstituteRequestCreatedEvent(
+        SubstituteRequest request,
+        List<SubstituteCandidate> createdCandidates
+    ) {
+        List<Long> candidateMemberIds =
+            createdCandidates.stream()
+                .map(candidate ->
+                    candidate.getMember().getId()
+                )
+                .toList();
+
+        SubstituteRequestCreatedEvent event =
+            new SubstituteRequestCreatedEvent(
+                request.getId(),
+                candidateMemberIds
+            );
+
+        applicationEventPublisher.publishEvent(
+            event
+        );
+    }
+
+    private void publishSubstituteNoCandidateEvent(
+        Shift shift
+    ) {
+        Long workplaceId =
+            shift.getSchedule()
+                .getWorkplace()
+                .getId();
+
+        List<Long> managerMemberIds =
+            workplaceMemberRepository
+                .findAllByWorkplace_IdAndRoleAndLeftAtIsNull(
+                    workplaceId,
+                    WorkplaceRole.MANAGER
+                )
+                .stream()
+                .map(WorkplaceMember::getId)
+                .toList();
+
+        SubstituteNoCandidateEvent event =
+            new SubstituteNoCandidateEvent(
+                shift.getId(),
+                managerMemberIds
+            );
+
+        applicationEventPublisher.publishEvent(
+            event
+        );
+    }
+
+    private void publishSubstituteRequestApprovedEvent(
+        Long requestId,
+        Long requesterMemberId,
+        Long acceptedMemberId
+    ) {
+        SubstituteRequestApprovedEvent event =
+            new SubstituteRequestApprovedEvent(
+                requestId,
+                requesterMemberId,
+                acceptedMemberId
+            );
+
+        applicationEventPublisher.publishEvent(
+            event
+        );
+    }
+
+    private List<Long> findManagerClosedRecipientMemberIds(
+        Long requestId,
+        Long requesterMemberId,
+        RequestStatus statusBeforeClose
+    ) {
+        List<Long> candidateMemberIds;
+
+        if (statusBeforeClose == RequestStatus.OPEN) {
+
+            candidateMemberIds =
+                substituteCandidateRepository
+                    .findByRequestIdInAndStatus(
+                        List.of(requestId),
+                        CandidateStatus.PENDING
+                    )
+                    .stream()
+                    .map(candidate ->
+                        candidate.getMember().getId()
+                    )
+                    .toList();
+
+        } else {
+
+            SubstituteCandidate acceptedCandidate =
+                getAcceptedCandidates(
+                    List.of(requestId)
+                ).get(requestId);
+
+            candidateMemberIds =
+                List.of(
+                    acceptedCandidate
+                        .getMember()
+                        .getId()
+                );
+        }
+
+        return Stream.concat(
+                Stream.of(requesterMemberId),
+                candidateMemberIds.stream()
+            )
+            .distinct()
+            .toList();
+    }
+
+    private void publishSubstituteRequestManagerClosedEvent(
+        Long requestId,
+        List<Long> recipientMemberIds
+    ) {
+        SubstituteRequestManagerClosedEvent event =
+            new SubstituteRequestManagerClosedEvent(
+                requestId,
+                recipientMemberIds
+            );
+
+        applicationEventPublisher.publishEvent(
+            event
+        );
+    }
+
 }
