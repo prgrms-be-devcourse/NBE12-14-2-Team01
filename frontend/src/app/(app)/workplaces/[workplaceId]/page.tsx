@@ -123,31 +123,30 @@ export default function WorkplacePage() {
         />
 
         {/* 요약 카드 */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Link
-              href={`/workplaces/${workplaceId}/members`}
-              className="block"
-          >
-            <Card className="h-full cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md">
-              <p className="text-sm font-semibold text-[#78847f]">
-                현재 구성원
-              </p>
+        <div className={`grid gap-4 ${workplaceRole === "MANAGER" ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
+          {workplaceRole === "MANAGER" && (
+            <Link href={`/workplaces/${workplaceId}/members`} className="block">
+              <Card className="h-full cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md">
+                <p className="text-sm font-semibold text-[#78847f]">
+                  현재 구성원
+                </p>
 
-              <p className="mt-2 text-3xl font-black text-[#005642]">
-                {members.length}명
-              </p>
+                <p className="mt-2 text-3xl font-black text-[#005642]">
+                  {members.length}명
+                </p>
 
-              <p className="mt-1 text-sm text-[#78847f]">
-                관리자 {managerCount}명
-                {employeeCount > 0 && ` · 직원 ${employeeCount}명`}
-              </p>
-            </Card>
-          </Link>
+                <p className="mt-1 text-sm text-[#78847f]">
+                  관리자 {managerCount}명
+                  {employeeCount > 0 && ` · 직원 ${employeeCount}명`}
+                </p>
+              </Card>
+            </Link>
+          )}
 
-          <Link
-              href={`/workplaces/${workplaceId}/schedule`}
-              className="block"
-          >
+          <Link href={workplaceRole === "MANAGER"
+                ? `/workplaces/${workplaceId}/schedule`
+                : `/workplaces/${workplaceId}/my-shifts`
+          } className="block">
             <Card className="h-full cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md">
               <p className="text-sm font-semibold text-[#78847f]">
                 {workplaceRole === "MANAGER"
@@ -167,10 +166,11 @@ export default function WorkplacePage() {
             </Card>
           </Link>
 
-          <Link
-              href={`/workplaces/${workplaceId}/substitutes/admin`}
-              className="block"
-          >
+          <Link href={
+            workplaceRole === "MANAGER"
+                ? `/workplaces/${workplaceId}/substitutes/admin`
+                : `/workplaces/${workplaceId}/substitutes/request`
+          } className="block">
             <Card className="h-full cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md">
               <p className="text-sm font-semibold text-[#78847f]">
                 {workplaceRole === "MANAGER"
