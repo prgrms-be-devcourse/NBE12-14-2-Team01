@@ -49,6 +49,15 @@ type MyShift = {
   status: "SCHEDULED";
 };
 
+// 서버의 LocalDateTime 문자열을 무조건 KST(UTC+9) Date 객체로 해석
+function parseAsKst(isoString: string | null): Date | null {
+  if (!isoString) return null;
+  // 타임존 지정(Z 또는 +09:00 등)이 없는 경우 +09:00을 붙여 KST로 강제 고정
+  const hasTimeZone = /[Z+-]\d{2}:?\d{2}$/.test(isoString);
+  const kstFormattedString = hasTimeZone ? isoString : `${isoString}+09:00`;
+  return new Date(kstFormattedString);
+}
+
 // KST 기준 날짜 변환 유틸리티
 function getKstDate(date = new Date()): Date {
   const utc = date.getTime() + date.getTimezoneOffset() * 60000;
@@ -70,10 +79,13 @@ function getMondayOfCurrentWeek(): string {
 }
 
 function parseShiftDto(dto: ShiftItemDto): MyShift {
-  const startDate = new Date(dto.startAt);
-  const endDate = new Date(dto.endAt);
+  const startDate = parseAsKst(dto.startAt);
+  const endDate = parseAsKst(dto.endAt);
 
-  // KST 포맷터
+  if (!startDate || !endDate) {
+    throw new Error("Invalid date string");
+  }
+
   const formatKstTime = (date: Date) =>
       date.toLocaleTimeString("ko-KR", {
         timeZone: "Asia/Seoul",
@@ -82,16 +94,18 @@ function parseShiftDto(dto: ShiftItemDto): MyShift {
         minute: "2-digit",
       });
 
-  const month = Number(
-      new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "numeric" }).format(startDate)
-  );
-  const dayNum = Number(
-      new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", day: "numeric" }).format(startDate)
-  );
-  const dayName = new Intl.DateTimeFormat("ko-KR", {
+  // formatToParts()로 월, 일 숫자만 안전하게 추출
+  const formatter = new Intl.DateTimeFormat("ko-KR", {
     timeZone: "Asia/Seoul",
+    month: "numeric",
+    day: "numeric",
     weekday: "short",
-  }).format(startDate);
+  });
+
+  const parts = formatter.formatToParts(startDate);
+  const month = parts.find((p) => p.type === "month")?.value || "";
+  const dayNum = parts.find((p) => p.type === "day")?.value || "";
+  const dayName = parts.find((p) => p.type === "weekday")?.value || "";
 
   return {
     id: dto.shiftId,
@@ -99,7 +113,7 @@ function parseShiftDto(dto: ShiftItemDto): MyShift {
     workplaceName: dto.workplaceName,
     date: `${month}월 ${dayNum}일`,
     day: dayName,
-    dayNumber: String(dayNum),
+    dayNumber: dayNum,
     startTime: formatKstTime(startDate),
     endTime: formatKstTime(endDate),
     status: dto.status,
@@ -122,7 +136,7 @@ function getWorkHours(startTime: string, endTime: string) {
   return (endMins - startMins) / 60;
 }
 
-// YYYY-MM-DD 날짜 계산 유틸 (KST 기준 날짜 처리)
+// YYYY-MM-DD 날짜 계산 유틸
 function addDays(dateStr: string, days: number): string {
   const [year, month, day] = dateStr.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day));
@@ -149,7 +163,8 @@ function formatWeekTitle(dateStr: string): string {
 // 날짜/시간 포맷팅 유틸 (ISO -> KST YYYY.MM.DD HH:mm)
 function formatDateTime(isoString: string | null) {
   if (!isoString) return "-";
-  const date = new Date(isoString);
+  const date =parseAsKst(isoString);
+  if (!date) return "-";
   const formatted = new Intl.DateTimeFormat("ko-KR", {
     timeZone: "Asia/Seoul",
     year: "numeric",
@@ -265,7 +280,17 @@ export default function MyShiftsPage() {
         );
 
         if (!isCancelled) {
-          const formattedShifts = response.shifts.map(parseShiftDto);
+          //서버에서 잘못된 날짜 형식을 보낸다면 전체가 튕기는 게 아닌 정상 데이터만 필터링해 표시
+          const formattedShifts = response.shifts
+          .map((dto) => {
+            try {
+              return parseShiftDto(dto);
+            } catch {
+              return null; // 파싱 실패한 항목은 null 처리
+            }
+          })
+          .filter((shift): shift is MyShift => shift !== null); // null 항목 제거
+
           setShifts(formattedShifts);
         }
       } catch (err) {
