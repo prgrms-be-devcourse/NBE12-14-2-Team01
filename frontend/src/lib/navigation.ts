@@ -39,6 +39,10 @@ export const navItems: NavItem[] = [
     href: (id) => `/workplaces/${id}/substitutes/request`,
   },
   {
+    label: "보낸 요청",
+    href: (id) => `/workplaces/${id}/substitutes/sent`,
+  },
+  {
     label: "받은 요청",
     href: (id) => `/workplaces/${id}/substitutes/received`,
   },
