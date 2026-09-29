@@ -10,6 +10,12 @@ import { apiFetch } from "@/lib/api";
 
 type MemberRole = "MANAGER" | "EMPLOYEE";
 
+type MyWorkplaceResponse = {
+  workplaceId: number;
+  name: string;
+  role: MemberRole;
+};
+
 type Member = {
   memberId: number;
   name: string;
@@ -28,10 +34,13 @@ export default function WorkplacePage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [inviteCode, setInviteCode] = useState("");
 
+  const [workplaceName, setWorkplaceName] = useState("");
+
   useEffect(() => {
     const fetchWorkplaceData = async () => {
       try {
-        const [inviteData, memberData] = await Promise.all([
+        const [workplaceData, inviteData, memberData] = await Promise.all([
+          apiFetch<MyWorkplaceResponse[]>("/workplaces"),
           apiFetch<InviteCodeResponse>(
               `/workplaces/${workplaceId}/invite-code`
           ),
@@ -40,6 +49,11 @@ export default function WorkplacePage() {
           ),
         ]);
 
+        const currentWorkplace = workplaceData.find(
+            (workplace) => workplace.workplaceId === Number(workplaceId)
+        );
+
+        setWorkplaceName(currentWorkplace?.name ?? "");
         setInviteCode(inviteData.inviteCode);
         setMembers(memberData);
       } catch (error) {
@@ -63,7 +77,7 @@ export default function WorkplacePage() {
   return (
       <>
         <PageHeader
-            title="카페 스위치"
+            title={workplaceName}
             description="근무지의 일정과 구성원을 한눈에 확인하세요."
         />
 

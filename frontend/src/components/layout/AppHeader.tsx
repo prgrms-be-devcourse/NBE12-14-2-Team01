@@ -1,8 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useCurrentUser } from "@/components/providers/CurrentUserProvider";
+import { apiFetch } from "@/lib/api";
+
+type WorkplaceRole = "MANAGER" | "EMPLOYEE";
+
+type MyWorkplaceResponse = {
+  workplaceId: number;
+  name: string;
+  role: WorkplaceRole;
+};
 
 type Notification = {
   id: number;
@@ -41,6 +50,33 @@ export default function AppHeader() {
   const params = useParams();
 
   const workplaceId = params.workplaceId as string;
+
+  const [workplaceName, setWorkplaceName] = useState("");
+  const [workplaceRole, setWorkplaceRole] = useState<WorkplaceRole | null>(null);
+
+  useEffect(() => {
+    const fetchWorkplace = async () => {
+      if (!workplaceId) return;
+
+      try {
+        const workplaces =
+            await apiFetch<MyWorkplaceResponse[]>("/workplaces");
+
+        const currentWorkplace = workplaces.find(
+            (workplace) => workplace.workplaceId === Number(workplaceId)
+        );
+
+        if (currentWorkplace) {
+          setWorkplaceName(currentWorkplace.name);
+          setWorkplaceRole(currentWorkplace.role);
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    fetchWorkplace();
+  }, [workplaceId]);
 
   // 로그인한 사람 이름, 동그라미엔 첫 글자
   const { user, status } = useCurrentUser();
@@ -101,7 +137,7 @@ export default function AppHeader() {
           </p>
 
           <p className="mt-0.5 font-black">
-            카페 스위치
+            {workplaceName}
           </p>
         </div>
 
@@ -240,8 +276,8 @@ export default function AppHeader() {
                   )}
                 </p>
 
-                <p className="text-xs text-[#78847f]">
-                  관리자
+                <p className="mt-0.5 text-xs text-[#78847f]">
+                  {workplaceRole === "MANAGER" ? "관리자" : "직원"} · {workplaceName}
                 </p>
               </div>
 
@@ -267,7 +303,7 @@ export default function AppHeader() {
                     </p>
 
                     <p className="mt-0.5 text-xs text-[#78847f]">
-                      관리자 · 카페 스위치
+                      {workplaceRole === "MANAGER" ? "관리자" : "직원"} · {workplaceName}
                     </p>
                   </div>
 
