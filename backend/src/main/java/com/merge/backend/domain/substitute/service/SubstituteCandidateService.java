@@ -9,6 +9,8 @@ import com.merge.backend.domain.substitute.entity.CandidateStatus;
 import com.merge.backend.domain.substitute.entity.RequestStatus;
 import com.merge.backend.domain.substitute.entity.SubstituteCandidate;
 import com.merge.backend.domain.substitute.entity.SubstituteRequest;
+import com.merge.backend.domain.substitute.event.SubstituteAllCandidatesRejectedEvent;
+import com.merge.backend.domain.substitute.event.SubstituteCandidateAcceptedEvent;
 import com.merge.backend.domain.substitute.exception.SubstituteRequestErrorCode;
 import com.merge.backend.domain.substitute.repository.SubstituteCandidateRepository;
 import com.merge.backend.domain.substitute.repository.SubstituteRequestRepository;
@@ -20,7 +22,9 @@ import com.merge.backend.global.exception.BusinessException;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +39,7 @@ public class SubstituteCandidateService {
     private final SubstituteRequestRepository substituteRequestRepository;
     private final UserService userService;
     private final Clock clock;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     @Transactional(readOnly = true)
     public List<WorkplaceMember> findCandidates(Long workplaceId, Long requestMemberId,
@@ -237,6 +242,10 @@ public class SubstituteCandidateService {
         // Request: OPEN → ACCEPTED
         candidate.acceptRequest(now);
 
+        publishSubstituteCandidateAcceptedEvent(
+            candidate
+        );
+
         return candidate;
     }
 
@@ -273,8 +282,87 @@ public class SubstituteCandidateService {
         // 다른 PENDING 후보가 없다면 마지막 후보가 거절한 것
         if (!hasOtherPendingCandidate) {
             request.closeAllCandidatesRejected(now);
+
+            publishSubstituteAllCandidatesRejectedEvent(
+                request
+            );
         }
 
         return candidate;
+    }
+
+    private void publishSubstituteCandidateAcceptedEvent(
+        SubstituteCandidate candidate
+    ) {
+        SubstituteRequest request =
+            candidate.getRequest();
+
+        Long workplaceId =
+            request.getShift()
+                .getSchedule()
+                .getWorkplace()
+                .getId();
+
+        List<Long> managerMemberIds =
+            workplaceMemberRepository
+                .findAllByWorkplace_IdAndRoleAndLeftAtIsNull(
+                    workplaceId,
+                    WorkplaceRole.MANAGER
+                )
+                .stream()
+                .map(WorkplaceMember::getId)
+                .toList();
+
+        SubstituteCandidateAcceptedEvent event =
+            new SubstituteCandidateAcceptedEvent(
+                request.getId(),
+                managerMemberIds
+            );
+
+        applicationEventPublisher.publishEvent(
+            event
+        );
+    }
+
+    private void publishSubstituteAllCandidatesRejectedEvent(
+        SubstituteRequest request
+    ) {
+        Long workplaceId =
+            request.getShift()
+                .getSchedule()
+                .getWorkplace()
+                .getId();
+
+        Long requesterMemberId =
+            request.getRequesterMember()
+                .getId();
+
+        List<Long> managerMemberIds =
+            workplaceMemberRepository
+                .findAllByWorkplace_IdAndRoleAndLeftAtIsNull(
+                    workplaceId,
+                    WorkplaceRole.MANAGER
+                )
+                .stream()
+                .map(WorkplaceMember::getId)
+                .toList();
+
+        List<Long> recipientMemberIds =
+            Stream.concat(
+                    Stream.of(requesterMemberId),
+                    managerMemberIds.stream()
+                )
+                .distinct()
+                .toList();
+
+        SubstituteAllCandidatesRejectedEvent event =
+            new SubstituteAllCandidatesRejectedEvent(
+                request.getId(),
+                recipientMemberIds
+            );
+
+        applicationEventPublisher.publishEvent(
+            event
+        );
     }
 }

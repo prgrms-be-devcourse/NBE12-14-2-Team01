@@ -3,6 +3,7 @@ package com.merge.backend.domain.workplace.repository;
 import com.merge.backend.domain.user.entity.User;
 import com.merge.backend.domain.workplace.entity.Workplace;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
+import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -27,4 +28,10 @@ public interface WorkplaceMemberRepository extends JpaRepository<WorkplaceMember
         Long workplaceId,
         Long userId
     );
+
+    List<WorkplaceMember> findAllByWorkplace_IdAndRoleAndLeftAtIsNull(
+        Long workplaceId,
+        WorkplaceRole role
+    );
+
 }
