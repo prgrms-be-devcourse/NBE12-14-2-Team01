@@ -33,6 +33,20 @@ type ReceivedSubstituteRequestResponse = {
   createdAt: string;
 };
 
+type AcceptedSubstituteRequestResponse = {
+  candidateId: number;
+  requestId: number;
+  shiftId: number;
+  workplaceId: number;
+  workplaceName: string;
+  requesterName: string;
+  startAt: string;
+  endAt: string;
+  requestStatus: "ACCEPTED";
+  candidateStatus: "ACCEPTED";
+  respondedAt: string;
+};
+
 
 type Tab = "PENDING" | "ACCEPTED" | "REJECTED";
 
@@ -42,77 +56,143 @@ export default function ReceivedRequestsPage() {
 
   const [requests, setRequests] = useState<SubstituteRequest[]>([]);
   const [tab, setTab] = useState<Tab>("PENDING");
+  const [respondingCandidateId, setRespondingCandidateId] =
+      useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchRequests = async () => {
-      const data = await apiFetch<ReceivedSubstituteRequestResponse[]>(
-          "/substitute-requests/received"
-      );
+      try {
+        setIsLoading(true);
+        setLoadError(null);
 
-      const receivedRequests: SubstituteRequest[] = data
-      .filter((request) => request.workplaceId === workplaceId)
-      .map((request) => {
-        const start = new Date(request.startAt);
-        const end = new Date(request.endAt);
+        const [receivedData, acceptedData] = await Promise.all([
+          apiFetch<ReceivedSubstituteRequestResponse[]>(
+              "/substitute-requests/received"
+          ),
+          apiFetch<AcceptedSubstituteRequestResponse[]>(
+              "/substitute-requests/accepted"
+          ),
+        ]);
 
         const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
 
-        return {
-          id: request.candidateId,
-          requesterName: request.requesterName,
-          workplaceName: request.workplaceName,
-          date: `${start.getMonth() + 1}월 ${start.getDate()}일`,
-          day: dayNames[start.getDay()],
-          startTime: start.toTimeString().slice(0, 5),
-          endTime: end.toTimeString().slice(0, 5),
-          status: "PENDING",
-        };
-      });
+        const receivedRequests: SubstituteRequest[] = receivedData
+        .filter((request) => request.workplaceId === workplaceId)
+        .map((request) => {
+          const start = new Date(request.startAt);
+          const end = new Date(request.endAt);
 
-      setRequests(receivedRequests);
+          return {
+            id: request.candidateId,
+            requesterName: request.requesterName,
+            workplaceName: request.workplaceName,
+            date: `${start.getMonth() + 1}월 ${start.getDate()}일`,
+            day: dayNames[start.getDay()],
+            startTime: start.toTimeString().slice(0, 5),
+            endTime: end.toTimeString().slice(0, 5),
+            status: "PENDING",
+          };
+        });
+
+        const acceptedRequests: SubstituteRequest[] = acceptedData
+        .filter((request) => request.workplaceId === workplaceId)
+        .map((request) => {
+          const start = new Date(request.startAt);
+          const end = new Date(request.endAt);
+
+          return {
+            id: request.candidateId,
+            requesterName: request.requesterName,
+            workplaceName: request.workplaceName,
+            date: `${start.getMonth() + 1}월 ${start.getDate()}일`,
+            day: dayNames[start.getDay()],
+            startTime: start.toTimeString().slice(0, 5),
+            endTime: end.toTimeString().slice(0, 5),
+            status: "ACCEPTED",
+          };
+        });
+
+        setRequests([...receivedRequests, ...acceptedRequests]);
+      } catch (error) {
+        setLoadError(
+            error instanceof Error
+                ? error.message
+                : "대타 요청을 불러오지 못했습니다."
+        );
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     fetchRequests();
   }, [workplaceId]);
 
   const handleAccept = async (candidateId: number) => {
-    await apiFetch(
-        `/substitute-candidates/${candidateId}/response`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            decision: "ACCEPT",
-          }),
-        }
-    );
+    try {
+      setRespondingCandidateId(candidateId);
 
-    setRequests((prevRequests) =>
-        prevRequests.map((request) =>
-            request.id === candidateId
-                ? { ...request, status: "ACCEPTED" }
-                : request
-        )
-    );
+      await apiFetch(
+          `/substitute-candidates/${candidateId}/response`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({
+              decision: "ACCEPT",
+            }),
+          }
+      );
+
+      setRequests((prevRequests) =>
+          prevRequests.map((request) =>
+              request.id === candidateId
+                  ? { ...request, status: "ACCEPTED" }
+                  : request
+          )
+      );
+    } catch (error) {
+      const message =
+          error instanceof Error
+              ? error.message
+              : "대타 요청 수락에 실패했습니다.";
+
+      alert(message);
+    } finally {
+      setRespondingCandidateId(null);
+    }
   };
 
   const handleReject = async (candidateId: number) => {
-    await apiFetch(
-        `/substitute-candidates/${candidateId}/response`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            decision: "REJECT",
-          }),
-        }
-    );
+    try {
+      setRespondingCandidateId(candidateId);
 
-    setRequests((prevRequests) =>
-        prevRequests.map((request) =>
-            request.id === candidateId
-                ? { ...request, status: "REJECTED" }
-                : request
-        )
-    );
+      await apiFetch(
+          `/substitute-candidates/${candidateId}/response`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({
+              decision: "REJECT",
+            }),
+          }
+      );
+
+      setRequests((prevRequests) =>
+          prevRequests.map((request) =>
+              request.id === candidateId
+                  ? { ...request, status: "REJECTED" }
+                  : request
+          )
+      );
+    } catch (error) {
+      const message =
+          error instanceof Error
+              ? error.message
+              : "대타 요청 거절에 실패했습니다.";
+
+      alert(message);
+    } finally {
+      setRespondingCandidateId(null);
+    }
   };
 
   const filteredRequests = requests.filter(
@@ -179,7 +259,20 @@ export default function ReceivedRequestsPage() {
 
         {/* 요청 목록 */}
         <div className="space-y-4">
-          {filteredRequests.map((request) => (
+
+          {isLoading && (
+              <div className="flex min-h-[240px] items-center justify-center rounded-2xl border border-dashed border-[#dce8e2] bg-white text-sm text-[#78847f]">
+                대타 요청을 불러오는 중입니다...
+              </div>
+          )}
+
+          {!isLoading && loadError && (
+              <div className="flex min-h-[240px] items-center justify-center rounded-2xl border border-dashed border-[#f1cccc] bg-white text-sm text-[#d95555]">
+                {loadError}
+              </div>
+          )}
+
+          {!isLoading && !loadError && filteredRequests.map((request) => (
               <div
                   key={request.id}
                   className="rounded-2xl border border-[#dce8e2] bg-white p-5 shadow-sm"
@@ -233,17 +326,19 @@ export default function ReceivedRequestsPage() {
                       <button
                           type="button"
                           onClick={() => handleReject(request.id)}
-                          className="rounded-xl border border-[#f1cccc] px-4 py-3 font-bold text-[#d95555] transition hover:bg-[#fff5f5]"
+                          disabled={respondingCandidateId === request.id}
+                          className="rounded-xl border border-[#f1cccc] px-4 py-3 font-bold text-[#d95555] transition hover:bg-[#fff5f5] disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        거절하기
+                        {respondingCandidateId === request.id ? "처리 중..." : "거절하기"}
                       </button>
 
                       <button
                           type="button"
                           onClick={() => handleAccept(request.id)}
-                          className="rounded-xl bg-[#005642] px-4 py-3 font-bold text-white transition hover:bg-[#0b6b52]"
+                          disabled={respondingCandidateId === request.id}
+                          className="rounded-xl bg-[#005642] px-4 py-3 font-bold text-white transition hover:bg-[#0b6b52] disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        수락하기
+                        {respondingCandidateId === request.id ? "처리 중..." : "수락하기"}
                       </button>
                     </div>
                 )}
@@ -263,7 +358,7 @@ export default function ReceivedRequestsPage() {
           ))}
 
           {/* 비어있는 탭 */}
-          {filteredRequests.length === 0 && (
+          {!isLoading && !loadError && filteredRequests.length === 0 && (
               <div className="flex min-h-[240px] items-center justify-center rounded-2xl border border-dashed border-[#dce8e2] bg-white text-sm text-[#78847f]">
                 {tab === "PENDING" && "현재 대기 중인 요청이 없습니다."}
                 {tab === "ACCEPTED" && "수락한 요청이 없습니다."}
