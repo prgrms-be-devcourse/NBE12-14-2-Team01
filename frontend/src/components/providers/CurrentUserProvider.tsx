@@ -34,6 +34,9 @@ export default function CurrentUserProvider({ children }: { children: ReactNode 
 
   // 로그인한 사람 정보 한 번만 불러옴
   useEffect(() => {
+    // 이 Provider가 사라졌으면 늦게 온 응답은 무시
+    let ignore = false;
+
     async function loadCurrentUser() {
       // 로그인 안 했으면 로그인 화면으로
       if (!getToken()) {
@@ -43,9 +46,18 @@ export default function CurrentUserProvider({ children }: { children: ReactNode 
 
       try {
         const data = await apiFetch<CurrentUser>("/auth/me");
+        if (ignore) {
+          return;
+        }
+
         setUser(data);
         setStatus("success");
       } catch (error) {
+        // 토큰 지우거나 화면 옮기기 전에 먼저 확인
+        if (ignore) {
+          return;
+        }
+
         // 토큰이 틀렸거나 재발급도 실패하면 토큰 지우고 로그인 화면으로
         if (error instanceof ApiError && error.status === 401) {
           clearToken();
@@ -68,6 +80,10 @@ export default function CurrentUserProvider({ children }: { children: ReactNode 
     }
 
     loadCurrentUser();
+
+    return () => {
+      ignore = true;
+    };
   }, [router]);
 
   // 로그인 확인 끝날 때까지 화면 안 그림
