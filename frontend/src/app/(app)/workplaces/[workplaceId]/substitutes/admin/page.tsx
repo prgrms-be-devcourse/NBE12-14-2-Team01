@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect, useState, useCallback, useRef} from "react";
+import {useEffect, useState, useCallback} from "react";
 import Card from "@/components/ui/Card";
 import { useParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
@@ -126,6 +126,8 @@ export default function SubstituteAdminPage() {
   useEffect(() => {
     if (!workplaceId) return;
 
+    let isIgnore = false;
+
     // 비동기 함수 선언
     const loadRequests = async () => {
       setIsLoading(true);
@@ -136,22 +138,31 @@ export default function SubstituteAdminPage() {
         const data = await apiFetch<SubstituteRequestItem[]>(
             `/workplaces/${workplaceId}/substitute-requests/ongoing`
         );
-        setRequests(data ?? []);
+        if (!isIgnore) {
+          setRequests(data ?? []);
+        }
       } catch (error) {
-        setRequests([]);
-        if (error instanceof ApiError) {
-          setLoadError(`[${error.code}] ${error.message}`);
-        } else {
-          setLoadError(
-              "대체 근무 요청 목록을 불러오지 못했습니다. 네트워크 상태를 확인해주세요."
-          );
+        if (!isIgnore) {
+          setRequests([]);
+          if (error instanceof ApiError) {
+            setLoadError(`[${error.code}] ${error.message}`);
+          } else {
+            setLoadError(
+                "대체 근무 요청 목록을 불러오지 못했습니다. 네트워크 상태를 확인해주세요."
+            );
+          }
         }
       } finally {
-        setIsLoading(false);
+        if (!isIgnore) {
+          setIsLoading(false);
+        }
       }
     };
 
     loadRequests();
+    return () => {
+      isIgnore = true;
+    }
   }, [workplaceId, retryCount]);
 
   // Esc 키 모달 닫기
