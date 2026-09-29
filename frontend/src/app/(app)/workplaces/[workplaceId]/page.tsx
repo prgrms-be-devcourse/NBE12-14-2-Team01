@@ -31,24 +31,24 @@ export default function WorkplacePage() {
   const params = useParams();
   const workplaceId = params.workplaceId as string;
 
+  // 근무지 기본 정보
+  const [workplaceName, setWorkplaceName] = useState("");
+  const [workplaceRole, setWorkplaceRole] = useState<MemberRole | null>(null);
+
+  // 구성원 / 초대 코드
   const [members, setMembers] = useState<Member[]>([]);
   const [inviteCode, setInviteCode] = useState("");
 
-  const [workplaceName, setWorkplaceName] = useState("");
+  // 대체 근무 요청 개수
+  const [substituteCount, setSubstituteCount] = useState(0);
 
-  const [workplaceRole, setWorkplaceRole] = useState<MemberRole | null>(null);
-
+  // 근무지 기본 정보와 구성원 조회
   useEffect(() => {
     const fetchWorkplaceData = async () => {
       try {
-        const [workplaceData, inviteData, memberData] = await Promise.all([
+        const [workplaceData, memberData] = await Promise.all([
           apiFetch<MyWorkplaceResponse[]>("/workplaces"),
-          apiFetch<InviteCodeResponse>(
-              `/workplaces/${workplaceId}/invite-code`
-          ),
-          apiFetch<Member[]>(
-              `/workplaces/${workplaceId}/members`
-          ),
+          apiFetch<Member[]>(`/workplaces/${workplaceId}/members`),
         ]);
 
         const currentWorkplace = workplaceData.find(
@@ -57,8 +57,15 @@ export default function WorkplacePage() {
 
         setWorkplaceName(currentWorkplace?.name ?? "");
         setWorkplaceRole(currentWorkplace?.role ?? null);
-        setInviteCode(inviteData.inviteCode);
         setMembers(memberData);
+
+        // 초대 코드는 관리자만 조회
+        if (currentWorkplace?.role === "MANAGER") {
+          const inviteData = await apiFetch<InviteCodeResponse>(
+              `/workplaces/${workplaceId}/invite-code`
+          );
+          setInviteCode(inviteData.inviteCode);
+        }
       } catch (error) {
         console.error(error);
       }
@@ -66,6 +73,37 @@ export default function WorkplacePage() {
 
     fetchWorkplaceData();
   }, [workplaceId]);
+
+  // 관리자/직원에 따라 진행 중인 대체 근무 요청 개수 조회
+  useEffect(() => {
+    if (!workplaceRole) return;
+
+    const fetchSubstituteCount = async () => {
+      try {
+        if (workplaceRole === "MANAGER") {
+          const data = await apiFetch<unknown[]>(
+              `/workplaces/${workplaceId}/substitute-requests/ongoing`
+          );
+          setSubstituteCount(data.length);
+        } else {
+          const data = await apiFetch<{ workplaceId: number }[]>(
+              "/substitute-requests/received"
+          );
+
+          setSubstituteCount(
+              data.filter(
+                  (request) => request.workplaceId === Number(workplaceId)
+              ).length
+          );
+        }
+      } catch (error) {
+        console.error(error);
+        setSubstituteCount(0);
+      }
+    };
+
+    fetchSubstituteCount();
+  }, [workplaceId, workplaceRole]);
 
   const managerCount = members.filter(
       (member) => member.role === "MANAGER"
@@ -141,7 +179,7 @@ export default function WorkplacePage() {
               </p>
 
               <p className="mt-2 text-3xl font-black text-[#005642]">
-                0건
+                {substituteCount}건
               </p>
 
               <p className="mt-1 text-sm text-[#78847f]">
