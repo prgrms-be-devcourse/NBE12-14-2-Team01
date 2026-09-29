@@ -49,14 +49,21 @@ export class UnexpectedResponseError extends Error {
   }
 }
 
-// API 부를 때 이거 하나로 통일해서 씀. JSON 전용이라 body는 호출부에서 JSON.stringify() 해서 넘겨야 함
-// 네트워크 끊기거나 요청 취소된 건 여기서 안 건드리고 그대로 흘려보냄
-export async function apiFetch<T>(
-    path: string,
-    options: RequestInit = {}
-): Promise<T> {
-  const token = getToken();
+// 서버가 토큰 만료(또는 틀린 토큰)일 때 주는 코드
+const EXPIRED_TOKEN_CODE = "AUTH-006";
 
+// 재발급하면 안 되는 경로 (무한 반복 방지)
+const NO_REFRESH_PATHS = ["/auth/login", "/auth/signup", "/auth/refresh"];
+
+// 진행 중인 재발급, 여러 요청이 동시에 만료돼도 한 번만 부르려고 같이 씀
+let refreshing: Promise<string> | null = null;
+
+// 요청 한 번 보내고 응답 해석함, 넘겨받은 토큰을 헤더에 붙임
+async function request<T>(
+    path: string,
+    options: RequestInit,
+    token: string | null
+): Promise<T> {
   // headers를 객체 스프레드로 합치면 Headers나 배열로 넘어올 때 씹혀서 Headers로 정규화함
   const headers = new Headers(options.headers);
   if (options.body) {
@@ -98,4 +105,60 @@ export async function apiFetch<T>(
   }
 
   return json.data;
+}
+
+// refreshToken 쿠키로 새 accessToken 받아서 저장, 이미 받는 중이면 그 결과를 같이 기다림
+function refreshAccessToken(): Promise<string> {
+  if (!refreshing) {
+    refreshing = request<{ accessToken: string }>(
+        "/auth/refresh",
+        { method: "POST" },
+        null
+    )
+        .then((data) => {
+          setToken(data.accessToken);
+          return data.accessToken;
+        })
+        .finally(() => {
+          // 끝나면 비워서 다음 만료 때 다시 받을 수 있게
+          refreshing = null;
+        });
+  }
+
+  return refreshing;
+}
+
+// API 부를 때 이거 하나로 통일해서 씀. JSON 전용이라 body는 호출부에서 JSON.stringify() 해서 넘겨야 함
+// 네트워크 끊기거나 요청 취소된 건 여기서 안 건드리고 그대로 흘려보냄
+// 토큰 만료면 새로 받아서 한 번만 다시 보냄
+export async function apiFetch<T>(
+    path: string,
+    options: RequestInit = {}
+): Promise<T> {
+  const token = getToken();
+
+  try {
+    return await request<T>(path, options, token);
+  } catch (error) {
+    // 토큰 만료가 아니거나 재발급하면 안 되는 경로면 그대로 던짐 (토큰 없음 AUTH-004 등은 재발급 안 함)
+    if (
+        !(error instanceof ApiError) ||
+        error.code !== EXPIRED_TOKEN_CODE ||
+        NO_REFRESH_PATHS.includes(path)
+    ) {
+      throw error;
+    }
+
+    // 다른 요청이 이미 새 토큰을 받아뒀으면 재발급 없이 바로 다시 보냄
+    if (getToken() === token) {
+      try {
+        await refreshAccessToken();
+      } catch {
+        // 재발급도 실패하면 처음 받은 만료 에러를 그대로 던짐
+        throw error;
+      }
+    }
+
+    return request<T>(path, options, getToken());
+  }
 }
