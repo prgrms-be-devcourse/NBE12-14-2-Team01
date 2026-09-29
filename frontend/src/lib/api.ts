@@ -177,9 +177,14 @@ export async function apiFetch<T>(
     if (getToken() === token) {
       try {
         await refreshAccessToken();
-      } catch {
-        // 재발급도 실패하면 처음 받은 만료 에러를 그대로 던짐
-        throw error;
+      } catch (refreshError) {
+        // 재발급 기다리는 동안 로그인·로그아웃했으면 처음 받은 만료 에러를 던짐
+        if (version !== sessionVersion) {
+          throw error;
+        }
+
+        // 그 외엔 재발급 실패 원인 그대로 던짐 (refreshToken 틀리면 401, 서버 문제면 401 아니라 로그아웃 안 됨)
+        throw refreshError;
       }
     }
 
