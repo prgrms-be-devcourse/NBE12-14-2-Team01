@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useCurrentUser } from "@/components/providers/CurrentUserProvider";
+import { clearToken } from "@/lib/api";
 
 type Notification = {
   id: number;
@@ -56,12 +57,10 @@ export default function AppHeader() {
       (notification) => !notification.read
   ).length;
 
+  // 토큰 지우고 로그인 화면으로 (뒤로 가기로 못 돌아오게 replace)
   const handleLogout = () => {
-    /*
-     * TODO: 인증 API 연동 후
-     * 실제 로그아웃 처리 추가
-     */
-    router.push("/login");
+    clearToken();
+    router.replace("/login");
   };
 
   const handleNotificationClick = (notification: Notification) => {
@@ -231,13 +230,9 @@ export default function AppHeader() {
               </div>
 
               <div className="hidden min-w-0 sm:block">
-                {/* 불러오는 중엔 회색 막대, 실패하면 빈칸 (높이는 유지) */}
+                {/* 실패하면 빈칸 (높이는 유지) */}
                 <p className="min-h-5 max-w-[160px] truncate text-sm font-black">
-                  {status === "loading" ? (
-                      <span className="inline-block h-3.5 w-14 rounded bg-[#edf2ef] align-middle" />
-                  ) : (
-                      userName
-                  )}
+                  {userName}
                 </p>
 
                 <p className="text-xs text-[#78847f]">
@@ -259,11 +254,7 @@ export default function AppHeader() {
                 <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-52 overflow-hidden rounded-xl border border-[#dce8e2] bg-white shadow-lg">
                   <div className="border-b border-[#edf2ef] px-4 py-3">
                     <p className="min-h-5 truncate text-sm font-black">
-                      {status === "loading" ? (
-                          <span className="inline-block h-3.5 w-14 rounded bg-[#edf2ef] align-middle" />
-                      ) : (
-                          userName
-                      )}
+                      {userName}
                     </p>
 
                     <p className="mt-0.5 text-xs text-[#78847f]">
