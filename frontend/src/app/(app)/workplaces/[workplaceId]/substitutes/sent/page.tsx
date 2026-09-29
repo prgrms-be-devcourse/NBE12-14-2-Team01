@@ -75,8 +75,8 @@ function isActive(request: SentSubstituteRequest): boolean {
 function getStatusView(request: SentSubstituteRequest): StatusView {
   if (request.status === "OPEN") {
     return {
-      label: "후보 응답 대기",
-      description: "후보들의 응답을 기다리고 있어요.",
+      label: "응답 대기",
+      description: "대체 근무 요청에 대한 응답을 기다리고 있어요.",
       badgeClassName: YELLOW_BADGE,
     };
   }
@@ -84,7 +84,7 @@ function getStatusView(request: SentSubstituteRequest): StatusView {
   if (request.status === "ACCEPTED") {
     return {
       label: "관리자 승인 대기",
-      description: "후보가 수락했어요. 관리자 승인을 기다리고 있어요.",
+      description: "대체 근무 요청이 수락되었습니다. 관리자 승인을 기다리고 있어요.",
       badgeClassName: PURPLE_BADGE,
     };
   }
