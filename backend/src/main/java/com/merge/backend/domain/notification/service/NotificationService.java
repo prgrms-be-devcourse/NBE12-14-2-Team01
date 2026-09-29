@@ -299,7 +299,7 @@ public class NotificationService {
         Long actorUserId,
         Long notificationId
     ) {
-        Notification notification = notificationRepository.findById(notificationId)
+        Notification notification = notificationRepository.findByIdForUpdate(notificationId)
             .orElseThrow(() ->
                 new BusinessException(
                     NotificationErrorCode.NOT_FOUND_NOTIFICATION

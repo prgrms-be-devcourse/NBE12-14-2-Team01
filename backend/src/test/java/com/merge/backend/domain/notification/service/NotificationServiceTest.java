@@ -116,8 +116,13 @@ class NotificationServiceTest {
             "새로운 주간 근무표가 공개되었습니다."
         );
 
-        when(notificationRepository.findById(notificationId))
-            .thenReturn(Optional.of(notification));
+        when(
+            notificationRepository.findByIdForUpdate(
+                notificationId
+            )
+        ).thenReturn(
+            Optional.of(notification)
+        );
 
         NotificationReadResponse result =
             notificationService.markAsRead(
@@ -139,6 +144,11 @@ class NotificationServiceTest {
 
         assertThat(result.readAt())
             .isEqualTo(expectedReadAt);
+
+        verify(notificationRepository)
+            .findByIdForUpdate(
+                notificationId
+            );
     }
 
     @Test
@@ -147,8 +157,13 @@ class NotificationServiceTest {
         Long actorUserId = 1L;
         Long notificationId = 100L;
 
-        when(notificationRepository.findById(notificationId))
-            .thenReturn(Optional.empty());
+        when(
+            notificationRepository.findByIdForUpdate(
+                notificationId
+            )
+        ).thenReturn(
+            Optional.empty()
+        );
 
         assertThatThrownBy(() ->
             notificationService.markAsRead(
@@ -193,8 +208,13 @@ class NotificationServiceTest {
             "새로운 주간 근무표가 공개되었습니다."
         );
 
-        when(notificationRepository.findById(notificationId))
-            .thenReturn(Optional.of(notification));
+        when(
+            notificationRepository.findByIdForUpdate(
+                notificationId
+            )
+        ).thenReturn(
+            Optional.of(notification)
+        );
 
         assertThatThrownBy(() ->
             notificationService.markAsRead(
