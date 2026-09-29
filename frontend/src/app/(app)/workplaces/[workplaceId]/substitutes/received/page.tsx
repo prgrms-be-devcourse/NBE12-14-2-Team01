@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import { apiFetch } from "@/lib/api";
 
-type RequestStatus = "PENDING" | "ACCEPTED" | "REJECTED";
+type RequestStatus = "PENDING" | "ACCEPTED";
 
 type SubstituteRequest = {
   id: number;
@@ -48,7 +48,35 @@ type AcceptedSubstituteRequestResponse = {
 };
 
 
-type Tab = "PENDING" | "ACCEPTED" | "REJECTED";
+type Tab = "PENDING" | "ACCEPTED";
+
+const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+function parseAsKst(iso: string): Date {
+  return new Date(`${iso}+09:00`);
+}
+
+function toKstDisplay(iso: string): Date {
+  return new Date(parseAsKst(iso).getTime() + KST_OFFSET_MS);
+}
+
+function formatDateLabel(iso: string): string {
+  const date = toKstDisplay(iso);
+  return `${date.getUTCMonth() + 1}월 ${date.getUTCDate()}일`;
+}
+
+function formatDayLabel(iso: string): string {
+  return WEEKDAY_LABELS[toKstDisplay(iso).getUTCDay()];
+}
+
+function formatTimeLabel(iso: string): string {
+  const date = toKstDisplay(iso);
+  const hour = String(date.getUTCHours()).padStart(2, "0");
+  const minute = String(date.getUTCMinutes()).padStart(2, "0");
+
+  return `${hour}:${minute}`;
+}
 
 export default function ReceivedRequestsPage() {
   const params = useParams();
@@ -56,12 +84,13 @@ export default function ReceivedRequestsPage() {
 
   const [requests, setRequests] = useState<SubstituteRequest[]>([]);
   const [tab, setTab] = useState<Tab>("PENDING");
-  const [respondingCandidateId, setRespondingCandidateId] =
-      useState<number | null>(null);
+  const [isResponding, setIsResponding] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
+    let ignore = false;
+
     const fetchRequests = async () => {
       try {
         setIsLoading(true);
@@ -76,22 +105,18 @@ export default function ReceivedRequestsPage() {
           ),
         ]);
 
-        const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
-
         const receivedRequests: SubstituteRequest[] = receivedData
         .filter((request) => request.workplaceId === workplaceId)
         .map((request) => {
-          const start = new Date(request.startAt);
-          const end = new Date(request.endAt);
 
           return {
             id: request.candidateId,
             requesterName: request.requesterName,
             workplaceName: request.workplaceName,
-            date: `${start.getMonth() + 1}월 ${start.getDate()}일`,
-            day: dayNames[start.getDay()],
-            startTime: start.toTimeString().slice(0, 5),
-            endTime: end.toTimeString().slice(0, 5),
+            date: formatDateLabel(request.startAt),
+            day: formatDayLabel(request.startAt),
+            startTime: formatTimeLabel(request.startAt),
+            endTime: formatTimeLabel(request.endAt),
             status: "PENDING",
           };
         });
@@ -99,39 +124,47 @@ export default function ReceivedRequestsPage() {
         const acceptedRequests: SubstituteRequest[] = acceptedData
         .filter((request) => request.workplaceId === workplaceId)
         .map((request) => {
-          const start = new Date(request.startAt);
-          const end = new Date(request.endAt);
 
           return {
             id: request.candidateId,
             requesterName: request.requesterName,
             workplaceName: request.workplaceName,
-            date: `${start.getMonth() + 1}월 ${start.getDate()}일`,
-            day: dayNames[start.getDay()],
-            startTime: start.toTimeString().slice(0, 5),
-            endTime: end.toTimeString().slice(0, 5),
+            date: formatDateLabel(request.startAt),
+            day: formatDayLabel(request.startAt),
+            startTime: formatTimeLabel(request.startAt),
+            endTime: formatTimeLabel(request.endAt),
             status: "ACCEPTED",
           };
         });
 
+        if (ignore) return;
+
         setRequests([...receivedRequests, ...acceptedRequests]);
       } catch (error) {
+        if (ignore) return;
+
         setLoadError(
             error instanceof Error
                 ? error.message
                 : "대타 요청을 불러오지 못했습니다."
         );
       } finally {
-        setIsLoading(false);
+        if (!ignore) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchRequests();
+
+    return () => {
+      ignore = true;
+    };
   }, [workplaceId]);
 
   const handleAccept = async (candidateId: number) => {
     try {
-      setRespondingCandidateId(candidateId);
+      setIsResponding(true);
 
       await apiFetch(
           `/substitute-candidates/${candidateId}/response`,
@@ -158,13 +191,13 @@ export default function ReceivedRequestsPage() {
 
       alert(message);
     } finally {
-      setRespondingCandidateId(null);
+      setIsResponding(false);
     }
   };
 
   const handleReject = async (candidateId: number) => {
     try {
-      setRespondingCandidateId(candidateId);
+      setIsResponding(true);
 
       await apiFetch(
           `/substitute-candidates/${candidateId}/response`,
@@ -177,11 +210,7 @@ export default function ReceivedRequestsPage() {
       );
 
       setRequests((prevRequests) =>
-          prevRequests.map((request) =>
-              request.id === candidateId
-                  ? { ...request, status: "REJECTED" }
-                  : request
-          )
+          prevRequests.filter((request) => request.id !== candidateId)
       );
     } catch (error) {
       const message =
@@ -191,7 +220,7 @@ export default function ReceivedRequestsPage() {
 
       alert(message);
     } finally {
-      setRespondingCandidateId(null);
+      setIsResponding(false);
     }
   };
 
@@ -205,10 +234,6 @@ export default function ReceivedRequestsPage() {
 
   const acceptedCount = requests.filter(
       (request) => request.status === "ACCEPTED"
-  ).length;
-
-  const rejectedCount = requests.filter(
-      (request) => request.status === "REJECTED"
   ).length;
 
   return (
@@ -241,20 +266,9 @@ export default function ReceivedRequestsPage() {
                       : "text-[#66736d] hover:bg-[#f3fbf7]"
               }`}
           >
-            수락한 요청 {acceptedCount}
+            승인 대기 {acceptedCount}
           </button>
 
-          <button
-              type="button"
-              onClick={() => setTab("REJECTED")}
-              className={`rounded-full px-4 py-2 text-sm font-bold transition ${
-                  tab === "REJECTED"
-                      ? "bg-[#005642] text-white"
-                      : "text-[#66736d] hover:bg-[#f3fbf7]"
-              }`}
-          >
-            거절한 요청 {rejectedCount}
-          </button>
         </div>
 
         {/* 요청 목록 */}
@@ -290,20 +304,14 @@ export default function ReceivedRequestsPage() {
 
                   {request.status === "PENDING" && (
                       <span className="rounded-full bg-[#fff1d7] px-3 py-1 text-xs font-bold text-[#a96d09]">
-                  대기 중
-                </span>
+                        대기 중
+                      </span>
                   )}
 
                   {request.status === "ACCEPTED" && (
                       <span className="rounded-full bg-[#dff7ec] px-3 py-1 text-xs font-bold text-[#14956c]">
-                  수락함
-                </span>
-                  )}
-
-                  {request.status === "REJECTED" && (
-                      <span className="rounded-full bg-[#fff1f1] px-3 py-1 text-xs font-bold text-[#d95555]">
-                  거절함
-                </span>
+                        승인 대기
+                      </span>
                   )}
                 </div>
 
@@ -326,32 +334,26 @@ export default function ReceivedRequestsPage() {
                       <button
                           type="button"
                           onClick={() => handleReject(request.id)}
-                          disabled={respondingCandidateId === request.id}
+                          disabled={isResponding}
                           className="rounded-xl border border-[#f1cccc] px-4 py-3 font-bold text-[#d95555] transition hover:bg-[#fff5f5] disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {respondingCandidateId === request.id ? "처리 중..." : "거절하기"}
+                        {isResponding ? "처리 중..." : "거절하기"}
                       </button>
 
                       <button
                           type="button"
                           onClick={() => handleAccept(request.id)}
-                          disabled={respondingCandidateId === request.id}
+                          disabled={isResponding}
                           className="rounded-xl bg-[#005642] px-4 py-3 font-bold text-white transition hover:bg-[#0b6b52] disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {respondingCandidateId === request.id ? "처리 중..." : "수락하기"}
+                        {isResponding ? "처리 중..." : "수락하기"}
                       </button>
                     </div>
                 )}
 
                 {request.status === "ACCEPTED" && (
                     <div className="mt-5 rounded-xl bg-[#f3fbf7] px-4 py-3 text-center text-sm font-bold text-[#14956c]">
-                      대체 근무 요청을 수락했습니다.
-                    </div>
-                )}
-
-                {request.status === "REJECTED" && (
-                    <div className="mt-5 rounded-xl bg-[#fff7f7] px-4 py-3 text-center text-sm font-bold text-[#d95555]">
-                      대체 근무 요청을 거절했습니다.
+                      대체 근무 요청을 수락했습니다. 관리자 최종 승인을 기다리고 있습니다.
                     </div>
                 )}
               </div>
@@ -361,8 +363,7 @@ export default function ReceivedRequestsPage() {
           {!isLoading && !loadError && filteredRequests.length === 0 && (
               <div className="flex min-h-[240px] items-center justify-center rounded-2xl border border-dashed border-[#dce8e2] bg-white text-sm text-[#78847f]">
                 {tab === "PENDING" && "현재 대기 중인 요청이 없습니다."}
-                {tab === "ACCEPTED" && "수락한 요청이 없습니다."}
-                {tab === "REJECTED" && "거절한 요청이 없습니다."}
+                {tab === "ACCEPTED" && "승인 대기 중인 요청이 없습니다."}
               </div>
           )}
         </div>
