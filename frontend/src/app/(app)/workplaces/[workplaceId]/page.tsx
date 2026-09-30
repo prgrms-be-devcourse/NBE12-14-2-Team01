@@ -251,18 +251,18 @@ export default function WorkplacePage() {
             <Card className="h-full cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md">
               <p className="text-sm font-semibold text-[#78847f]">
                 {workplaceRole === "MANAGER"
-                    ? "이번 주 공식 근무"
-                    : "이번 주 내 근무"}
+                    ? "근무표"
+                    : "내 근무"}
               </p>
 
-              <p className="mt-2 text-3xl font-black text-[#005642]">
-                0건
+              <p className="mt-2 text-lg font-black text-[#005642]">
+                {workplaceRole === "MANAGER"
+                    ? "근무표 확인하기"
+                    : "내 근무 확인하기"}
               </p>
 
               <p className="mt-1 text-sm text-[#78847f]">
-                {workplaceRole === "MANAGER"
-                    ? "아직 공개된 근무표가 없어요."
-                    : "이번 주 예정된 근무를 확인하세요."}
+                상세 일정 보기 ›
               </p>
             </Card>
           </Link>
