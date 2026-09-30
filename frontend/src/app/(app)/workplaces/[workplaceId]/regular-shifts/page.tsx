@@ -355,10 +355,14 @@ const handleEdit = (shift: RegularShiftPattern) => {
                     value={selectedMemberId ?? ""}
                     disabled={isSubmitting}
                     onChange={(e) => {
-                      setSelectedMemberId(
-                        e.target.value === "" ? null : Number(e.target.value)
-                      );
-                      resetEditMode();
+                      const nextMemberId =
+                        e.target.value === "" ? null : Number(e.target.value);
+
+                      setSelectedMemberId(nextMemberId);
+
+                      if (editingPatternId === null) {
+                        resetEditMode();
+                      }
                     }}
                     className="w-full appearance-none rounded-xl border border-[#dce8e2] bg-white py-3 pl-4 pr-12 outline-none transition focus:border-[#14956c]"
                   >
