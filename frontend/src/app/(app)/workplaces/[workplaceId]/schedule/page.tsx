@@ -51,6 +51,23 @@ type ManagerScheduleResponse = {
   shifts: ScheduleShiftResponse[];
 };
 
+type WorkplaceMemberResponse = {
+  memberId: number;
+  name: string;
+  email: string;
+  role: "MANAGER" | "EMPLOYEE";
+};
+
+type ScheduleMember = {
+  id: number;
+  name: string;
+};
+
+type MemberLoadStatus =
+  | "loading"
+  | "success"
+  | "error";
+
 type PositionedShift = Shift & {
   lane: number;
   laneCount: number;
@@ -158,14 +175,6 @@ function convertScheduleShiftToShift(
     endTime: shift.endAt.slice(11, 16),
   };
 }
-
-// TODO: API 연동 후 GET 근무지 구성원 목록으로 대체 (id는 WorkplaceMember의 id)
-const members: { id: number; name: string }[] = [
-  { id: 1, name: "김지연" },
-  { id: 2, name: "이서연" },
-  { id: 3, name: "박민수" },
-  { id: 4, name: "최하은" },
-];
 
 const START_HOUR = 9;
 const END_HOUR = 22;
@@ -389,8 +398,12 @@ export default function SchedulePage() {
 
   const [scheduleId, setScheduleId] = useState<number | null>(null);
   const [showShiftModal, setShowShiftModal] = useState(false);
+  const [members, setMembers] = useState<ScheduleMember[]>([]);
+  const [memberLoadStatus, setMemberLoadStatus] = useState<MemberLoadStatus>("loading");
+  const [loadedMembersWorkplaceId, setLoadedMembersWorkplaceId] = useState<string | null>(null);
+  const [memberReloadKey, setMemberReloadKey] = useState(0);
   const [editingShiftId, setEditingShiftId] = useState<number | null>(null);
-  const [selectedMemberId, setSelectedMemberId] = useState<number>(members[0].id);
+  const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
   const [selectedDay, setSelectedDay] = useState<DayKey>("mon");
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("18:00");
@@ -402,6 +415,65 @@ export default function SchedulePage() {
   const isCurrentScheduleReady =
     scheduleLoadStatus === "success" &&
     loadedScheduleKey === currentScheduleKey;
+
+  const areCurrentMembersReady = memberLoadStatus === "success" && loadedMembersWorkplaceId === workplaceId;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadMembers = async () => {
+      setMemberLoadStatus("loading");
+      setLoadedMembersWorkplaceId(null);
+
+      try {
+        const result =
+          await apiFetch<WorkplaceMemberResponse[]>(
+            `/workplaces/${workplaceId}/members`
+          );
+
+        if (cancelled) {
+          return;
+        }
+
+        const loadedMembers: ScheduleMember[] =
+          result.map((member) => ({
+            id: member.memberId,
+            name: member.name,
+          }));
+
+        setMembers(loadedMembers);
+
+        setSelectedMemberId((prev) => {
+          if (
+            prev !== null &&
+            loadedMembers.some((member) => member.id === prev)
+          ) {
+            return prev;
+          }
+
+          return loadedMembers[0]?.id ?? null;
+        });
+
+        setLoadedMembersWorkplaceId(workplaceId);
+        setMemberLoadStatus("success");
+      } catch {
+        if (cancelled) {
+          return;
+        }
+
+        setMembers([]);
+        setSelectedMemberId(null);
+        setLoadedMembersWorkplaceId(workplaceId);
+        setMemberLoadStatus("error");
+      }
+    };
+
+    void loadMembers();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [workplaceId, memberReloadKey]);
 
   useEffect(() => {
     let ignore = false;
@@ -477,6 +549,14 @@ export default function SchedulePage() {
     }
 
     setScheduleReloadKey((prev) => prev + 1);
+  };
+
+  const handleRetryMembers = () => {
+    if (isSubmitting) {
+      return;
+    }
+
+    setMemberReloadKey((prev) => prev + 1);
   };
 
   const handleCreateSchedule = async () => {
@@ -601,13 +681,15 @@ export default function SchedulePage() {
 };
 
   const openAddShiftModal = () => {
-    if (
-      isSubmitting ||
-      !isCurrentScheduleReady ||
-      status !== "DRAFT"
-    ) {
-      return;
-    }
+  if (
+    isSubmitting ||
+    !isCurrentScheduleReady ||
+    !areCurrentMembersReady ||
+    members.length === 0 ||
+    status !== "DRAFT"
+  ) {
+    return;
+  }
 
     setEditingShiftId(null);
     setSelectedMemberId(members[0].id);
@@ -622,8 +704,20 @@ export default function SchedulePage() {
     if (
       isSubmitting ||
       !isCurrentScheduleReady ||
+      !areCurrentMembersReady ||
       status !== "DRAFT"
     ) {
+      return;
+    }
+
+    const memberExists = members.some(
+      (member) => member.id === shift.memberId
+    );
+
+    if (!memberExists) {
+      window.alert(
+        "현재 구성원 목록에서 해당 근무자를 확인할 수 없습니다."
+      );
       return;
     }
 
@@ -654,7 +748,11 @@ export default function SchedulePage() {
   const submitCreateShift = async (
     confirmUnavailableConflict: boolean
   ) => {
-    if (!isCurrentScheduleReady || status !== "DRAFT") {
+    if (
+      !isCurrentScheduleReady ||
+      !areCurrentMembersReady ||
+      status !== "DRAFT"
+    ) {
       setError(
         "현재 주차의 근무표 상태를 확인한 후 다시 시도해주세요."
       );
@@ -729,7 +827,11 @@ export default function SchedulePage() {
       return;
     }
 
-    if (!isCurrentScheduleReady || status !== "DRAFT") {
+    if (
+      !isCurrentScheduleReady ||
+      !areCurrentMembersReady ||
+      status !== "DRAFT"
+    ) {
       setError(
         "현재 주차의 근무표 상태를 확인한 후 다시 시도해주세요."
       );
@@ -887,7 +989,12 @@ export default function SchedulePage() {
                 <button
                     type="button"
                     onClick={openAddShiftModal}
-                    disabled={!isCurrentScheduleReady || isSubmitting}
+                    disabled={
+                      !isCurrentScheduleReady ||
+                      !areCurrentMembersReady ||
+                      members.length === 0 ||
+                      isSubmitting
+                    }
                     className="rounded-xl border border-[#dce8e2] bg-white px-4 py-2.5 text-sm font-bold text-[#005642] transition hover:bg-[#f3fbf7]"
                 >
                   + 근무 추가
@@ -905,6 +1012,46 @@ export default function SchedulePage() {
           )}
 
         </PageHeader>
+
+        {isCurrentScheduleReady &&
+          status === "DRAFT" &&
+          memberLoadStatus === "loading" && (
+            <div className="mb-4 rounded-xl border border-[#dce8e2] bg-[#fafdfb] px-4 py-3">
+              <p className="text-sm font-semibold text-[#78847f]">
+                근무에 배정할 구성원을 불러오는 중입니다...
+              </p>
+            </div>
+        )}
+
+        {isCurrentScheduleReady &&
+          status === "DRAFT" &&
+          memberLoadStatus === "error" && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#e6caca] bg-[#fffafa] px-4 py-3">
+              <p className="text-sm font-semibold text-[#d95555]">
+                구성원 목록을 불러오지 못했습니다.
+              </p>
+
+              <button
+                type="button"
+                onClick={handleRetryMembers}
+                disabled={isSubmitting}
+                className="rounded-lg border border-[#dce8e2] bg-white px-3 py-2 text-sm font-bold text-[#005642] transition hover:bg-[#f3fbf7] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                다시 시도
+              </button>
+            </div>
+          )}
+
+        {isCurrentScheduleReady &&
+          status === "DRAFT" &&
+          areCurrentMembersReady &&
+          members.length === 0 && (
+            <div className="mb-4 rounded-xl border border-[#dce8e2] bg-[#fafdfb] px-4 py-3">
+              <p className="text-sm font-semibold text-[#78847f]">
+                현재 근무에 배정할 수 있는 구성원이 없습니다.
+              </p>
+            </div>
+          )}
 
         <Card>
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -1078,6 +1225,7 @@ export default function SchedulePage() {
                                       disabled={
                                         isSubmitting ||
                                         !isCurrentScheduleReady ||
+                                        !areCurrentMembersReady ||
                                         status !== "DRAFT"
                                       }
                                       style={getShiftStyle(shift)}
@@ -1167,7 +1315,7 @@ export default function SchedulePage() {
                     </label>
 
                     <select
-                        value={selectedMemberId}
+                        value={selectedMemberId ?? ""}
                         onChange={(e) => setSelectedMemberId(Number(e.target.value))}
                         disabled={isSubmitting}
                         className="w-full rounded-xl border border-[#dce8e2] bg-white px-4 py-3 outline-none focus:border-[#14956c]"
