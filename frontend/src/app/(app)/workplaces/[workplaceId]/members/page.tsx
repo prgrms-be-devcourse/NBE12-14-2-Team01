@@ -160,6 +160,8 @@ export default function MembersPage() {
   ).length;
 
   const handleCopyInviteCode = async () => {
+    if (!inviteCode) return;
+
     await navigator.clipboard.writeText(inviteCode);
 
     setShowCopyToast(true);
@@ -540,7 +542,8 @@ export default function MembersPage() {
                   <button
                       type="button"
                       onClick={handleCopyInviteCode}
-                      className="flex-1 rounded-xl bg-[#005642] px-4 py-3 text-sm font-bold text-white hover:bg-[#0b6b52]"
+                      disabled={!inviteCode}
+                      className="flex-1 rounded-xl bg-[#005642] px-4 py-3 text-sm font-bold text-white hover:bg-[#0b6b52] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     초대 코드 복사
                   </button>

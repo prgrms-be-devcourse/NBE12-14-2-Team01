@@ -34,6 +34,13 @@ export default function WorkplacePage() {
   const [workplaceStatus, setWorkplaceStatus] = useState<WorkplaceStatus>("loading");
   const [loadedWorkplaceId, setLoadedWorkplaceId] = useState<string | null>(null);
 
+  const [substituteError, setSubstituteError] = useState(false);
+  const [substituteLoadedWorkplaceId, setSubstituteLoadedWorkplaceId] =
+      useState<string | null>(null);
+
+  const isSubstituteLoaded =
+      substituteLoadedWorkplaceId === workplaceId;
+
   const currentWorkplaceStatus =
       loadedWorkplaceId === workplaceId
           ? workplaceStatus
@@ -134,6 +141,8 @@ export default function WorkplacePage() {
 
           if (!cancelled) {
             setSubstituteCount(data.length);
+            setSubstituteError(false);
+            setSubstituteLoadedWorkplaceId(workplaceId);
           }
         } else {
           const data = await apiFetch<{ workplaceId: number }[]>(
@@ -147,13 +156,16 @@ export default function WorkplacePage() {
                         request.workplaceId === Number(workplaceId)
                 ).length
             );
+            setSubstituteError(false);
+            setSubstituteLoadedWorkplaceId(workplaceId);
           }
         }
       } catch (error) {
         if (cancelled) return;
 
         console.error(error);
-        setSubstituteCount(0);
+        setSubstituteError(true);
+        setSubstituteLoadedWorkplaceId(workplaceId);
       }
     };
 
@@ -268,13 +280,23 @@ export default function WorkplacePage() {
               </p>
 
               <p className="mt-2 text-3xl font-black text-[#005642]">
-                {substituteCount}건
+                {!isSubstituteLoaded
+                    ? "…"
+                    : substituteError
+                        ? "—"
+                        : `${substituteCount}건`}
               </p>
 
               <p className="mt-1 text-sm text-[#78847f]">
-                {workplaceRole === "MANAGER"
-                    ? "현재 처리할 요청이 없어요."
-                    : "진행 중인 요청을 확인해보세요."}
+                {!isSubstituteLoaded
+                    ? "요청을 확인하는 중입니다."
+                    : substituteError
+                        ? "요청을 불러오지 못했어요."
+                        : workplaceRole === "MANAGER"
+                            ? substituteCount === 0
+                                ? "현재 처리할 요청이 없어요."
+                                : `${substituteCount}건의 요청을 확인해주세요.`
+                            : "진행 중인 요청을 확인해보세요."}
               </p>
             </Card>
           </Link>
