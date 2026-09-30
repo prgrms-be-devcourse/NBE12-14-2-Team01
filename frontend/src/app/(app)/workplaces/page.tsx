@@ -41,9 +41,6 @@ export default function WorkplacesPage() {
     const requestId = ++listRequestIdRef.current;
 
     try {
-      setIsLoading(true);
-      setLoadError(null);
-
       const data = await apiFetch<MyWorkplaceResponse[]>("/workplaces");
 
       if (requestId !== listRequestIdRef.current) return;
@@ -81,7 +78,7 @@ export default function WorkplacesPage() {
   };
 
   const handleCreateWorkplace = async () => {
-    if (isCreating) return;
+    if (isCreating || isLoading || loadError) return;
 
     const name = workplaceName.trim();
 
@@ -133,7 +130,7 @@ export default function WorkplacesPage() {
   };
 
   const handleJoinWorkplace = async () => {
-    if (isJoining) return;
+    if (isJoining || isLoading || loadError) return;
 
     const code = inviteCode.trim();
 
@@ -258,7 +255,11 @@ export default function WorkplacesPage() {
 
                       <button
                           type="button"
-                          onClick={() => void fetchWorkplaces()}
+                          onClick={() => {
+                            setIsLoading(true);
+                            setLoadError(null);
+                            void fetchWorkplaces();
+                          }}
                           className="mt-4 rounded-xl border border-[#dce8e2] bg-white px-4 py-2 text-sm font-bold text-[#005642] transition hover:bg-[#f3fbf7]"
                       >
                         다시 시도
@@ -327,7 +328,7 @@ export default function WorkplacesPage() {
                   <input
                       type="text"
                       value={workplaceName}
-                      disabled={isCreating}
+                      disabled={isCreating || isLoading || !!loadError}
                       onChange={(e) => setWorkplaceName(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
@@ -341,7 +342,7 @@ export default function WorkplacesPage() {
 
                 <button
                     type="button"
-                    disabled={isCreating}
+                    disabled={isCreating || isLoading || !!loadError}
                     onClick={handleCreateWorkplace}
                     className="mt-4 w-full rounded-xl bg-[#005642] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#0b6b52]"
                 >
@@ -367,7 +368,7 @@ export default function WorkplacesPage() {
                   <input
                       type="text"
                       value={inviteCode}
-                      disabled={isJoining}
+                      disabled={isJoining || isLoading || !!loadError}
                       onChange={(e) =>
                           setInviteCode(e.target.value.toUpperCase())
                       }
@@ -383,7 +384,7 @@ export default function WorkplacesPage() {
 
                 <button
                     type="button"
-                    disabled={isJoining}
+                    disabled={isJoining || isLoading || !!loadError}
                     onClick={handleJoinWorkplace}
                     className="mt-4 w-full rounded-xl border border-[#005642] bg-white px-4 py-3 text-sm font-bold text-[#005642] transition hover:bg-[#f3fbf7]"
                 >
