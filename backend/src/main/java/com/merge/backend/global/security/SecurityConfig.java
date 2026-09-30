@@ -4,6 +4,7 @@ import com.merge.backend.domain.user.exception.UserErrorCode;
 import com.merge.backend.global.dto.ApiResponse;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -24,6 +25,10 @@ public class SecurityConfig {
 
     private final CustomAuthenticationFilter customAuthenticationFilter;
     private final ObjectMapper objectMapper;
+
+    //허용할 프론트 주소 (application.yml, 배포 때 환경변수로 덮어씀)
+    @Value("${custom.cors.allowed-origins}")
+    private List<String> allowedOrigins;
 
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -92,8 +97,7 @@ public class SecurityConfig {
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        //배포 도메인 확정되면 변경 필요
-        configuration.setAllowedOrigins(List.of("http://localhost:3000"));
+        configuration.setAllowedOrigins(allowedOrigins);
         configuration.setAllowedMethods(
             List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
