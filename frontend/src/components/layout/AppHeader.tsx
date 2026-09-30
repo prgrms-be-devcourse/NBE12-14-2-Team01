@@ -220,12 +220,25 @@ export default function AppHeader() {
     router.replace("/login");
   };
 
+  const reloadNotifications = () => {
+    if (
+      readingNotificationId !== null ||
+      notificationLoadStatus === "loading"
+    ) {
+      return;
+    }
+
+    setNotificationLoadStatus("loading");
+    setNotificationReloadKey((prev) => prev + 1);
+  };
+
   const handleNotificationClick = async (
     notification: NotificationResponse
   ) => {
     if (
       notification.readAt !== null ||
-      readingNotificationId !== null
+      readingNotificationId !== null ||
+      notificationLoadStatus === "loading"
     ) {
       return;
     }
@@ -249,6 +262,10 @@ export default function AppHeader() {
       );
     } catch (error) {
       console.error(error);
+
+      window.alert(
+        "알림을 읽음 처리하지 못했습니다. 다시 시도해주세요."
+      );
     } finally {
       setReadingNotificationId(null);
     }
@@ -261,7 +278,7 @@ export default function AppHeader() {
     setShowProfileMenu(false);
 
     if (nextOpen) {
-      setNotificationReloadKey((prev) => prev + 1);
+      reloadNotifications();
     }
   };
 
@@ -341,9 +358,7 @@ export default function AppHeader() {
 
                         <button
                           type="button"
-                          onClick={() =>
-                            setNotificationReloadKey((prev) => prev + 1)
-                          }
+                          onClick={reloadNotifications}
                           className="mt-3 text-xs font-bold text-[#14956c] hover:underline"
                           >
                             다시 시도
