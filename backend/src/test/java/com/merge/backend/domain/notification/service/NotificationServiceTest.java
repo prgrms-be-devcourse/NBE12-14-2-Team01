@@ -237,6 +237,69 @@ class NotificationServiceTest {
     }
 
     @Test
+    @DisplayName("퇴사한 근무지의 알림은 읽음 처리할 수 없다")
+    void markAsReadFailsWhenRecipientMembershipIsInactive() {
+        Long actorUserId = 1L;
+        Long notificationId = 100L;
+
+        User recipientUser =
+            mock(User.class);
+
+        WorkplaceMember recipientMember =
+            mock(WorkplaceMember.class);
+
+        when(recipientMember.getUser())
+            .thenReturn(recipientUser);
+
+        when(recipientUser.getId())
+            .thenReturn(actorUserId);
+
+        when(recipientMember.getLeftAt())
+            .thenReturn(
+                LocalDateTime.of(
+                    2026,
+                    9,
+                    30,
+                    10,
+                    0
+                )
+            );
+
+        Notification notification = new Notification(
+            recipientMember,
+            NotificationType.SCHEDULE_PUBLISHED,
+            "새로운 주간 근무표가 공개되었습니다."
+        );
+
+        when(
+            notificationRepository.findByIdForUpdate(
+                notificationId
+            )
+        ).thenReturn(
+            Optional.of(notification)
+        );
+
+        assertThatThrownBy(() ->
+            notificationService.markAsRead(
+                actorUserId,
+                notificationId
+            )
+        )
+            .isInstanceOf(BusinessException.class)
+            .satisfies(exception -> {
+                BusinessException businessException =
+                    (BusinessException) exception;
+
+                assertThat(businessException.getErrorCode())
+                    .isEqualTo(
+                        NotificationErrorCode.FORBIDDEN_ACCESS
+                    );
+            });
+
+        assertThat(notification.getReadAt()).isNull();
+    }
+
+    @Test
     @DisplayName("내 알림 목록을 조회한다")
     void getNotifications() {
         Long actorUserId = 1L;
