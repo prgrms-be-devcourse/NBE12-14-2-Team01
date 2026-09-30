@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {useEffect, useState} from "react";
+import {useCallback, useEffect, useRef, useState} from "react";
 import { apiFetch, clearToken } from "@/lib/api";
 import {useRouter} from "next/navigation";
 import {useCurrentUser} from "@/components/providers/CurrentUserProvider";
@@ -28,36 +28,51 @@ export default function WorkplacesPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [workplaceName, setWorkplaceName] = useState("");
   const [inviteCode, setInviteCode] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
+  const listRequestIdRef = useRef(0);
 
   // 로그인한 사람 이름, 동그라미엔 첫 글자
   const {user, status} = useCurrentUser();
   const userName = status === "success" && user ? user.name.trim() : "";
   const userInitial = userName.charAt(0);
 
-  useEffect(() => {
-    const fetchWorkplaces = async () => {
-      try {
-        setIsLoading(true);
-        setLoadError(null);
+  const fetchWorkplaces = useCallback(async () => {
+    const requestId = ++listRequestIdRef.current;
 
-        const data = await apiFetch<MyWorkplaceResponse[]>("/workplaces");
+    try {
+      setIsLoading(true);
+      setLoadError(null);
 
-        setWorkplaces(
-            data.map((workplace) => ({
-              id: workplace.workplaceId,
-              name: workplace.name,
-              role: workplace.role,
-            }))
-        );
-      } catch (error) {
-        setLoadError(error instanceof Error ? error.message : "근무지 목록을 불러오지 못했습니다.");
-      } finally {
+      const data = await apiFetch<MyWorkplaceResponse[]>("/workplaces");
+
+      if (requestId !== listRequestIdRef.current) return;
+
+      setWorkplaces(
+          data.map((workplace) => ({
+            id: workplace.workplaceId,
+            name: workplace.name,
+            role: workplace.role,
+          }))
+      );
+    } catch (error) {
+      if (requestId !== listRequestIdRef.current) return;
+
+      setLoadError(
+          error instanceof Error
+              ? error.message
+              : "근무지 목록을 불러오지 못했습니다."
+      );
+    } finally {
+      if (requestId === listRequestIdRef.current) {
         setIsLoading(false);
       }
-    };
-
-    fetchWorkplaces();
+    }
   }, []);
+
+  useEffect(() => {
+    void fetchWorkplaces();
+  }, [fetchWorkplaces]);
 
   // 토큰 지우고 로그인 화면으로 (뒤로 가기로 못 돌아오게 replace)
   const handleLogout = () => {
@@ -66,12 +81,16 @@ export default function WorkplacesPage() {
   };
 
   const handleCreateWorkplace = async () => {
+    if (isCreating) return;
+
     const name = workplaceName.trim();
 
     if (!name) {
       alert("근무지 이름을 입력해주세요.");
       return;
     }
+
+    setIsCreating(true);
 
     try {
       const created = await apiFetch<MyWorkplaceResponse>("/workplaces", {
@@ -81,14 +100,25 @@ export default function WorkplacesPage() {
         }),
       });
 
-      setWorkplaces((prev) => [
-        ...prev,
-        {
-          id: created.workplaceId,
-          name: created.name,
-          role: created.role,
-        },
-      ]);
+      // 생성 전에 시작된 목록 조회는 더 이상 반영하지 않음
+      listRequestIdRef.current += 1;
+      setIsLoading(false);
+      setLoadError(null);
+
+      setWorkplaces((prev) => {
+        if (prev.some((workplace) => workplace.id === created.workplaceId)) {
+          return prev;
+        }
+
+        return [
+          ...prev,
+          {
+            id: created.workplaceId,
+            name: created.name,
+            role: created.role,
+          },
+        ];
+      });
 
       setWorkplaceName("");
     } catch (error) {
@@ -97,16 +127,22 @@ export default function WorkplacesPage() {
               ? error.message
               : "근무지 생성에 실패했습니다."
       );
+    } finally {
+      setIsCreating(false);
     }
   };
 
   const handleJoinWorkplace = async () => {
+    if (isJoining) return;
+
     const code = inviteCode.trim();
 
     if (!code) {
       alert("초대 코드를 입력해주세요.");
       return;
     }
+
+    setIsJoining(true);
 
     try {
       const joined = await apiFetch<MyWorkplaceResponse>("/workplaces/join", {
@@ -116,14 +152,25 @@ export default function WorkplacesPage() {
         }),
       });
 
-      setWorkplaces((prev) => [
-        ...prev,
-        {
-          id: joined.workplaceId,
-          name: joined.name,
-          role: joined.role,
-        },
-      ]);
+      // 참여 전에 시작된 목록 조회는 더 이상 반영하지 않음
+      listRequestIdRef.current += 1;
+      setIsLoading(false);
+      setLoadError(null);
+
+      setWorkplaces((prev) => {
+        if (prev.some((workplace) => workplace.id === joined.workplaceId)) {
+          return prev;
+        }
+
+        return [
+          ...prev,
+          {
+            id: joined.workplaceId,
+            name: joined.name,
+            role: joined.role,
+          },
+        ];
+      });
 
       setInviteCode("");
     } catch (error) {
@@ -132,6 +179,8 @@ export default function WorkplacesPage() {
               ? error.message
               : "근무지 참여에 실패했습니다."
       );
+    } finally {
+      setIsJoining(false);
     }
   };
 
@@ -204,8 +253,16 @@ export default function WorkplacesPage() {
                 )}
 
                 {!isLoading && loadError && (
-                    <div className="rounded-2xl border border-dashed border-[#f1cccc] bg-white p-8 text-center text-sm text-[#d95555]">
-                      {loadError}
+                    <div className="rounded-2xl border border-dashed border-[#f1cccc] bg-white p-8 text-center">
+                      <p className="text-sm text-[#d95555]">{loadError}</p>
+
+                      <button
+                          type="button"
+                          onClick={() => void fetchWorkplaces()}
+                          className="mt-4 rounded-xl border border-[#dce8e2] bg-white px-4 py-2 text-sm font-bold text-[#005642] transition hover:bg-[#f3fbf7]"
+                      >
+                        다시 시도
+                      </button>
                     </div>
                 )}
 
@@ -270,6 +327,7 @@ export default function WorkplacesPage() {
                   <input
                       type="text"
                       value={workplaceName}
+                      disabled={isCreating}
                       onChange={(e) => setWorkplaceName(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
@@ -283,6 +341,7 @@ export default function WorkplacesPage() {
 
                 <button
                     type="button"
+                    disabled={isCreating}
                     onClick={handleCreateWorkplace}
                     className="mt-4 w-full rounded-xl bg-[#005642] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#0b6b52]"
                 >
@@ -308,6 +367,7 @@ export default function WorkplacesPage() {
                   <input
                       type="text"
                       value={inviteCode}
+                      disabled={isJoining}
                       onChange={(e) =>
                           setInviteCode(e.target.value.toUpperCase())
                       }
@@ -323,6 +383,7 @@ export default function WorkplacesPage() {
 
                 <button
                     type="button"
+                    disabled={isJoining}
                     onClick={handleJoinWorkplace}
                     className="mt-4 w-full rounded-xl border border-[#005642] bg-white px-4 py-3 text-sm font-bold text-[#005642] transition hover:bg-[#f3fbf7]"
                 >
