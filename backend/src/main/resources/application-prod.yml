@@ -1,0 +1,20 @@
+spring:
+  datasource:
+    url: ${MYSQLURL}
+    username: ${MYSQLUSER}
+    password: ${MYSQLPASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update # 개발 초기 단계에만 update 사용 권장
+
+    properties:
+      hibernate:
+        format_sql: true
+
+    show-sql: false
+
+logging:
+  level:
+    root: INFO
