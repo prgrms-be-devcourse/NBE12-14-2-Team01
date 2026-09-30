@@ -6,19 +6,17 @@ import com.merge.backend.domain.shift.dto.RegularShiftPatternResponse;
 import com.merge.backend.domain.shift.entity.RegularShiftPattern;
 import com.merge.backend.domain.shift.exception.RegularShiftErrorCode;
 import com.merge.backend.domain.shift.repository.RegularShiftPatternRepository;
-import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
+import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import com.merge.backend.global.exception.BusinessException;
 import com.merge.backend.global.rq.Rq;
 import com.merge.backend.global.util.TimeRangeUtils;
 import jakarta.transaction.Transactional;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
-import java.sql.Time;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
