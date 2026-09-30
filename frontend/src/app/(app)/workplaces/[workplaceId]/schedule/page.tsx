@@ -383,6 +383,7 @@ export default function SchedulePage() {
   const [schedule, setSchedule] = useState<ManagerScheduleResponse | null>(null);
   const [scheduleLoadStatus, setScheduleLoadStatus] = useState<ScheduleLoadStatus>("idle");
   const [scheduleReloadKey, setScheduleReloadKey] = useState(0);
+  const [loadedScheduleKey, setLoadedScheduleKey] = useState<string | null>(null);
   const [status, setStatus] = useState<ScheduleStatus>("NONE");
   const [shifts, setShifts] = useState<Shift[]>([]);
 
@@ -396,7 +397,17 @@ export default function SchedulePage() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const currentScheduleKey = `${workplaceId}:${weekStartDate}:${scheduleReloadKey}`;
+
+  const isCurrentScheduleReady =
+    scheduleLoadStatus === "success" &&
+    loadedScheduleKey === currentScheduleKey;
+
   useEffect(() => {
+    let ignore = false;
+
+    const requestKey = `${workplaceId}:${weekStartDate}:${scheduleReloadKey}`;
+
     const loadSchedule = async () => {
       setScheduleLoadStatus("loading");
 
@@ -406,6 +417,11 @@ export default function SchedulePage() {
           weekStartDate
         );
 
+        if (ignore) {
+          return;
+        }
+
+        setLoadedScheduleKey(requestKey);
         setSchedule(result);
 
         if (result === null) {
@@ -422,29 +438,72 @@ export default function SchedulePage() {
 
         setScheduleLoadStatus("success");
       } catch {
+        if (ignore) {
+          return;
+        }
+
+        setLoadedScheduleKey(null);
         setSchedule(null);
         setScheduleLoadStatus("error");
       }
     };
 
     void loadSchedule();
+
+    return () => {
+      ignore = true;
+    };
   }, [workplaceId, weekStartDate, scheduleReloadKey]);
 
   const handlePreviousWeek = () => {
+    if (isSubmitting || !isCurrentScheduleReady) {
+      return;
+    }
+
     setWeekStartDate((prev) => addDays(prev, -7));
   };
 
   const handleNextWeek = () => {
+    if (isSubmitting || !isCurrentScheduleReady) {
+      return;
+    }
+
     setWeekStartDate((prev) => addDays(prev, 7));
   };
 
+  const handleRetrySchedule = () => {
+    if (isSubmitting) {
+      return;
+    }
+
+    setScheduleReloadKey((prev) => prev + 1);
+  };
+
   const handleCreateSchedule = async () => {
+    // 이미 다른 생성/공개/Shift 작업이 진행 중이면 중복 실행 방지
+    if (isSubmitting) {
+      return;
+    }
+
+    // 현재 화면의 주차가 최신 조회 결과인지,
+    // 그리고 실제로 근무표가 없는 상태인지 확인
+    if (!isCurrentScheduleReady || status !== "NONE") {
+      window.alert(
+        "현재 주차의 근무표 상태를 확인 중입니다. 잠시 후 다시 시도해주세요."
+      );
+      return;
+    }
+
+    // 여기서부터 근무표 생성 작업 잠금
+    setIsSubmitting(true);
+
     try {
       await createSchedule(
         workplaceId,
         weekStartDate
       );
 
+      // 생성 성공 후 서버의 최신 DRAFT 상태를 다시 조회
       setScheduleReloadKey((prev) => prev + 1);
     } catch (err) {
       if (err instanceof ApiError) {
@@ -455,64 +514,101 @@ export default function SchedulePage() {
       window.alert(
         "근무표 생성 중 오류가 발생했습니다."
       );
+    } finally {
+      // 성공 / 실패 여부와 상관없이 작업 잠금 해제
+      setIsSubmitting(false);
     }
   };
 
   const handlePublishSchedule = async () => {
-    if (scheduleId === null) {
-      window.alert("근무표가 생성되지 않았습니다.");
-      return;
-    }
+  // 이미 다른 생성/공개/Shift 작업이 진행 중이면 중복 실행 방지
+  if (isSubmitting) {
+    return;
+  }
 
-    const submitPublish = async (
-      confirmUnavailableConflict: boolean
-    ) => {
-      try {
-        await publishSchedule(
-          workplaceId,
-          scheduleId,
-          confirmUnavailableConflict
-        );
+  // 현재 화면의 주차가 최신 조회 결과인지,
+  // 그리고 실제 DRAFT 상태인지 확인
+  if (!isCurrentScheduleReady || status !== "DRAFT") {
+    window.alert(
+      "현재 주차의 근무표 상태를 확인 중입니다. 잠시 후 다시 시도해주세요."
+    );
+    return;
+  }
 
-        setScheduleReloadKey((prev) => prev + 1);
-      } catch (err) {
-        if (err instanceof ApiError) {
-          const requiresConfirmation =
-            typeof err.data === "object" &&
-            err.data !== null &&
-            "requiresConfirmation" in err.data &&
-            err.data.requiresConfirmation === true;
+  // 공개할 Schedule 자체가 없는 경우 방어
+  if (scheduleId === null) {
+    window.alert("근무표가 생성되지 않았습니다.");
+    return;
+  }
 
-          if (
-            err.code === UNAVAILABLE_TIME_CONFLICT_CODE &&
-            requiresConfirmation &&
-            !confirmUnavailableConflict
-          ) {
-            const confirmed = window.confirm(
-              `${err.message}\n\n그래도 근무표를 공개하시겠습니까?`
-            );
+  // 실제 공개 API 요청
+  // false 요청에서 SFT-015가 발생하면 사용자 확인 후 true로 재요청
+  const submitPublish = async (
+    confirmUnavailableConflict: boolean
+  ) => {
+    try {
+      await publishSchedule(
+        workplaceId,
+        scheduleId,
+        confirmUnavailableConflict
+      );
 
-            if (confirmed) {
-              await submitPublish(true);
-            }
+      // 공개 성공 후 서버의 최신 PUBLISHED 상태를 다시 조회
+      setScheduleReloadKey((prev) => prev + 1);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const requiresConfirmation =
+          typeof err.data === "object" &&
+          err.data !== null &&
+          "requiresConfirmation" in err.data &&
+          err.data.requiresConfirmation === true;
 
-            return;
+        if (
+          err.code === UNAVAILABLE_TIME_CONFLICT_CODE &&
+          requiresConfirmation &&
+          !confirmUnavailableConflict
+        ) {
+          const confirmed = window.confirm(
+            `${err.message}\n\n그래도 근무표를 공개하시겠습니까?`
+          );
+
+          if (confirmed) {
+            await submitPublish(true);
           }
 
-          window.alert(err.message);
           return;
         }
 
-        window.alert(
-          "근무표 공개 중 오류가 발생했습니다."
-        );
+        window.alert(err.message);
+        return;
       }
-    };
 
-    await submitPublish(false);
+      window.alert(
+        "근무표 공개 중 오류가 발생했습니다."
+      );
+    }
   };
 
+  // 여기서부터 공개 작업 전체를 잠금
+  setIsSubmitting(true);
+
+  try {
+    await submitPublish(false);
+  } finally {
+    // 성공 / 실패 / 사용자가 충돌 확인을 취소한 경우 모두 잠금 해제
+    setIsSubmitting(false);
+  }
+};
+
   const openAddShiftModal = () => {
+    if (
+      isSubmitting ||
+      !isCurrentScheduleReady ||
+      status !== "DRAFT"
+    ) {
+      return;
+    }
+
     setEditingShiftId(null);
     setSelectedMemberId(members[0].id);
     setSelectedDay("mon");
@@ -523,9 +619,14 @@ export default function SchedulePage() {
   };
 
   const openEditShiftModal = (shift: Shift) => {
-    if (status !== "DRAFT") {
+    if (
+      isSubmitting ||
+      !isCurrentScheduleReady ||
+      status !== "DRAFT"
+    ) {
       return;
     }
+
     setEditingShiftId(shift.id);
     setSelectedMemberId(shift.memberId);
     setSelectedDay(shift.day);
@@ -550,9 +651,17 @@ export default function SchedulePage() {
     setError("");
   };
 
-  const submitCreateShift = async (confirmUnavailableConflict: boolean) => {
+  const submitCreateShift = async (
+    confirmUnavailableConflict: boolean
+  ) => {
+    if (!isCurrentScheduleReady || status !== "DRAFT") {
+      setError(
+        "현재 주차의 근무표 상태를 확인한 후 다시 시도해주세요."
+      );
+      return;
+    }
     if (scheduleId === null) {
-      setError("근무표가 아직 생성되지 않았습니다.");
+      setError("근무표가 생성되지 않았습니다.");
       return;
     }
 
@@ -616,6 +725,17 @@ export default function SchedulePage() {
   };
 
   const handleSaveShift = async () => {
+    if (isSubmitting) {
+      return;
+    }
+
+    if (!isCurrentScheduleReady || status !== "DRAFT") {
+      setError(
+        "현재 주차의 근무표 상태를 확인한 후 다시 시도해주세요."
+      );
+      return;
+    }
+
     if (startTime >= endTime) {
       setError("종료 시간은 시작 시간보다 늦어야 합니다.");
       return;
@@ -711,6 +831,17 @@ export default function SchedulePage() {
 
  //근무 삭제 핸들러 구현
   const handleDeleteShift = async () => {
+    if (isSubmitting) {
+      return;
+    }
+
+    if (!isCurrentScheduleReady || status !== "DRAFT") {
+      setError(
+        "현재 주차의 근무표 상태를 확인한 후 다시 시도해주세요."
+      );
+      return;
+    }
+
     if (editingShiftId === null || scheduleId === null) return;
 
     if (!window.confirm("정말로 이 근무를 삭제하시겠습니까?")) return;
@@ -740,21 +871,23 @@ export default function SchedulePage() {
             title="주간 근무표"
             description="이번 주 근무 일정을 확인하고 관리하세요."
         >
-          {status === "NONE" && (
+          {isCurrentScheduleReady && status === "NONE" && (
               <button
-                  type="button"
-                  onClick={handleCreateSchedule}
-                  className="rounded-xl bg-[#005642] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#0b6b52]"
+                type="button"
+                onClick={handleCreateSchedule}
+                disabled={!isCurrentScheduleReady || isSubmitting}
+                className="rounded-xl bg-[#005642] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#0b6b52] disabled:bg-[#dce8e2] disabled:text-[#78847f]"
               >
                 이번 주 근무표 생성
               </button>
           )}
 
-          {status === "DRAFT" && (
+          {isCurrentScheduleReady && status === "DRAFT" && (
               <div className="flex gap-2">
                 <button
                     type="button"
                     onClick={openAddShiftModal}
+                    disabled={!isCurrentScheduleReady || isSubmitting}
                     className="rounded-xl border border-[#dce8e2] bg-white px-4 py-2.5 text-sm font-bold text-[#005642] transition hover:bg-[#f3fbf7]"
                 >
                   + 근무 추가
@@ -763,6 +896,7 @@ export default function SchedulePage() {
                 <button
                     type="button"
                     onClick={handlePublishSchedule}
+                    disabled={!isCurrentScheduleReady || isSubmitting}
                     className="rounded-xl bg-[#005642] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#0b6b52]"
                 >
                   공개하기
@@ -778,6 +912,7 @@ export default function SchedulePage() {
               <button
                   type="button"
                   onClick={handlePreviousWeek}
+                  disabled={isSubmitting || !isCurrentScheduleReady}
                   className="grid h-9 w-9 place-items-center rounded-lg border border-[#dce8e2] text-[#66736d] transition hover:bg-[#f3fbf7]"
               >
                 <span className="block -translate-y-px text-xl leading-none">‹</span>
@@ -790,38 +925,68 @@ export default function SchedulePage() {
               <button
                   type="button"
                   onClick={handleNextWeek}
+                  disabled={isSubmitting || !isCurrentScheduleReady}
                   className="grid h-9 w-9 place-items-center rounded-lg border border-[#dce8e2] text-[#66736d] transition hover:bg-[#f3fbf7]"
               >
                 <span className="block -translate-y-px text-xl leading-none">›</span>
               </button>
 
-              {status === "DRAFT" && (
+              {isCurrentScheduleReady && status === "DRAFT" && (
                   <span className="ml-2 rounded-full bg-[#fff1d7] px-3 py-1 text-xs font-bold text-[#a96d09]">
                 미공개
               </span>
               )}
 
-              {status === "PUBLISHED" && (
+              {isCurrentScheduleReady && status === "PUBLISHED" && (
                   <span className="ml-2 rounded-full bg-[#dff7ec] px-3 py-1 text-xs font-bold text-[#14956c]">
                 공개됨
               </span>
               )}
             </div>
 
-            {status === "DRAFT" && (
+            {isCurrentScheduleReady && status === "DRAFT" && (
                 <p className="text-xs text-[#78847f]">
                   직원에게 공개되기 전 근무표입니다.
                 </p>
             )}
 
-            {status === "PUBLISHED" && (
+            {isCurrentScheduleReady && status === "PUBLISHED" && (
                 <p className="text-xs font-semibold text-[#14956c]">
                   직원에게 공개된 근무표입니다.
                 </p>
             )}
           </div>
 
-          {status === "NONE" ? (
+          {!isCurrentScheduleReady ? (
+            scheduleLoadStatus === "error" ? (
+            <div className="flex min-h-[420px] flex-col items-center justify-center rounded-xl border border-dashed border-[#e6caca] bg-[#fffafa] px-4 text-center">
+              <div className="text-4xl">⚠️</div>
+
+              <h2 className="mt-4 text-lg font-black">
+                근무표를 불러오지 못했습니다.
+                </h2>
+
+                <p className="mt-2 max-w-md text-sm leading-6 text-[#78847f]">
+                  현재 주차의 근무표 정보를 다시 불러와주세요.
+                  </p>
+
+                <button
+                 type="button"
+                 onClick={handleRetrySchedule}
+                 disabled={isSubmitting}
+                 className="mt-5 rounded-xl bg-[#005642] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#0b6b52] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  다시 시도
+                </button>
+                </div>
+              ) : (
+              <div className="flex min-h-[420px] items-center justify-center rounded-xl border border-[#dce8e2] bg-[#fafdfb] px-4 text-center">
+                <p className="text-sm font-semibold text-[#78847f]">
+                  근무표를 불러오는 중입니다...
+                </p>
+              </div>
+            )
+          ) : status === "NONE" ? (
               <div className="flex min-h-[420px] flex-col items-center justify-center rounded-xl border border-dashed border-[#c9ded4] bg-[#fafdfb] px-4 text-center">
                 <div className="text-4xl">📅</div>
 
@@ -837,6 +1002,7 @@ export default function SchedulePage() {
                 <button
                     type="button"
                     onClick={handleCreateSchedule}
+                    disabled={!isCurrentScheduleReady || isSubmitting}
                     className="mt-5 rounded-xl bg-[#005642] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#0b6b52]"
                 >
                   이번 주 근무표 생성
@@ -909,7 +1075,11 @@ export default function SchedulePage() {
                                       key={shift.id}
                                       type="button"
                                       onClick={() => openEditShiftModal(shift)}
-                                      disabled={status !== "DRAFT"}
+                                      disabled={
+                                        isSubmitting ||
+                                        !isCurrentScheduleReady ||
+                                        status !== "DRAFT"
+                                      }
                                       style={getShiftStyle(shift)}
                                       className="absolute z-10 overflow-hidden rounded-lg border border-[#bde5d3] bg-[#dff7ec] px-2 py-2 text-left text-[#005642] shadow-sm transition hover:bg-[#cceedd] disabled:cursor-default disabled:hover:bg-[#dff7ec]"
                                   >
@@ -965,7 +1135,7 @@ export default function SchedulePage() {
         </Card>
 
         {/* 근무 추가 / 수정 모달 */}
-        {showShiftModal && status === "DRAFT" && (
+        {showShiftModal && isCurrentScheduleReady && status === "DRAFT" && (
             <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4">
               <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
                 <div className="flex items-start justify-between">
