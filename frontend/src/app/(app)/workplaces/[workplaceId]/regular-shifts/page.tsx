@@ -87,6 +87,16 @@ export default function RegularShiftsPage() {
   const [endTime, setEndTime] = useState("18:00");
 
 useEffect(() => {
+  let ignore = false;
+
+  setMembers([]);
+  setPatterns([]);
+  setSelectedMemberId(null);
+  setEditingPatternId(null);
+  setSelectedDays([]);
+  setStartTime("09:00");
+  setEndTime("18:00");
+
   const fetchData = async () => {
     try {
       // 전체 직원 조회
@@ -102,10 +112,14 @@ useEffect(() => {
       console.log("직원 목록:", memberData);
       console.log("정기근무 목록:", patternData);
 
+      if (ignore) return;
+
       setMembers(memberData);
       setPatterns(patternData);
     } catch (error) {
       console.error("정기근무 조회 오류:", error);
+
+      if (ignore) return;
 
       if (error instanceof ApiError) {
         alert(error.message);
@@ -118,7 +132,11 @@ useEffect(() => {
   if (workplaceId) {
     fetchData();
   }
-}, [workplaceId]);
+
+  return () => {
+    ignore = true;
+  };
+  }, [workplaceId]);
 
   const handleDayClick = (day: DayKey) => {
     if (editingPatternId !== null) {
