@@ -419,11 +419,9 @@ export default function MembersPage() {
                                     <div className="absolute -left-24 top-10 z-30 w-36 overflow-hidden rounded-xl border border-[#dce8e2] bg-white shadow-lg">
                                       <button
                                           type="button"
-                                          onClick={() => {
-                                            setMemberToEnd(member);
-                                            setOpenMenuId(null);
-                                          }}
-                                          className="w-full px-4 py-3 text-left text-sm font-bold text-[#d95555] transition hover:bg-[#fff5f5]"
+                                          disabled
+                                          title="소속 종료 기능은 준비 중입니다."
+                                          className="w-full cursor-not-allowed px-4 py-3 text-left text-sm font-bold text-[#b0b8b4]"
                                       >
                                         소속 종료
                                       </button>
