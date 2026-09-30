@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { useCurrentUser } from "@/components/providers/CurrentUserProvider";
-import { apiFetch, clearToken } from "@/lib/api";
+import {useEffect, useState} from "react";
+import {useParams, useRouter} from "next/navigation";
+import {useCurrentUser} from "@/components/providers/CurrentUserProvider";
+import {apiFetch, clearToken} from "@/lib/api";
 
 type WorkplaceRole = "MANAGER" | "EMPLOYEE";
 
@@ -51,10 +51,39 @@ export default function AppHeader() {
 
   const workplaceId = params.workplaceId as string;
 
-  const [workplaceName, setWorkplaceName] = useState("");
-  const [workplaceRole, setWorkplaceRole] = useState<WorkplaceRole | null>(null);
+  type WorkplaceStatus = "loading" | "success" | "error" | "not-found";
+
+  const [workplaceState, setWorkplaceState] = useState<{
+    workplaceId: string;
+    name: string;
+    role: WorkplaceRole | null;
+    status: WorkplaceStatus;
+  }>({
+    workplaceId,
+    name: "",
+    role: null,
+    status: "loading",
+  });
+
+  const isCurrentWorkplace =
+      workplaceState.workplaceId === workplaceId;
+
+  const workplaceStatus =
+      isCurrentWorkplace ? workplaceState.status : "loading";
+
+  const workplaceName =
+      isCurrentWorkplace && workplaceState.status === "success"
+          ? workplaceState.name
+          : "";
+
+  const workplaceRole =
+      isCurrentWorkplace && workplaceState.status === "success"
+          ? workplaceState.role
+          : null;
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchWorkplace = async () => {
       if (!workplaceId) return;
 
@@ -62,24 +91,59 @@ export default function AppHeader() {
         const workplaces =
             await apiFetch<MyWorkplaceResponse[]>("/workplaces");
 
+        if (cancelled) return;
+
         const currentWorkplace = workplaces.find(
-            (workplace) => workplace.workplaceId === Number(workplaceId)
+            (workplace) =>
+                workplace.workplaceId === Number(workplaceId)
         );
 
-        if (currentWorkplace) {
-          setWorkplaceName(currentWorkplace.name);
-          setWorkplaceRole(currentWorkplace.role);
+        if (!currentWorkplace) {
+          setWorkplaceState({
+            workplaceId,
+            name: "",
+            role: null,
+            status: "not-found",
+          });
+          return;
         }
+
+        setWorkplaceState({
+          workplaceId,
+          name: currentWorkplace.name,
+          role: currentWorkplace.role,
+          status: "success",
+        });
       } catch (error) {
+        if (cancelled) return;
+
         console.error(error);
+
+        setWorkplaceState({
+          workplaceId,
+          name: "",
+          role: null,
+          status: "error",
+        });
       }
     };
 
-    fetchWorkplace();
+    void fetchWorkplace();
+
+    return () => {
+      cancelled = true;
+    };
   }, [workplaceId]);
 
+  const workplaceRoleLabel =
+      workplaceRole === "MANAGER"
+          ? "관리자"
+          : workplaceRole === "EMPLOYEE"
+              ? "직원"
+              : "";
+
   // 로그인한 사람 이름, 동그라미엔 첫 글자
-  const { user, status } = useCurrentUser();
+  const {user, status} = useCurrentUser();
   const userName = status === "success" && user ? user.name.trim() : "";
   const userInitial = userName.charAt(0);
 
@@ -127,7 +191,8 @@ export default function AppHeader() {
   };
 
   return (
-      <header className="relative z-40 flex h-[76px] items-center justify-between border-b border-[#dce8e2] bg-white pl-20 pr-4 sm:pr-6 lg:px-8">
+      <header
+          className="relative z-40 flex h-[76px] items-center justify-between border-b border-[#dce8e2] bg-white pl-20 pr-4 sm:pr-6 lg:px-8">
         {/* 현재 근무지 */}
         <div>
           <p className="text-xs font-semibold text-[#78847f]">
@@ -135,7 +200,13 @@ export default function AppHeader() {
           </p>
 
           <p className="mt-0.5 font-black">
-            {workplaceName}
+            {workplaceStatus === "success"
+                ? workplaceName
+                : workplaceStatus === "loading"
+                    ? "확인 중..."
+                    : workplaceStatus === "not-found"
+                        ? "소속 근무지 없음"
+                        : "근무지 조회 실패"}
           </p>
         </div>
 
@@ -155,7 +226,8 @@ export default function AppHeader() {
               🔔
 
               {unreadCount > 0 && (
-                  <span className="absolute right-0.5 top-0.5 grid min-h-[16px] min-w-[16px] place-items-center rounded-full bg-[#d95555] px-1 text-[10px] font-bold leading-none text-white">
+                  <span
+                      className="absolute right-0.5 top-0.5 grid min-h-[16px] min-w-[16px] place-items-center rounded-full bg-[#d95555] px-1 text-[10px] font-bold leading-none text-white">
                 {unreadCount}
               </span>
               )}
@@ -163,15 +235,18 @@ export default function AppHeader() {
 
             {/* 알림 메뉴 */}
             {showNotificationMenu && (
-                <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-[340px] max-w-[calc(100vw-24px)] overflow-hidden rounded-2xl border border-[#dce8e2] bg-white shadow-xl">
-                  <div className="flex items-center justify-between border-b border-[#edf2ef] px-4 py-4">
+                <div
+                    className="absolute right-0 top-[calc(100%+10px)] z-50 w-[340px] max-w-[calc(100vw-24px)] overflow-hidden rounded-2xl border border-[#dce8e2] bg-white shadow-xl">
+                  <div
+                      className="flex items-center justify-between border-b border-[#edf2ef] px-4 py-4">
                     <div className="flex items-center gap-2">
                       <p className="font-black">
                         알림
                       </p>
 
                       {unreadCount > 0 && (
-                          <span className="rounded-full bg-[#dff7ec] px-2 py-0.5 text-xs font-bold text-[#14956c]">
+                          <span
+                              className="rounded-full bg-[#dff7ec] px-2 py-0.5 text-xs font-bold text-[#14956c]">
                       {unreadCount}
                     </span>
                       )}
@@ -260,7 +335,8 @@ export default function AppHeader() {
                 }}
                 className="flex items-center gap-3 rounded-xl px-2 py-1.5 text-left transition hover:bg-[#f3fbf7]"
             >
-              <div className="grid h-10 w-10 place-items-center rounded-full bg-[#dff7ec] font-black text-[#005642]">
+              <div
+                  className="grid h-10 w-10 place-items-center rounded-full bg-[#dff7ec] font-black text-[#005642]">
                 {userInitial}
               </div>
 
@@ -271,7 +347,13 @@ export default function AppHeader() {
                 </p>
 
                 <p className="mt-0.5 text-xs text-[#78847f]">
-                  {workplaceRole === "MANAGER" ? "관리자" : "직원"} · {workplaceName}
+                  {workplaceStatus === "success"
+                      ? `${workplaceRoleLabel} · ${workplaceName}`
+                      : workplaceStatus === "loading"
+                          ? "근무지 확인 중"
+                          : workplaceStatus === "not-found"
+                              ? "소속 근무지 없음"
+                              : "근무지 조회 실패"}
                 </p>
               </div>
 
@@ -286,14 +368,21 @@ export default function AppHeader() {
 
             {/* 프로필 메뉴 */}
             {showProfileMenu && (
-                <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-52 overflow-hidden rounded-xl border border-[#dce8e2] bg-white shadow-lg">
+                <div
+                    className="absolute right-0 top-[calc(100%+8px)] z-50 w-52 overflow-hidden rounded-xl border border-[#dce8e2] bg-white shadow-lg">
                   <div className="border-b border-[#edf2ef] px-4 py-3">
                     <p className="min-h-5 truncate text-sm font-black">
                       {userName}
                     </p>
 
                     <p className="mt-0.5 text-xs text-[#78847f]">
-                      {workplaceRole === "MANAGER" ? "관리자" : "직원"} · {workplaceName}
+                      {workplaceStatus === "success"
+                          ? `${workplaceRoleLabel} · ${workplaceName}`
+                          : workplaceStatus === "loading"
+                              ? "근무지 확인 중"
+                              : workplaceStatus === "not-found"
+                                  ? "소속 근무지 없음"
+                                  : "근무지 조회 실패"}
                     </p>
                   </div>
 
