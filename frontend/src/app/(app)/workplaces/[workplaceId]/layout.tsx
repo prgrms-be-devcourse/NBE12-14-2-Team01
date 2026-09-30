@@ -9,6 +9,8 @@ import AppSidebar from "@/components/layout/AppSidebar";
 import { apiFetch } from "@/lib/api";
 import type { WorkplaceRole } from "@/lib/navigation";
 
+type RoleStatus = "loading" | "success" | "error" | "not-found";
+
 type Props = {
   children: ReactNode;
 };
@@ -23,29 +25,72 @@ export default function WorkplaceLayout({ children }: Props) {
   const params = useParams();
   const workplaceId = params.workplaceId as string;
 
-  const [role, setRole] = useState<WorkplaceRole | null>(null);
+  const [roleState, setRoleState] = useState<{
+    workplaceId: string;
+    role: WorkplaceRole | null;
+    status: RoleStatus;
+  }>({
+    workplaceId,
+    role: null,
+    status: "loading",
+  });
+
+  const isCurrentWorkplace = roleState.workplaceId === workplaceId;
+  const role = isCurrentWorkplace ? roleState.role : null;
+  const roleStatus = isCurrentWorkplace ? roleState.status : "loading";
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchRole = async () => {
       try {
-        const workplaces = await apiFetch<MyWorkplaceResponse[]>("/workplaces");
+        const workplaces =
+            await apiFetch<MyWorkplaceResponse[]>("/workplaces");
+
+        if (cancelled) return;
 
         const currentWorkplace = workplaces.find(
-            (workplace) => workplace.workplaceId === Number(workplaceId)
+            (workplace) =>
+                workplace.workplaceId === Number(workplaceId)
         );
 
-        setRole(currentWorkplace?.role ?? null);
+        if (!currentWorkplace) {
+          setRoleState({
+            workplaceId,
+            role: null,
+            status: "not-found",
+          });
+          return;
+        }
+
+        setRoleState({
+          workplaceId,
+          role: currentWorkplace.role,
+          status: "success",
+        });
       } catch (error) {
+        if (cancelled) return;
+
         console.error(error);
+
+        setRoleState({
+          workplaceId,
+          role: null,
+          status: "error",
+        });
       }
     };
 
-    fetchRole();
+    void fetchRole();
+
+    return () => {
+      cancelled = true;
+    };
   }, [workplaceId]);
 
   return (
       <div className="min-h-screen bg-[#f5faf7]">
-        {role && (
+        {roleStatus === "success" && role && (
             <AppSidebar
                 workplaceId={workplaceId}
                 role={role}

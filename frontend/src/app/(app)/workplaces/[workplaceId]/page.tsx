@@ -9,6 +9,7 @@ import InviteCodeBox from "@/components/ui/InviteCodeBox";
 import { apiFetch } from "@/lib/api";
 
 type MemberRole = "MANAGER" | "EMPLOYEE";
+type WorkplaceStatus = "loading" | "success" | "error" | "not-found";
 
 type MyWorkplaceResponse = {
   workplaceId: number;
@@ -30,6 +31,13 @@ type InviteCodeResponse = {
 export default function WorkplacePage() {
   const params = useParams();
   const workplaceId = params.workplaceId as string;
+  const [workplaceStatus, setWorkplaceStatus] = useState<WorkplaceStatus>("loading");
+  const [loadedWorkplaceId, setLoadedWorkplaceId] = useState<string | null>(null);
+
+  const currentWorkplaceStatus =
+      loadedWorkplaceId === workplaceId
+          ? workplaceStatus
+          : "loading";
 
   // 근무지 기본 정보
   const [workplaceName, setWorkplaceName] = useState("");
@@ -44,37 +52,78 @@ export default function WorkplacePage() {
 
   // 근무지 기본 정보와 구성원 조회
   useEffect(() => {
+    let cancelled = false;
+
     const fetchWorkplaceData = async () => {
       try {
-        const workplaceData = await apiFetch<MyWorkplaceResponse[]>("/workplaces");
+        const workplaceData =
+            await apiFetch<MyWorkplaceResponse[]>("/workplaces");
+
+        if (cancelled) return;
 
         const currentWorkplace = workplaceData.find(
-            (workplace) => workplace.workplaceId === Number(workplaceId)
+            (workplace) =>
+                workplace.workplaceId === Number(workplaceId)
         );
 
-        setWorkplaceName(currentWorkplace?.name ?? "");
-        setWorkplaceRole(currentWorkplace?.role ?? null);
+        if (!currentWorkplace) {
+          setWorkplaceName("");
+          setWorkplaceRole(null);
+          setMembers([]);
+          setInviteCode("");
+          setWorkplaceStatus("not-found");
+          setLoadedWorkplaceId(workplaceId);
+          return;
+        }
 
-        if (currentWorkplace?.role === "MANAGER") {
+        if (currentWorkplace.role === "MANAGER") {
           const [memberData, inviteData] = await Promise.all([
-            apiFetch<Member[]>(`/workplaces/${workplaceId}/members`),
-            apiFetch<InviteCodeResponse>(`/workplaces/${workplaceId}/invite-code`),
+            apiFetch<Member[]>(
+                `/workplaces/${workplaceId}/members`
+            ),
+            apiFetch<InviteCodeResponse>(
+                `/workplaces/${workplaceId}/invite-code`
+            ),
           ]);
+
+          if (cancelled) return;
 
           setMembers(memberData);
           setInviteCode(inviteData.inviteCode);
+        } else {
+          setMembers([]);
+          setInviteCode("");
         }
+
+        setWorkplaceName(currentWorkplace.name);
+        setWorkplaceRole(currentWorkplace.role);
+        setWorkplaceStatus("success");
+        setLoadedWorkplaceId(workplaceId);
       } catch (error) {
+        if (cancelled) return;
+
         console.error(error);
+        setWorkplaceName("");
+        setWorkplaceRole(null);
+        setMembers([]);
+        setInviteCode("");
+        setWorkplaceStatus("error");
+        setLoadedWorkplaceId(workplaceId);
       }
     };
 
-    fetchWorkplaceData();
+    void fetchWorkplaceData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [workplaceId]);
 
   // 관리자/직원에 따라 진행 중인 대체 근무 요청 개수 조회
   useEffect(() => {
-    if (!workplaceRole) return;
+    if (currentWorkplaceStatus !== "success" || !workplaceRole) return;
+
+    let cancelled = false;
 
     const fetchSubstituteCount = async () => {
       try {
@@ -82,26 +131,38 @@ export default function WorkplacePage() {
           const data = await apiFetch<unknown[]>(
               `/workplaces/${workplaceId}/substitute-requests/ongoing`
           );
-          setSubstituteCount(data.length);
+
+          if (!cancelled) {
+            setSubstituteCount(data.length);
+          }
         } else {
           const data = await apiFetch<{ workplaceId: number }[]>(
               "/substitute-requests/received"
           );
 
-          setSubstituteCount(
-              data.filter(
-                  (request) => request.workplaceId === Number(workplaceId)
-              ).length
-          );
+          if (!cancelled) {
+            setSubstituteCount(
+                data.filter(
+                    (request) =>
+                        request.workplaceId === Number(workplaceId)
+                ).length
+            );
+          }
         }
       } catch (error) {
+        if (cancelled) return;
+
         console.error(error);
         setSubstituteCount(0);
       }
     };
 
-    fetchSubstituteCount();
-  }, [workplaceId, workplaceRole]);
+    void fetchSubstituteCount();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [workplaceId, workplaceRole, currentWorkplaceStatus]);
 
   const managerCount = members.filter(
       (member) => member.role === "MANAGER"
@@ -112,6 +173,36 @@ export default function WorkplacePage() {
   ).length;
 
   const hasEmployees = employeeCount > 0;
+
+  if (currentWorkplaceStatus === "loading") {
+    return (
+        <Card>
+          <p className="text-sm text-[#78847f]">
+            근무지 정보를 확인하는 중입니다...
+          </p>
+        </Card>
+    );
+  }
+
+  if (currentWorkplaceStatus === "error") {
+    return (
+        <Card>
+          <p className="text-sm text-[#d95555]">
+            근무지 정보를 불러오지 못했습니다.
+          </p>
+        </Card>
+    );
+  }
+
+  if (currentWorkplaceStatus === "not-found") {
+    return (
+        <Card>
+          <p className="text-sm text-[#78847f]">
+            현재 참여 중인 근무지가 아닙니다.
+          </p>
+        </Card>
+    );
+  }
 
   return (
       <>

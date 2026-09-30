@@ -8,6 +8,19 @@ import { apiFetch } from "@/lib/api";
 
 type MemberRole = "MANAGER" | "EMPLOYEE";
 
+type MyWorkplaceResponse = {
+  workplaceId: number;
+  name: string;
+  role: MemberRole;
+};
+
+type AccessStatus =
+    "loading"
+    | "manager"
+    | "employee"
+    | "not-found"
+    | "error";
+
 type MemberResponse = {
   memberId: number;
   name: string;
@@ -35,6 +48,16 @@ export default function MembersPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [inviteCode, setInviteCode] = useState("");
 
+  const [accessStatus, setAccessStatus] =
+      useState<AccessStatus>("loading");
+  const [loadedWorkplaceId, setLoadedWorkplaceId] =
+      useState<string | null>(null);
+
+  const currentAccessStatus =
+      loadedWorkplaceId === workplaceId
+          ? accessStatus
+          : "loading";
+
   const [filter, setFilter] = useState<
       "ALL" | "MANAGER" | "EMPLOYEE"
   >("ALL");
@@ -46,8 +69,38 @@ export default function MembersPage() {
   const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchMembersData = async () => {
       try {
+        // 먼저 현재 근무지와 역할 확인
+        const workplaces =
+            await apiFetch<MyWorkplaceResponse[]>("/workplaces");
+
+        if (cancelled) return;
+
+        const currentWorkplace = workplaces.find(
+            (workplace) =>
+                workplace.workplaceId === Number(workplaceId)
+        );
+
+        if (!currentWorkplace) {
+          setMembers([]);
+          setInviteCode("");
+          setAccessStatus("not-found");
+          setLoadedWorkplaceId(workplaceId);
+          return;
+        }
+
+        if (currentWorkplace.role !== "MANAGER") {
+          setMembers([]);
+          setInviteCode("");
+          setAccessStatus("employee");
+          setLoadedWorkplaceId(workplaceId);
+          return;
+        }
+
+        // 관리자 확인 후에만 관리자 전용 API 호출
         const [memberData, inviteData] = await Promise.all([
           apiFetch<MemberResponse[]>(
               `/workplaces/${workplaceId}/members`
@@ -56,6 +109,8 @@ export default function MembersPage() {
               `/workplaces/${workplaceId}/invite-code`
           ),
         ]);
+
+        if (cancelled) return;
 
         setMembers(
             memberData.map((member) => ({
@@ -68,12 +123,24 @@ export default function MembersPage() {
         );
 
         setInviteCode(inviteData.inviteCode);
+        setAccessStatus("manager");
+        setLoadedWorkplaceId(workplaceId);
       } catch (error) {
+        if (cancelled) return;
+
         console.error(error);
+        setMembers([]);
+        setInviteCode("");
+        setAccessStatus("error");
+        setLoadedWorkplaceId(workplaceId);
       }
     };
 
-    fetchMembersData();
+    void fetchMembersData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [workplaceId]);
 
   const filteredMembers = members.filter((member) => {
@@ -144,6 +211,46 @@ export default function MembersPage() {
       setSuccessMessage("");
     }, 2500);
   };
+
+  if (currentAccessStatus === "loading") {
+    return (
+        <Card>
+          <p className="text-sm text-[#78847f]">
+            권한을 확인하는 중입니다...
+          </p>
+        </Card>
+    );
+  }
+
+  if (currentAccessStatus === "error") {
+    return (
+        <Card>
+          <p className="text-sm text-[#d95555]">
+            근무지 정보를 불러오지 못했습니다.
+          </p>
+        </Card>
+    );
+  }
+
+  if (currentAccessStatus === "not-found") {
+    return (
+        <Card>
+          <p className="text-sm text-[#78847f]">
+            현재 참여 중인 근무지가 아닙니다.
+          </p>
+        </Card>
+    );
+  }
+
+  if (currentAccessStatus === "employee") {
+    return (
+        <Card>
+          <p className="text-sm text-[#78847f]">
+            직원 목록은 관리자만 확인할 수 있습니다.
+          </p>
+        </Card>
+    );
+  }
 
   return (
       <>
