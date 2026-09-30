@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { apiFetch, ApiError } from "@/lib/api";
 import Card from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 
@@ -9,22 +10,27 @@ type UnavailableTime = {
   date: string;
   startTime: string;
   endTime: string;
+  officialShiftConflict: boolean;
 };
 
-const initialUnavailableTimes: UnavailableTime[] = [
-  {
-    id: 1,
-    date: "2026-09-18",
-    startTime: "09:00",
-    endTime: "18:00",
-  },
-  {
-    id: 2,
-    date: "2026-09-19",
-    startTime: "13:00",
-    endTime: "18:00",
-  },
-];
+type UnavailableTimeRegisterResponse = {
+  unavailableTimeId: number;
+  startAt: string;
+  endAt: string;
+};
+
+type UnavailableTimeListResponse = {
+  unavailableTimeId: number;
+  startAt: string;
+  endAt: string;
+  officialShiftConflict: boolean;
+};
+
+type UnavailableTimeUpdateResponse = {
+  unavailableTimeId: number;
+  startAt: string;
+  endAt: string;
+};
 
 const weekDays = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -35,15 +41,104 @@ function formatDate(date: string) {
 }
 
 export default function UnavailablePage() {
-  const [currentYear, setCurrentYear] = useState(2026);
-  const [currentMonth, setCurrentMonth] = useState(9);
+  const today = new Date();
+
+  const latestFetchIdRef = useRef(0);
+  const isMountedRef = useRef(true);
+  
+  const [currentYear, setCurrentYear] = useState(today.getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(today.getMonth() + 1);
   const [unavailableTimes, setUnavailableTimes] =
-      useState<UnavailableTime[]>(initialUnavailableTimes);
+    useState<UnavailableTime[]>([]);
+  const [editingUnavailableTimeId, setEditingUnavailableTimeId] =
+    useState<number | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [selectedDate, setSelectedDate] = useState("2026-09-18");
+  const [selectedDate, setSelectedDate] = useState(
+    `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(
+      today.getDate()
+    ).padStart(2, "0")}`
+  );
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("18:00");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [listError, setListError] = useState("");
+
+  const handleEdit = (unavailable: UnavailableTime) => {
+  setEditingUnavailableTimeId(unavailable.id);
+  setSelectedDate(unavailable.date);
+  setStartTime(unavailable.startTime);
+  setEndTime(unavailable.endTime);
+  setError("");
+
+  setShowModal(true);
+};
+
+const fetchUnavailableTimes = async () => {
+  // 이번 조회의 번호
+  const fetchId = ++latestFetchIdRef.current;
+
+  try {
+    const data = await apiFetch<UnavailableTimeListResponse[]>(
+      "/unavailable-times"
+    );
+
+    // 페이지를 이미 떠났거나,
+    // 이 조회보다 더 최신 조회가 시작됐다면 무시
+    if (
+      !isMountedRef.current ||
+      fetchId !== latestFetchIdRef.current
+    ) {
+      return;
+    }
+
+    console.log("불가능 일정 목록:", data);
+
+    const converted: UnavailableTime[] = data.map((item) => ({
+      id: item.unavailableTimeId,
+      date: item.startAt.split("T")[0],
+      startTime: item.startAt.split("T")[1].slice(0, 5),
+      endTime: item.endAt.split("T")[1].slice(0, 5),
+      officialShiftConflict: item.officialShiftConflict,
+    }));
+
+    setUnavailableTimes(converted);
+    setListError("");
+
+    return true;
+  } catch (error) {
+    // 오래된 요청의 에러도 무시
+    if (
+      !isMountedRef.current ||
+      fetchId !== latestFetchIdRef.current
+    ) {
+      return;
+    }
+
+    console.error("불가능 일정 조회 오류:", error);
+
+    setListError(
+      error instanceof ApiError
+        ? error.message
+        : "불가능 일정 목록을 불러오지 못했습니다."
+    );
+
+    return false;
+  }
+};
+
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    fetchUnavailableTimes();
+
+    return () => {
+      isMountedRef.current = false;
+
+      // 현재 진행 중인 조회도 오래된 요청으로 만들어서 무효화
+      latestFetchIdRef.current++;
+    };
+  }, []);
 
   const firstDay = new Date(
       currentYear,
@@ -76,11 +171,18 @@ export default function UnavailablePage() {
   };
 
   const openAddModal = (date?: string) => {
+    setEditingUnavailableTimeId(null);
+
     if (date) {
       setSelectedDate(date);
     } else {
+
+      const today = new Date();
+
       setSelectedDate(
-          `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`
+        `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(
+          today.getDate()
+        ).padStart(2, "0")}`
       );
     }
 
@@ -93,33 +195,148 @@ export default function UnavailablePage() {
   const closeModal = () => {
     setShowModal(false);
     setError("");
+    setEditingUnavailableTimeId(null);
   };
 
-  const handleAddUnavailable = () => {
+  const saveUnavailableTime = async (
+    confirmOfficialShiftConflict: boolean
+  ) => {
+    const startAt = `${selectedDate}T${startTime}:00`;
+    const endAt = `${selectedDate}T${endTime}:00`;
+
+    // 수정
+    if (editingUnavailableTimeId !== null) {
+      return apiFetch<UnavailableTimeUpdateResponse>(
+        `/unavailable-times/${editingUnavailableTimeId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            startAt,
+            endAt,
+            confirmOfficialShiftConflict,
+          }),
+        }
+      );
+    }
+
+    // 등록
+    return apiFetch<UnavailableTimeRegisterResponse>(
+      "/unavailable-times",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          startAt,
+          endAt,
+          confirmOfficialShiftConflict,
+        }),
+      }
+    );
+  };
+
+const handleAddUnavailable = async () => {
+    if (isSubmitting) return;
+  
     if (startTime >= endTime) {
       setError("종료 시간은 시작 시간보다 늦어야 합니다.");
       return;
     }
 
-    const newUnavailable: UnavailableTime = {
-      id: Date.now(),
-      date: selectedDate,
-      startTime,
-      endTime,
-    };
+    try {
 
-    setUnavailableTimes((prev) => [
-      ...prev,
-      newUnavailable,
-    ]);
+      setIsSubmitting(true);
 
-    closeModal();
+      let result;
+
+      try {
+        // 일단 충돌 확인 없이 최초 요청
+        result = await saveUnavailableTime(false);
+      } catch (error) {
+        // 확정 근무와 겹치는 경우
+        if (
+          error instanceof ApiError &&
+          error.code === "OFFICIAL_SHIFT_CONFLICT"
+        ) {
+          const confirmed = window.confirm(
+            "이미 확정된 근무와 겹치는 시간입니다.\n그래도 저장하시겠습니까?"
+          );
+
+          // 사용자가 취소
+          if (!confirmed) {
+            return;
+          }
+
+          // 사용자가 확인 → true로 다시 요청
+          result = await saveUnavailableTime(true);
+        } else {
+          // 다른 에러면 바깥 catch로 넘김
+          throw error;
+        }
+      }
+
+      console.log(
+        editingUnavailableTimeId !== null
+          ? "불가능 일정 수정 성공:"
+          : "불가능 일정 등록 성공:",
+        result
+      );
+
+      const refreshed = await fetchUnavailableTimes();
+
+      if (refreshed === false) {
+        setListError("저장은 완료됐지만 목록 갱신에 실패했습니다.");
+      }
+
+      closeModal();
+    } catch (error) {
+      console.error("불가능 일정 처리 오류:", error);
+
+      if (error instanceof ApiError) {
+        setError(error.message);
+      } else {
+        setError("불가능 일정 처리 중 오류가 발생했습니다.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleDelete = (id: number) => {
-    setUnavailableTimes((prev) =>
+  const handleDelete = async (id: number) => {
+    if (isSubmitting) return;
+
+    const confirmed = window.confirm("이 불가능 일정을 삭제하시겠습니까?");
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      await apiFetch(`/unavailable-times/${id}`, {
+        method: "DELETE",
+      });
+
+      console.log("불가능 일정 삭제 성공:", id);
+
+      setUnavailableTimes((prev) =>
         prev.filter((item) => item.id !== id)
-    );
+      );
+
+      // 혹시 삭제한 항목을 수정 중이었다면 수정 모드 초기화
+      if (editingUnavailableTimeId === id) {
+        closeModal();
+      }
+    } catch (error) {
+      console.error("불가능 일정 삭제 오류:", error);
+
+      if (error instanceof ApiError) {
+        alert(error.message);
+      } else {
+        alert("불가능 일정 삭제 중 오류가 발생했습니다.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handlePrevMonth = () => {
@@ -151,6 +368,7 @@ export default function UnavailablePage() {
           <button
               type="button"
               onClick={() => openAddModal()}
+              disabled={isSubmitting}
               className="rounded-xl bg-[#005642] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#0b6b52]"
           >
             + 불가능 일정 추가
@@ -207,6 +425,7 @@ export default function UnavailablePage() {
                       key={date}
                       type="button"
                       onClick={() => openAddModal(date)}
+                      disabled={isSubmitting}
                       className="flex min-h-[110px] items-center justify-center p-2"
                   >
                     <div
@@ -247,7 +466,8 @@ export default function UnavailablePage() {
           </div>
 
           <div className="mt-5 space-y-3">
-            {unavailableTimes.map((item) => (
+            {!listError &&
+              unavailableTimes.map((item) => (
                 <div
                     key={item.id}
                     className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#dce8e2] p-4"
@@ -260,23 +480,55 @@ export default function UnavailablePage() {
                     <p className="mt-1 text-sm text-[#78847f]">
                       {item.startTime} ~ {item.endTime}
                     </p>
+
+                    {item.officialShiftConflict && (
+                      <p className="mt-1 text-sm font-semibold text-[#d95555]">
+                        확정된 근무와 겹치는 일정입니다.
+                      </p>
+                    )}
                   </div>
 
-                  <button
-                      type="button"
-                      onClick={() => handleDelete(item.id)}
-                      className="rounded-lg border border-[#f1cccc] px-3 py-2 text-sm font-bold text-[#d95555] transition hover:bg-[#fff5f5]"
-                  >
-                    삭제
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                        type="button"
+                        onClick={() => handleEdit(item)}
+                        disabled={isSubmitting}
+                        className="rounded-lg border border-[#dce8e2] px-3 py-2 text-sm font-bold text-[#66736d] transition hover:bg-[#f3fbf7]"
+                    >
+                      수정
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => handleDelete(item.id)}
+                        disabled={isSubmitting}
+                        className="rounded-lg border border-[#f1cccc] px-3 py-2 text-sm font-bold text-[#d95555] transition hover:bg-[#fff5f5]"
+                    >
+                      삭제
+                    </button>
+                  </div>
                 </div>
             ))}
 
-            {unavailableTimes.length === 0 && (
-                <div className="flex min-h-[150px] items-center justify-center rounded-xl border border-dashed border-[#dce8e2] text-sm text-[#78847f]">
-                  등록된 불가능 일정이 없습니다.
-                </div>
-            )}
+            {listError ? (
+              <div className="flex min-h-[150px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[#dce8e2]">
+                <p className="text-sm font-semibold text-[#d95555]">
+                  {listError}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => fetchUnavailableTimes()}
+                  className="rounded-lg border border-[#dce8e2] px-3 py-2 text-sm font-bold text-[#66736d] transition hover:bg-[#f3fbf7]"
+                >
+                  다시 불러오기
+                </button>
+              </div>
+            ) : unavailableTimes.length === 0 ? (
+              <div className="flex min-h-[150px] items-center justify-center rounded-xl border border-dashed border-[#dce8e2] text-sm text-[#78847f]">
+                등록된 불가능 일정이 없습니다.
+              </div>
+            ) : null}
           </div>
         </Card>
 
@@ -287,7 +539,9 @@ export default function UnavailablePage() {
                 <div className="flex items-start justify-between">
                   <div>
                     <h2 className="text-xl font-black">
-                      불가능 일정 추가
+                      {editingUnavailableTimeId !== null
+                        ? "불가능 일정 수정"
+                        : "불가능 일정 추가"}
                     </h2>
 
                     <p className="mt-1 text-sm text-[#78847f]">
@@ -298,6 +552,7 @@ export default function UnavailablePage() {
                   <button
                       type="button"
                       onClick={closeModal}
+                      disabled={isSubmitting}
                       className="text-xl text-[#78847f] hover:text-black"
                   >
                     ×
@@ -314,6 +569,7 @@ export default function UnavailablePage() {
                         type="date"
                         value={selectedDate}
                         onChange={(e) => setSelectedDate(e.target.value)}
+                        disabled={isSubmitting}
                         className="w-full rounded-xl border border-[#dce8e2] px-4 py-3 outline-none focus:border-[#14956c]"
                     />
                   </div>
@@ -328,6 +584,7 @@ export default function UnavailablePage() {
                           type="time"
                           value={startTime}
                           onChange={(e) => setStartTime(e.target.value)}
+                          disabled={isSubmitting}
                           className="rounded-xl border border-[#dce8e2] px-4 py-3 outline-none focus:border-[#14956c]"
                       />
 
@@ -339,6 +596,7 @@ export default function UnavailablePage() {
                           type="time"
                           value={endTime}
                           onChange={(e) => setEndTime(e.target.value)}
+                          disabled={isSubmitting}
                           className="rounded-xl border border-[#dce8e2] px-4 py-3 outline-none focus:border-[#14956c]"
                       />
                     </div>
@@ -355,6 +613,7 @@ export default function UnavailablePage() {
                   <button
                       type="button"
                       onClick={closeModal}
+                      disabled={isSubmitting}
                       className="flex-1 rounded-xl border border-[#dce8e2] px-4 py-3 text-sm font-bold text-[#66736d] transition hover:bg-[#f3fbf7]"
                   >
                     취소
@@ -363,9 +622,14 @@ export default function UnavailablePage() {
                   <button
                       type="button"
                       onClick={handleAddUnavailable}
+                      disabled={isSubmitting}
                       className="flex-1 rounded-xl bg-[#005642] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#0b6b52]"
                   >
-                    등록하기
+                    {isSubmitting
+                      ? "처리 중..."
+                      : editingUnavailableTimeId !== null
+                        ? "수정하기"
+                        : "등록하기"}
                   </button>
                 </div>
               </div>
