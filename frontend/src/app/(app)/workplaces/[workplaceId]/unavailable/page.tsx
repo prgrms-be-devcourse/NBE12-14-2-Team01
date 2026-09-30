@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiFetch, ApiError } from "@/lib/api";
 import Card from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
@@ -42,6 +42,9 @@ function formatDate(date: string) {
 
 export default function UnavailablePage() {
   const today = new Date();
+
+  const latestFetchIdRef = useRef(0);
+  const isMountedRef = useRef(true);
   
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth() + 1);
@@ -59,6 +62,7 @@ export default function UnavailablePage() {
   const [endTime, setEndTime] = useState("18:00");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [listError, setListError] = useState("");
 
   const handleEdit = (unavailable: UnavailableTime) => {
   setEditingUnavailableTimeId(unavailable.id);
@@ -70,13 +74,23 @@ export default function UnavailablePage() {
   setShowModal(true);
 };
 
-const fetchUnavailableTimes = async (
-  shouldIgnore: () => boolean = () => false
-) => {
+const fetchUnavailableTimes = async () => {
+  // 이번 조회의 번호
+  const fetchId = ++latestFetchIdRef.current;
+
   try {
     const data = await apiFetch<UnavailableTimeListResponse[]>(
       "/unavailable-times"
     );
+
+    // 페이지를 이미 떠났거나,
+    // 이 조회보다 더 최신 조회가 시작됐다면 무시
+    if (
+      !isMountedRef.current ||
+      fetchId !== latestFetchIdRef.current
+    ) {
+      return;
+    }
 
     console.log("불가능 일정 목록:", data);
 
@@ -88,30 +102,41 @@ const fetchUnavailableTimes = async (
       officialShiftConflict: item.officialShiftConflict,
     }));
 
-    if (shouldIgnore()) return;
-
     setUnavailableTimes(converted);
-  } catch (error) {
+    setListError("");
 
-    if (shouldIgnore()) return;
-    
+    return true;
+  } catch (error) {
+    // 오래된 요청의 에러도 무시
+    if (
+      !isMountedRef.current ||
+      fetchId !== latestFetchIdRef.current
+    ) {
+      return;
+    }
+
     console.error("불가능 일정 조회 오류:", error);
 
-    if (error instanceof ApiError) {
-      alert(error.message);
-    } else {
-      alert("불가능 일정 조회 중 오류가 발생했습니다.");
-    }
+    setListError(
+      error instanceof ApiError
+        ? error.message
+        : "불가능 일정 목록을 불러오지 못했습니다."
+    );
+
+    return false;
   }
 };
 
   useEffect(() => {
-    let ignore = false;
+    isMountedRef.current = true;
 
-    fetchUnavailableTimes(() => ignore);
+    fetchUnavailableTimes();
 
     return () => {
-      ignore = true;
+      isMountedRef.current = false;
+
+      // 현재 진행 중인 조회도 오래된 요청으로 만들어서 무효화
+      latestFetchIdRef.current++;
     };
   }, []);
 
@@ -151,8 +176,13 @@ const fetchUnavailableTimes = async (
     if (date) {
       setSelectedDate(date);
     } else {
+
+      const today = new Date();
+
       setSelectedDate(
-          `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`
+        `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(
+          today.getDate()
+        ).padStart(2, "0")}`
       );
     }
 
@@ -250,7 +280,11 @@ const handleAddUnavailable = async () => {
         result
       );
 
-      await fetchUnavailableTimes();
+      const refreshed = await fetchUnavailableTimes();
+
+      if (refreshed === false) {
+        setListError("저장은 완료됐지만 목록 갱신에 실패했습니다.");
+      }
 
       closeModal();
     } catch (error) {
@@ -334,6 +368,7 @@ const handleAddUnavailable = async () => {
           <button
               type="button"
               onClick={() => openAddModal()}
+              disabled={isSubmitting}
               className="rounded-xl bg-[#005642] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#0b6b52]"
           >
             + 불가능 일정 추가
@@ -390,6 +425,7 @@ const handleAddUnavailable = async () => {
                       key={date}
                       type="button"
                       onClick={() => openAddModal(date)}
+                      disabled={isSubmitting}
                       className="flex min-h-[110px] items-center justify-center p-2"
                   >
                     <div
@@ -430,7 +466,8 @@ const handleAddUnavailable = async () => {
           </div>
 
           <div className="mt-5 space-y-3">
-            {unavailableTimes.map((item) => (
+            {!listError &&
+              unavailableTimes.map((item) => (
                 <div
                     key={item.id}
                     className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#dce8e2] p-4"
@@ -473,11 +510,25 @@ const handleAddUnavailable = async () => {
                 </div>
             ))}
 
-            {unavailableTimes.length === 0 && (
-                <div className="flex min-h-[150px] items-center justify-center rounded-xl border border-dashed border-[#dce8e2] text-sm text-[#78847f]">
-                  등록된 불가능 일정이 없습니다.
-                </div>
-            )}
+            {listError ? (
+              <div className="flex min-h-[150px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[#dce8e2]">
+                <p className="text-sm font-semibold text-[#d95555]">
+                  {listError}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => fetchUnavailableTimes()}
+                  className="rounded-lg border border-[#dce8e2] px-3 py-2 text-sm font-bold text-[#66736d] transition hover:bg-[#f3fbf7]"
+                >
+                  다시 불러오기
+                </button>
+              </div>
+            ) : unavailableTimes.length === 0 ? (
+              <div className="flex min-h-[150px] items-center justify-center rounded-xl border border-dashed border-[#dce8e2] text-sm text-[#78847f]">
+                등록된 불가능 일정이 없습니다.
+              </div>
+            ) : null}
           </div>
         </Card>
 
