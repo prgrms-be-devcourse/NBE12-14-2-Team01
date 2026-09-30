@@ -19,3 +19,12 @@ custom:
     secret-key: ${JWT_SECRET_KEY:temp-dev-secret-key-change-before-deploy}
     expireMills: "#{1000L * 60 * 10}"
     refresh-expire-mills: "#{1000L * 60 * 60 * 24 * 14}"
+  #refreshToken 쿠키 설정, 기본값은 로컬용이고 배포 때 환경변수로 덮어씀
+  #도메인은 비워두면 응답한 주소 기준으로 저장됨 (로컬·배포 둘 다 비워두면 됨)
+  cookie:
+    domain: ${COOKIE_DOMAIN:}
+    secure: ${COOKIE_SECURE:false}
+    same-site: ${COOKIE_SAME_SITE:}
+  #프론트 주소, 여러 개면 쉼표로 구분(공백 없이), 배포 때 환경변수로 덮어씀
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
