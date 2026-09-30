@@ -270,13 +270,13 @@ export default function WorkplacePage() {
           <Link href={
             workplaceRole === "MANAGER"
                 ? `/workplaces/${workplaceId}/substitutes/admin`
-                : `/workplaces/${workplaceId}/substitutes/request`
-          } className="block">
+                : `/workplaces/${workplaceId}/substitutes/received`
+          }>
             <Card className="h-full cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md">
               <p className="text-sm font-semibold text-[#78847f]">
                 {workplaceRole === "MANAGER"
                     ? "진행 중 대체 근무"
-                    : "대체 근무 요청"}
+                    : "받은 대체근무 요청"}
               </p>
 
               <p className="mt-2 text-3xl font-black text-[#005642]">
