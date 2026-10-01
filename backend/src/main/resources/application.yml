@@ -31,4 +31,4 @@ custom:
 
 app:
   init:
-    default-password: ${APP_INIT_DEFAULT_PASSWORD}
+    default-password: ${APP_INIT_DEFAULT_PASSWORD:1234}
