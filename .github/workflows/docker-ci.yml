@@ -25,12 +25,15 @@ jobs:
           distribution: 'temurin'
 
       - name: Grant execute permission for gradlew
+        working-directory: ./backend
         run: chmod +x gradlew
 
       - name: Build with Gradle
+        working-directory: ./backend
         run: ./gradlew bootJar
 
       # 3. Dockerfile을 이용해 실제 Docker 이미지 빌드 검증
       - name: Build Docker Image
+        working-directory: ./backend
         run: |
           docker build -t merge-backend-test .
