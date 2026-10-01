@@ -1,0 +1,3 @@
+app:
+  init:
+    default-password: ${APP_INIT_DEFAULT_PASSWORD}
