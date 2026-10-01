@@ -20,19 +20,19 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Configuration
+@Profile("init-data")
 @RequiredArgsConstructor
 public class InitData {
 
     private final InitDataService initDataService;
 
     @Bean
-    // 필요 시 'init-data' 프로필을 켜서 초기화
-    @Profile({"dev", "local", "init-data"})
     public CommandLineRunner initDummyData() {
         return args -> initDataService.init();
     }
     // 트랜잭션 적용을 위해 내부 서비스 클래스로 분리
     @Component
+    @Profile("init-data")
     @RequiredArgsConstructor
     public static class InitDataService {
 
