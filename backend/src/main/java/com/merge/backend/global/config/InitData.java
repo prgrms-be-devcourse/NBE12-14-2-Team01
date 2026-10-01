@@ -10,6 +10,7 @@ import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
 import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -40,6 +41,9 @@ public class InitData {
         private final WorkplaceMemberRepository workplaceMemberRepository;
         private final PasswordEncoder passwordEncoder;
 
+        @Value("${app.init.default-password}")
+        private String rawDefaultPassword;
+
         @Transactional
         public void init() {
             // 이미 데이터가 존재하는지 확인하여 중복 생성 방지
@@ -49,7 +53,9 @@ public class InitData {
             }
 
             LocalDateTime now = LocalDateTime.now();
-            String defaultPassword = passwordEncoder.encode("1234");
+
+            // 환경변수에서 읽어온 비밀번호를 암호화
+            String defaultPassword = passwordEncoder.encode(rawDefaultPassword);
 
             // User 생성 (매니저 1명, 직원 2명)
             User managerUser = userRepository.save(
