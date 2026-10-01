@@ -177,6 +177,14 @@ Access Token을 이용해 API 요청을 인증하며,
 
 ---
 
+## 🔄 CI/CD 및 배포 구조
+
+<p align="center">
+  <img src="docs/images/deploymentPipeline.png" width="1000" alt="SWITCH CI/CD Deployment Architecture" />
+</p>
+
+---
+
 ## 🚀 실행 방법
 
 ### Backend
