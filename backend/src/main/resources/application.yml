@@ -9,6 +9,10 @@ spring:
     ansi:
       enabled: always
 
+  datasource:
+    hikari:
+      transaction-isolation: TRANSACTION_READ_COMMITTED
+
 server:
   servlet:
     context-path: /api/v1

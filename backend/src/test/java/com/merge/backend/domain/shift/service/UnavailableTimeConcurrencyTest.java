@@ -20,6 +20,7 @@ import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
 import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
+import com.merge.backend.global.config.TestTimeConfig;
 import com.merge.backend.global.exception.BusinessException;
 import com.merge.backend.global.rq.Rq;
 import java.time.LocalDate;
@@ -34,6 +35,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -41,6 +43,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
 @ActiveProfiles("test")
+@Import(TestTimeConfig.class) //테스트의 "현재 시간"을 09-15로 고정
 class UnavailableTimeConcurrencyTest {
 
     @Autowired
