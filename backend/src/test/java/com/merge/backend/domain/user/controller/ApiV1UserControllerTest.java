@@ -1,11 +1,13 @@
 package com.merge.backend.domain.user.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.jayway.jsonpath.JsonPath;
 import com.merge.backend.domain.user.entity.User;
 import com.merge.backend.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -68,5 +70,27 @@ class ApiV1UserControllerTest {
         String refreshToken = result.getResponse().getCookie("refreshToken").getValue();
         User user = userRepository.findByEmail(EMAIL).orElseThrow();
         assertThat(user.getRefreshToken()).isEqualTo(refreshToken);
+    }
+
+    @Test
+    @DisplayName("로그인에서 받은 accessToken으로 내 정보를 조회하면 200과 내 정보를 반환한다")
+    void test2() throws Exception {
+        MvcResult loginResult = mvc.perform(post("/api/v1/auth/login").contextPath("/api/v1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"email": "%s", "password": "%s"}
+                    """.formatted(EMAIL, PASSWORD)))
+            .andExpect(status().isOk())
+            .andReturn();
+        String accessToken = JsonPath.read(
+            loginResult.getResponse().getContentAsString(), "$.data.accessToken");
+        Long userId = userRepository.findByEmail(EMAIL).orElseThrow().getId();
+
+        mvc.perform(get("/api/v1/auth/me").contextPath("/api/v1")
+                .header("Authorization", "Bearer " + accessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(userId))
+            .andExpect(jsonPath("$.data.email").value(EMAIL))
+            .andExpect(jsonPath("$.data.name").value("유저1"));
     }
 }
