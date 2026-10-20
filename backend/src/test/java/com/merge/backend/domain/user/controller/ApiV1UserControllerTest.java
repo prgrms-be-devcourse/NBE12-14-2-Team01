@@ -1,0 +1,72 @@
+package com.merge.backend.domain.user.controller;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.merge.backend.domain.user.entity.User;
+import com.merge.backend.domain.user.repository.UserRepository;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+@SpringBootTest
+@ActiveProfiles("test")
+@AutoConfigureMockMvc
+class ApiV1UserControllerTest {
+
+    private static final String EMAIL = "user1@test.com";
+    private static final String PASSWORD = "password1";
+
+    @Autowired
+    private MockMvc mvc;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    // 테스트마다 가입된 유저 한 명으로 시작
+    @BeforeEach
+    void setUp() throws Exception {
+        mvc.perform(post("/api/v1/auth/signup").contextPath("/api/v1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"email": "%s", "password": "%s", "name": "유저1"}
+                    """.formatted(EMAIL, PASSWORD)))
+            .andExpect(status().isCreated());
+    }
+
+    // 실제 DB에 남으니까 테스트마다 지움
+    @AfterEach
+    void tearDown() {
+        userRepository.findByEmail(EMAIL).ifPresent(userRepository::delete);
+    }
+
+    @Test
+    @DisplayName("로그인하면 accessToken을 주고 refreshToken을 HttpOnly 쿠키와 DB에 저장한다")
+    void test1() throws Exception {
+        MvcResult result = mvc.perform(post("/api/v1/auth/login").contextPath("/api/v1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"email": "%s", "password": "%s"}
+                    """.formatted(EMAIL, PASSWORD)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.user.email").value(EMAIL))
+            .andExpect(jsonPath("$.data.accessToken").isNotEmpty())
+            .andExpect(cookie().httpOnly("refreshToken", true))
+            .andReturn();
+
+        String refreshToken = result.getResponse().getCookie("refreshToken").getValue();
+        User user = userRepository.findByEmail(EMAIL).orElseThrow();
+        assertThat(user.getRefreshToken()).isEqualTo(refreshToken);
+    }
+}
