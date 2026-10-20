@@ -28,4 +28,13 @@ class CustomAuthenticationFilterTest {
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.code").value("AUTH-004"));
     }
+
+    @Test
+    @DisplayName("Authorization 헤더가 Bearer로 시작하지 않으면 401과 AUTH-005를 반환한다")
+    void test2() throws Exception {
+        mvc.perform(get("/api/v1/auth/me").contextPath("/api/v1")
+                .header("Authorization", "Basic abc123"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("AUTH-005"));
+    }
 }
