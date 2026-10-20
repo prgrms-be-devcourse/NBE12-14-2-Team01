@@ -16,7 +16,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
         from Notification n
         join fetch n.recipientMember rm
         join fetch rm.workplace w
-        where rm.user.id = :userId
+        where rm.user.id = :userId and rm.leftAt is null
         order by n.createDate desc, n.id desc
         """)
     List<Notification> findAllByUserId(

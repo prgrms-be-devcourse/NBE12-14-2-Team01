@@ -299,19 +299,20 @@ public class NotificationService {
         Long actorUserId,
         Long notificationId
     ) {
-        Notification notification = notificationRepository.findByIdForUpdate(notificationId)
-            .orElseThrow(() ->
-                new BusinessException(
-                    NotificationErrorCode.NOT_FOUND_NOTIFICATION
-                )
-            );
+        Notification notification = notificationRepository
+            .findByIdForUpdate(notificationId)
+                .orElseThrow(() ->
+                    new BusinessException(
+                        NotificationErrorCode.NOT_FOUND_NOTIFICATION
+                    )
+                );
 
-        Long recipientUserId = notification
-            .getRecipientMember()
-            .getUser()
-            .getId();
+        WorkplaceMember recipientMember = notification.getRecipientMember();
 
-        if (!recipientUserId.equals(actorUserId)) {
+        Long recipientUserId = recipientMember.getUser().getId();
+
+        if (!recipientUserId.equals(actorUserId)
+            || recipientMember.getLeftAt() != null) {
             throw new BusinessException(
                 NotificationErrorCode.FORBIDDEN_ACCESS
             );

@@ -46,6 +46,8 @@ type MyShift = {
   dayNumber: string;
   startTime: string;
   endTime: string;
+  startAt: string;
+  endAt: string;
   status: "SCHEDULED";
 };
 
@@ -116,8 +118,35 @@ function parseShiftDto(dto: ShiftItemDto): MyShift {
     dayNumber: dayNum,
     startTime: formatKstTime(startDate),
     endTime: formatKstTime(endDate),
+    startAt: dto.startAt,
+    endAt: dto.endAt,
     status: dto.status,
   };
+}
+
+type ShiftDisplayStatus = "예정" | "근무 중" | "완료";
+
+function getShiftDisplayStatus(
+    startAt: string,
+    endAt: string
+): ShiftDisplayStatus {
+  const now = new Date();
+  const start = parseAsKst(startAt);
+  const end = parseAsKst(endAt);
+
+  if (!start || !end) {
+    return "예정";
+  }
+
+  if (now < start) {
+    return "예정";
+  }
+
+  if (now < end) {
+    return "근무 중";
+  }
+
+  return "완료";
 }
 
 // 근무 시간 계산 (자정 넘어가는 밤샘 근무 예외 처리 보장)
@@ -402,14 +431,14 @@ export default function MyShiftsPage() {
                       </div>
 
                       <span className="shrink-0 rounded-full bg-[#dff7ec] px-3 py-1 text-xs font-bold text-[#14956c]">
-                  예정
-                </span>
+                        {getShiftDisplayStatus(shift.startAt, shift.endAt)}
+                      </span>
                     </div>
                 ))}
               </div>
           ) : (
               <div className="flex min-h-[180px] items-center justify-center rounded-xl border border-dashed border-[#dce8e2] text-sm text-[#78847f]">
-                이번 주 예정된 근무가 없습니다.
+                이번 주 근무가 없습니다.
               </div>
           )}
         </Card>
@@ -419,7 +448,7 @@ export default function MyShiftsPage() {
             <h2 className="text-lg font-black">이번 주 요약</h2>
 
             <p className="mt-1 text-sm text-[#78847f]">
-              예정된 근무를 간단히 확인하세요.
+              이번 주 근무를 간단히 확인하세요.
             </p>
           </div>
 
@@ -433,7 +462,7 @@ export default function MyShiftsPage() {
             </div>
 
             <div className="rounded-xl bg-[#f3fbf7] p-4">
-              <p className="text-sm text-[#78847f]">예정 시간</p>
+              <p className="text-sm text-[#78847f]">이번 주 근무 시간</p>
 
               <p className="mt-1 text-2xl font-black text-[#005642]">
                 {isLoading || error ? "-" : `${totalHours}시간`}
@@ -523,8 +552,11 @@ export default function MyShiftsPage() {
                         <div className="flex justify-between">
                           <span className="text-[#78847f]">상태</span>
                           <span className="rounded-full bg-[#dff7ec] px-2.5 py-0.5 text-xs font-bold text-[#14956c]">
-                      {selectedShiftDetail.status}
-                    </span>
+                            {getShiftDisplayStatus(
+                                selectedShiftDetail.startAt,
+                                selectedShiftDetail.endAt
+                            )}
+                          </span>
                         </div>
 
                         <div className="flex justify-between">
