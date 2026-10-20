@@ -37,4 +37,13 @@ class CustomAuthenticationFilterTest {
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.code").value("AUTH-005"));
     }
+
+    @Test
+    @DisplayName("Bearer 뒤의 토큰이 유효하지 않으면 401과 AUTH-006을 반환한다")
+    void test3() throws Exception {
+        mvc.perform(get("/api/v1/auth/me").contextPath("/api/v1")
+                .header("Authorization", "Bearer invalid-token"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("AUTH-006"));
+    }
 }
