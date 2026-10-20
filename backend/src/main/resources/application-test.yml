@@ -1,9 +1,6 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:db_test;MODE=MySQL
-    username: sa
-    password:
-    driver-class-name: org.h2.Driver
+    url: jdbc:tc:mysql:9.7.2:///db_test?TC_DAEMON=true
 
   jpa:
     hibernate:
