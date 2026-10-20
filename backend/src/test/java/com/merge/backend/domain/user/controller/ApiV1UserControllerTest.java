@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import com.merge.backend.domain.user.entity.User;
 import com.merge.backend.domain.user.repository.UserRepository;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -92,5 +93,31 @@ class ApiV1UserControllerTest {
             .andExpect(jsonPath("$.data.id").value(userId))
             .andExpect(jsonPath("$.data.email").value(EMAIL))
             .andExpect(jsonPath("$.data.name").value("유저1"));
+    }
+
+    @Test
+    @DisplayName("로그인에서 받은 refreshToken 쿠키로 재발급하면 200과 쓸 수 있는 새 accessToken을 반환한다")
+    void test3() throws Exception {
+        MvcResult loginResult = mvc.perform(post("/api/v1/auth/login").contextPath("/api/v1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"email": "%s", "password": "%s"}
+                    """.formatted(EMAIL, PASSWORD)))
+            .andExpect(status().isOk())
+            .andReturn();
+        Cookie refreshCookie = loginResult.getResponse().getCookie("refreshToken");
+
+        MvcResult refreshResult = mvc.perform(post("/api/v1/auth/refresh").contextPath("/api/v1")
+                .cookie(refreshCookie))
+            .andExpect(status().isOk())
+            .andReturn();
+        String newAccessToken = JsonPath.read(
+            refreshResult.getResponse().getContentAsString(), "$.data.accessToken");
+
+        // 새 accessToken으로 실제 API를 쓸 수 있는지
+        mvc.perform(get("/api/v1/auth/me").contextPath("/api/v1")
+                .header("Authorization", "Bearer " + newAccessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.email").value(EMAIL));
     }
 }
