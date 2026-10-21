@@ -10,7 +10,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import com.merge.backend.domain.user.entity.User;
 import com.merge.backend.domain.user.repository.UserRepository;
+import com.merge.backend.standard.Ut;
 import jakarta.servlet.http.Cookie;
+import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -156,5 +158,22 @@ class ApiV1UserControllerTest {
                 .cookie(new Cookie("refreshToken", accessToken)))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.code").value("AUTH-003"));
+    }
+
+    @Test
+    @DisplayName("내용은 맞지만 다른 비밀키로 서명한 토큰으로 요청하면 401과 AUTH-006을 반환한다")
+    void test6() throws Exception {
+        User user = userRepository.findByEmail(EMAIL).orElseThrow();
+        // 진짜 유저 정보로 만들되 서버가 모르는 키로 서명 (위조 토큰)
+        String forgedToken = Ut.jwt.toString(
+            "attacker-secret-key-attacker-secret-key-1234",
+            1000L * 60 * 10,
+            Map.of("id", user.getId(), "email", user.getEmail(), "name", user.getName())
+        );
+
+        mvc.perform(get("/api/v1/auth/me").contextPath("/api/v1")
+                .header("Authorization", "Bearer " + forgedToken))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("AUTH-006"));
     }
 }
