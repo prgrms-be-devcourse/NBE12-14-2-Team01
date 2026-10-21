@@ -138,4 +138,23 @@ class ApiV1UserControllerTest {
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.code").value("AUTH-006"));
     }
+
+    @Test
+    @DisplayName("accessToken을 refreshToken 쿠키 자리에 넣어 재발급하면 401과 AUTH-003을 반환한다")
+    void test5() throws Exception {
+        MvcResult loginResult = mvc.perform(post("/api/v1/auth/login").contextPath("/api/v1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"email": "%s", "password": "%s"}
+                    """.formatted(EMAIL, PASSWORD)))
+            .andExpect(status().isOk())
+            .andReturn();
+        String accessToken = JsonPath.read(
+            loginResult.getResponse().getContentAsString(), "$.data.accessToken");
+
+        mvc.perform(post("/api/v1/auth/refresh").contextPath("/api/v1")
+                .cookie(new Cookie("refreshToken", accessToken)))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("AUTH-003"));
+    }
 }
