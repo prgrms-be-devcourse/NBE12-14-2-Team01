@@ -341,8 +341,28 @@ public class WorkplaceServiceTest {
         verify(workplaceRepository)
             .save(any(Workplace.class));
 
-        verify(workplaceMemberRepository)
-            .save(any(WorkplaceMember.class));
+        ArgumentCaptor<String> codeCaptor =
+            ArgumentCaptor.forClass(String.class);
+
+        verify(workplaceRepository, times(2))
+            .existsByInviteCode(codeCaptor.capture());
+
+        List<String> checkedCodes = codeCaptor.getAllValues();
+
+        ArgumentCaptor<Workplace> workplaceCaptor =
+            ArgumentCaptor.forClass(Workplace.class);
+
+        verify(workplaceRepository)
+            .save(workplaceCaptor.capture());
+
+        Workplace savedWorkplace = workplaceCaptor.getValue();
+
+        // 중복 검사에서 최종 사용한 코드가 실제 저장된 코드여야 한다
+        assertEquals(
+            checkedCodes.get(1),
+            savedWorkplace.getInviteCode()
+        );
+
     }
 
 
@@ -371,5 +391,54 @@ public class WorkplaceServiceTest {
             exception.getErrorCode()
         );
     }
+
+
+    @Test
+    @DisplayName("존재하지 않는 근무지의 초대코드는 조회할 수 없다")
+    void rejectMissingWorkplaceInviteCode() {
+        when(workplaceRepository.findById(999L))
+            .thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> workplaceService.getInviteCode(999L, 1L)
+        );
+
+        assertSame(
+            WorkplaceErrorCode.WORKPLACE_NOT_FOUND,
+            exception.getErrorCode()
+        );
+
+        // 근무지가 없으면 권한 검증까지 진행하지 않는다
+        verifyNoInteractions(workplaceMemberService);
+        verifyNoInteractions(workplaceMemberRepository);
+    }
+
+
+    @Test
+    @DisplayName("구성원이 없는 근무지는 빈 목록을 반환한다")
+    void getEmptyWorkplaceMembers() {
+        Workplace workplace = mock(Workplace.class);
+
+        when(workplaceRepository.findById(10L))
+            .thenReturn(Optional.of(workplace));
+
+        when(workplaceMemberRepository
+            .findAllByWorkplace_IdAndLeftAtIsNull(10L))
+            .thenReturn(List.of());
+
+        List<WorkplaceMember> result =
+            workplaceService.getWorkplaceMembers(10L, 1L);
+
+        assertTrue(result.isEmpty());
+
+        // 구성원 목록이 비어 있어도 관리자 권한을 확인한다
+        verify(workplaceMemberService)
+            .requireManager(1L, 10L);
+
+        verify(workplaceMemberRepository)
+            .findAllByWorkplace_IdAndLeftAtIsNull(10L);
+    }
+
 
 }
