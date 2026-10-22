@@ -17,7 +17,9 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -38,6 +40,35 @@ class WorkplaceMemberRepositoryTest {
 
     private static final LocalDateTime LEFT_AT =
         LocalDateTime.of(2026, 9, 15, 18, 0);
+
+    private User createUser(String email, String name) {
+        return entityManager.persist(
+            new User(email, "test-password", name)
+        );
+    }
+
+    private Workplace createWorkplace(String name, String inviteCode) {
+        return entityManager.persist(
+            new Workplace(name, inviteCode)
+        );
+    }
+
+    private WorkplaceMember createMember(
+        Workplace workplace,
+        User user,
+        WorkplaceRole role,
+        LocalDateTime leftAt
+    ) {
+        return entityManager.persist(
+            new WorkplaceMember(
+                workplace,
+                user,
+                role,
+                JOINED_AT,
+                leftAt
+            )
+        );
+    }
 
     @Test
     @DisplayName("사용자의 재직 중인 근무지만 조회한다")
@@ -204,32 +235,45 @@ class WorkplaceMemberRepositoryTest {
             .containsExactly(activeManager.getId());
     }
 
-    private User createUser(String email, String name) {
-        return entityManager.persist(
-            new User(email, "test-password", name)
+
+    @Test
+    @DisplayName("동일한 사용자와 근무지의 멤버십은 DB에 중복 저장할 수 없다")
+    void rejectDuplicateMembershipAtDatabaseLevel() {
+        User user = createUser(
+            "duplicate-member@test.com",
+            "중복 테스트 직원"
         );
+
+        Workplace workplace = createWorkplace(
+            "중복 테스트 매장",
+            "DUPL0001"
+        );
+
+        // 첫 번째 멤버십 저장
+        createMember(
+            workplace,
+            user,
+            WorkplaceRole.EMPLOYEE,
+            null
+        );
+
+        entityManager.flush();
+
+        // 동일한 사용자 + 근무지 조합으로 두 번째 멤버십 저장
+        WorkplaceMember duplicateMember = new WorkplaceMember(
+            workplace,
+            user,
+            WorkplaceRole.EMPLOYEE,
+            JOINED_AT,
+            null
+        );
+
+        // DB UNIQUE 제약조건에 의해 저장이 거부되어야 한다
+        assertThatThrownBy(
+            () -> workplaceMemberRepository.saveAndFlush(duplicateMember)
+        ).isInstanceOf(DataIntegrityViolationException.class);
     }
 
-    private Workplace createWorkplace(String name, String inviteCode) {
-        return entityManager.persist(
-            new Workplace(name, inviteCode)
-        );
-    }
 
-    private WorkplaceMember createMember(
-        Workplace workplace,
-        User user,
-        WorkplaceRole role,
-        LocalDateTime leftAt
-    ) {
-        return entityManager.persist(
-            new WorkplaceMember(
-                workplace,
-                user,
-                role,
-                JOINED_AT,
-                leftAt
-            )
-        );
-    }
+
 }
