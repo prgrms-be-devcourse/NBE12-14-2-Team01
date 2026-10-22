@@ -3,6 +3,7 @@ package com.merge.backend.domain.shift.service;
 import com.merge.backend.domain.shift.entity.Schedule;
 import com.merge.backend.domain.shift.entity.Shift;
 import com.merge.backend.domain.shift.entity.ShiftStatus;
+import com.merge.backend.domain.shift.exception.ScheduleErrorCode;
 import com.merge.backend.domain.shift.repository.ScheduleRepository;
 import com.merge.backend.domain.shift.repository.ShiftRepository;
 import com.merge.backend.domain.user.entity.User;
@@ -12,6 +13,7 @@ import com.merge.backend.domain.workplace.entity.WorkplaceMember;
 import com.merge.backend.domain.workplace.entity.WorkplaceRole;
 import com.merge.backend.domain.workplace.repository.WorkplaceMemberRepository;
 import com.merge.backend.domain.workplace.repository.WorkplaceRepository;
+import com.merge.backend.global.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -304,14 +306,19 @@ class ScheduleRollbackIntegrationTest {
         LocalDateTime firstPublishedAt = firstResult.getPublishedAt();
 
         // 2. 같은 근무표를 다시 공개하면 예외가 발생해야 함
-        assertThrows(
-            RuntimeException.class,
+        BusinessException exception = assertThrows(
+            BusinessException.class,
             () -> scheduleService.publishSchedule(
                 manager.getId(),
                 workplace.getId(),
                 scheduleId,
                 false
             )
+        );
+
+        assertEquals(
+            ScheduleErrorCode.SCHEDULE_NOT_DRAFT,
+            exception.getErrorCode()
         );
 
         // 3. DB 상태가 변경되지 않았는지 확인

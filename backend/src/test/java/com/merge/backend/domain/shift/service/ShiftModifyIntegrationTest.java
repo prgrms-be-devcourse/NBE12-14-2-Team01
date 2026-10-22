@@ -4,6 +4,7 @@ import com.merge.backend.domain.shift.dto.ShiftRequest;
 import com.merge.backend.domain.shift.entity.Schedule;
 import com.merge.backend.domain.shift.entity.Shift;
 import com.merge.backend.domain.shift.entity.ShiftStatus;
+import com.merge.backend.domain.shift.exception.ShiftErrorCode;
 import com.merge.backend.domain.shift.repository.ScheduleRepository;
 import com.merge.backend.domain.shift.repository.ShiftRepository;
 import com.merge.backend.domain.user.entity.User;
@@ -18,9 +19,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import javax.sql.DataSource;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -38,6 +41,9 @@ class ShiftModifyIntegrationTest {
 
     @Autowired
     private ShiftService shiftService;
+
+    @Autowired
+    private DataSource dataSource;
 
     @Autowired
     private UserRepository userRepository;
@@ -244,7 +250,7 @@ class ShiftModifyIntegrationTest {
         );
 
         // 8. 시간 중복으로 예외 발생 확인
-        assertThrows(
+        BusinessException exception = assertThrows(
             BusinessException.class,
             () -> shiftService.modify(
                 workplace.getId(),
@@ -253,6 +259,11 @@ class ShiftModifyIntegrationTest {
                 request,
                 manager.getId()
             )
+        );
+
+        assertEquals(
+            ShiftErrorCode.DUPLICATE_LOCAL_SCHEDULE_TIME,
+            exception.getErrorCode()
         );
 
         // 9. DB에서 다시 조회
@@ -274,67 +285,12 @@ class ShiftModifyIntegrationTest {
     }
 
     @Test
-    @DisplayName("동시에 같은 근무표를 수정하면 비관적 락으로 순서대로 처리된다")
+    @DisplayName("두 트랜잭션이 같은 근무표에 접근하면 비관적 락으로 대기한다")
     void t3() throws Exception {
 
-        // 1. 테스트용 근무지 생성
-        String uniqueId = UUID.randomUUID().toString();
-
-        Workplace workplace = workplaceRepository.save(
-            new Workplace("동시성 테스트 근무지", uniqueId)
-        );
-
-        // 2. DRAFT 근무표 생성
-        Schedule schedule = scheduleRepository.save(
-            new Schedule(workplace, LocalDate.of(2026, 10, 19))
-        );
-
-        Long scheduleId = schedule.getId();
-
-        // 3. 별도 스레드에서 트랜잭션 실행
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-
-        try {
-            Future<?> future = executor.submit(() -> {
-
-                TransactionTemplate transactionTemplate =
-                    new TransactionTemplate(transactionManager);
-
-                transactionTemplate.executeWithoutResult(status -> {
-
-                    // 4. 근무표에 비관적 락 획득
-                    Schedule lockedSchedule = scheduleRepository
-                        .findByIdForUpdate(scheduleId)
-                        .orElseThrow();
-
-                    System.out.println(
-                        "스레드 A: 근무표 락 획득! ID = "
-                            + lockedSchedule.getId()
-                    );
-
-                    // 5. 락을 2초 동안 유지
-                    try {
-                        Thread.sleep(2000);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        throw new RuntimeException(e);
-                    }
-
-                    System.out.println("스레드 A: 트랜잭션 종료 직전");
-                });
-            });
-
-            // 스레드 작업 완료 확인
-            future.get(10, TimeUnit.SECONDS);
-
-        } finally {
-            executor.shutdownNow();
-        }
-    }
-
-    @Test
-    @DisplayName("두 트랜잭션이 같은 근무표에 접근하면 비관적 락으로 대기한다")
-    void t4() throws Exception {
+        // 두 스레드를 사용하여 락 대기 상황을 확인한다.
+        // 단, B가 실제 DB 락 대기에 진입한 시점은 보장하지 않는다.
+        // 결정적인 동시성 경쟁 검증은 별도 H6에서 진행한다.
 
         // 1. 테스트 데이터 생성
         String uniqueId = UUID.randomUUID().toString();
@@ -435,8 +391,8 @@ class ShiftModifyIntegrationTest {
     }
 
     @Test
-    @DisplayName("동시에 담당자를 수정해도 최종 근무 데이터가 일관되게 유지된다")
-    void t5() throws Exception {
+    @DisplayName("두 스레드에서 동일 근무를 수정한 후 최종 데이터를 확인한다")
+    void t4() throws Exception {
 
         String uniqueId = UUID.randomUUID().toString();
 
@@ -589,8 +545,8 @@ class ShiftModifyIntegrationTest {
     }
 
     @Test
-    @DisplayName("서로 다른 근무를 동시에 수정해도 동일 직원의 근무 시간이 중복되지 않는다")
-    void t6() throws Exception {
+    @DisplayName("두 근무의 담당자 변경 요청 후 시간 중복 여부를 확인한다")
+    void t5() throws Exception {
 
         String uniqueId = UUID.randomUUID().toString();
 
@@ -779,8 +735,8 @@ class ShiftModifyIntegrationTest {
     }
 
     @Test
-    @DisplayName("트랜잭션 중 예외 발생 시 근무 수정이 롤백된다")
-    void t7() {
+    @DisplayName("JPA 엔티티 변경 후 예외 발생 시 트랜잭션이 롤백된다")
+    void t6() {
         String uniqueId = UUID.randomUUID().toString();
 
         // 1. 테스트 데이터 생성
