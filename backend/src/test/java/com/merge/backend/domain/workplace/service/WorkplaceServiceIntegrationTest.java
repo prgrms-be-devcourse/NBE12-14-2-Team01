@@ -2,6 +2,7 @@
 package com.merge.backend.domain.workplace.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.merge.backend.domain.user.entity.User;
@@ -16,17 +17,19 @@ import com.merge.backend.global.config.TimeConfig;
 import com.merge.backend.global.exception.BusinessException;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.hibernate.TransientPropertyValueException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
-import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Propagation;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.springframework.transaction.annotation.Transactional;
+
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -374,31 +377,38 @@ class WorkplaceServiceIntegrationTest {
             });
     }
 
+
     @Test
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     @DisplayName("관리자 멤버십 저장 실패 시 근무지 생성도 롤백된다")
     void rollbackWorkplaceCreation() {
-        // 근무지 생성 전 실제 DB 개수
+        String workplaceName = "롤백 검증 매장";
         long beforeCount = workplaceRepository.count();
 
-        // DB에 저장하지 않은 사용자
         User unsavedUser = new User(
             "rollback@test.com",
             "password",
             "테스트 관리자"
         );
 
-        // 근무지 저장 이후 멤버십 저장 과정에서 실패해야 함
+        // 멤버십 저장 실패 시 정확한 예외와 원인 검증
         assertThatThrownBy(
             () -> workplaceService.createWorkplace(
-                "롤백 검증 매장",
+                workplaceName,
                 unsavedUser
             )
-        ).isInstanceOf(RuntimeException.class);
+        )
+            .isInstanceOf(InvalidDataAccessApiUsageException.class)
+            .hasRootCauseInstanceOf(TransientPropertyValueException.class);
 
-        // 근무지까지 정상적으로 롤백되었는지 확인
+        // 실패 이후 DB에 근무지가 남아 있지 않아야 한다
         assertThat(workplaceRepository.count())
             .isEqualTo(beforeCount);
+
+        assertThat(workplaceRepository.findAll())
+            .noneMatch(workplace ->
+                workplaceName.equals(workplace.getName())
+            );
     }
 
 
