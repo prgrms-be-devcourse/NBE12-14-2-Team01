@@ -2,6 +2,7 @@ package com.merge.backend.domain.user.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -41,6 +42,22 @@ class UserServiceTest {
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode")
             .isEqualTo(UserErrorCode.DUPLICATE_EMAIL);
+    }
+
+    @Test
+    void 새_이메일로_회원가입하면_비밀번호를_암호화해서_저장한다() {
+        when(userRepository.findByEmail("new@example.com")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode("password")).thenReturn("encodedPassword");
+        // save에 넘긴 User를 그대로 돌려줌
+        when(userRepository.save(any(User.class)))
+            .thenAnswer(invocation -> invocation.getArgument(0));
+
+        User result = userService.join("new@example.com", "password", "이름");
+
+        assertThat(result.getEmail()).isEqualTo("new@example.com");
+        assertThat(result.getPasswordHash()).isEqualTo("encodedPassword");
+        assertThat(result.getName()).isEqualTo("이름");
+        verify(userRepository).save(result);
     }
 
     @Test
